@@ -6,13 +6,14 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete.** Ledger invariants, platform spine, auth/RBAC
-with segregation of duties, and the bilingual RTL shell are all built and
-verified. **172 tests across 9 suites; typecheck, lint and production build
-clean.**
+**Status: Phase 0 complete · Track A1 (Chart of Accounts) complete.**
+Ledger invariants, platform spine, auth/RBAC with segregation of duties, the
+bilingual RTL shell, and a normalised chart of accounts with a standard
+university template. **201 tests across 10 suites; typecheck, lint and
+production build clean.**
 
-Tracks A (finance), B (student) and C (public surface) may now start in
-parallel.
+Tracks A (finance), B (student) and C (public surface) run in parallel from
+here.
 
 ---
 
@@ -23,7 +24,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 172 tests
+npm test              # 201 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -185,8 +186,10 @@ tests/auth-flow.test.ts    21  login, lockout, revocation, SoD at assignment,
 tests/i18n.test.ts         37  Arabic/English spelling, currency agreement,
                                Hijri round-trip, Arabic search normalisation
 tests/i18n-catalogue.test.ts 6 message parity, no untranslated strings
+tests/coa.test.ts          27  template integrity, install idempotency, level
+                               derivation, sign inheritance, deactivation
                            ───
-                           172
+                           201
 ```
 
 ---

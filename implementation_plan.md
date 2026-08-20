@@ -33,8 +33,10 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**172 tests pass across 9 suites; typecheck, lint and production build are all
+**201 tests pass across 10 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
+
+**Track A1 (Chart of Accounts) is also complete** — see §0.2.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -93,6 +95,46 @@ another tenant's ledger.
 | :--- | :--- | :--- |
 | E | **Next.js 16 renamed Middleware to Proxy** — the file is `src/proxy.ts`, and a `middleware.ts` is simply not picked up | Locale negotiation lives there. Authorisation deliberately does **not**: Next's own guidance is that Proxy is for optimistic checks, not session management or authorisation. `requirePermission()` runs in the data access layer |
 | F | **Arabic noun agreement is not what the first fixtures assumed** | After آلاف the counted noun is *singular* — خمسة آلاف جنيه, not جنيهات — and any count of 11 or more reverts to the singular. Three test fixtures were wrong and the implementation was right; corrected with the rule stated in the test. Getting this wrong prints a malformed amount on every voucher |
+
+---
+
+## 0.2 Track A progress
+
+### A1 — Chart of Accounts & Cost Centres · complete
+
+| Delivered | Notes |
+| :--- | :--- |
+| Normalised account tree | `id`, `code`, `parent_id`, derived `level`, bilingual names. Replaces five denormalised TEXT columns whose tree was rebuilt by five nested cursors on five separate connections |
+| Single-query tree assembly | One indexed read, assembled in memory. The legacy screen issued O(nodes) round trips to render once |
+| Structural rules enforced | Level derived from parent, never supplied · max depth 5 · only level-5 leaves postable · control accounts must declare their sub-ledger · root accounts must state their normal balance · sign inherited down each branch with an explicit override for contra-assets |
+| Immutable code/level/parent | Ledger history attaches by id; re-parenting would silently restate prior periods. Deactivate and replace instead |
+| Deactivate, never delete | Refuses while active children exist. Replaces the legacy `frmDeleteAcc.vb`, which deleted rows outright |
+| Standard university COA template | 60+ accounts and 7 cost centres installed at onboarding (SRS §6 step 1), idempotent by code. Includes the three sub-ledger control accounts, accumulated depreciation as a contra-asset, unearned fees for REQ-FEE-02, and FX difference accounts for REQ-FIN-03 — none of which existed in the legacy chart |
+| 27 tests | Template integrity, install idempotency, level derivation, sign inheritance, authorisation, deactivation rules, audit chain — plus an end-to-end posting of a tuition bill against the installed chart |
+
+### A defect found by A1, fixed: the audit chain reported false tampering
+
+The chart-of-accounts suite was the first to log an audit payload with more
+than one key, and it failed the chain verification immediately.
+
+**Cause.** Postgres `jsonb` does not preserve object key order — it normalises
+keys by length then bytewise. A payload written as
+`{nameAr, nameEn, requiresCostCenter, code}` reads back as
+`{code, nameAr, nameEn, requiresCostCenter}`. The hash was taken over
+`JSON.stringify` at write time and again at verify time, so the two digests
+differed for byte-identical data.
+
+**Impact had it shipped.** The scheduled chain verifier (plan §11) would have
+raised a P1 tampering alert on essentially every real change, since almost
+every audited change carries a multi-key before/after payload. The alert that
+exists to detect a genuine breach would have been permanently crying wolf —
+which is worse than not having it, because it would have been switched off.
+
+**Fix.** Hashes are taken over a canonical, recursively key-sorted
+serialisation ([`src/lib/canonical-json.ts`](uniflow/src/lib/canonical-json.ts)),
+shared with the idempotency key hasher, which needed the same property for the
+same reason. Two regression tests pin it: a multi-key payload, and a nested
+payload with arrays.
 
 ---
 
