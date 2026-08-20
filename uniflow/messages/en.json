@@ -1,0 +1,55 @@
+{
+  "app": {
+    "name": "UniFlow",
+    "tagline": "University Management System"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "students": "Students",
+    "registration": "Registration",
+    "finance": "Finance",
+    "chartOfAccounts": "Chart of Accounts",
+    "vouchers": "Vouchers",
+    "cashier": "Cashier",
+    "reports": "Reports",
+    "settings": "Settings"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "email": "Email",
+    "password": "Password",
+    "mfaCode": "Verification code",
+    "invalidCredentials": "Invalid email or password",
+    "accountLocked": "This account is temporarily locked. Try again shortly.",
+    "accountInactive": "This account is not active. Contact your administrator."
+  },
+  "ledger": {
+    "debit": "Debit",
+    "credit": "Credit",
+    "balance": "Balance",
+    "voucherNo": "Voucher no.",
+    "date": "Date",
+    "description": "Description",
+    "account": "Account",
+    "costCenter": "Cost centre",
+    "amountInWords": "Amount in words",
+    "totalDebit": "Total debit",
+    "totalCredit": "Total credit",
+    "unbalanced": "Voucher does not balance"
+  },
+  "period": {
+    "open": "Open",
+    "closed": "Closed",
+    "future": "Future",
+    "permanentlyClosed": "Permanently closed"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search",
+    "loading": "Loading…",
+    "noResults": "No results",
+    "language": "Language"
+  }
+}

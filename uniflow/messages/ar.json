@@ -1,0 +1,55 @@
+{
+  "app": {
+    "name": "يونيفلو",
+    "tagline": "نظام إدارة الجامعات"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "students": "الطلاب",
+    "registration": "التسجيل",
+    "finance": "المالية",
+    "chartOfAccounts": "دليل الحسابات",
+    "vouchers": "القيود",
+    "cashier": "الصندوق",
+    "reports": "التقارير",
+    "settings": "الإعدادات"
+  },
+  "auth": {
+    "signIn": "تسجيل الدخول",
+    "signOut": "تسجيل الخروج",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "mfaCode": "رمز التحقق",
+    "invalidCredentials": "بيانات الدخول غير صحيحة",
+    "accountLocked": "تم قفل الحساب مؤقتاً. حاول مرة أخرى بعد قليل.",
+    "accountInactive": "هذا الحساب غير مفعّل. راجع مدير النظام."
+  },
+  "ledger": {
+    "debit": "مدين",
+    "credit": "دائن",
+    "balance": "الرصيد",
+    "voucherNo": "رقم القيد",
+    "date": "التاريخ",
+    "description": "البيان",
+    "account": "الحساب",
+    "costCenter": "مركز التكلفة",
+    "amountInWords": "المبلغ كتابةً",
+    "totalDebit": "إجمالي المدين",
+    "totalCredit": "إجمالي الدائن",
+    "unbalanced": "القيد غير متوازن"
+  },
+  "period": {
+    "open": "مفتوحة",
+    "closed": "مقفلة",
+    "future": "مستقبلية",
+    "permanentlyClosed": "مقفلة نهائياً"
+  },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "search": "بحث",
+    "loading": "جارٍ التحميل…",
+    "noResults": "لا توجد نتائج",
+    "language": "اللغة"
+  }
+}

@@ -1,26 +1,132 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ---------------------------------------------------------------------------
+   Design tokens (SRS REQ-LP-01, REQ-NFR-12).
+ 
+   Colours are HSL *channels*, not finished colours, so a tenant can set its
+   own palette by overriding three custom properties at runtime — the
+   white-label requirement — without a rebuild. The theme engine writes these
+   onto <html> from the tenant's `theme_config`.
+ 
+   The defaults are a deep teal, chosen to be legible in print as well as on
+   screen: every voucher and receipt this system produces gets printed.
+--------------------------------------------------------------------------- */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --primary-h: 176;
+  --primary-s: 82%;
+  --primary-l: 27%;
+
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: var(--primary-h) var(--primary-s) var(--primary-l);
+  --primary: var(--primary-h) var(--primary-s) var(--primary-l);
+  --primary-foreground: 0 0% 100%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+
+  /* Ledger semantics. Debit and credit are not "good" and "bad", so they are
+     deliberately not red/green — an accountant reads them as sides, and
+     colouring a debit red implies an error where there is none. */
+  --debit: 221 83% 45%;
+  --credit: 271 70% 45%;
+  --destructive: 0 72% 45%;
+  --warning: 38 92% 42%;
+  --success: 142 65% 32%;
+
+  --radius: 0.5rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 222 47% 8%;
+    --foreground: 210 40% 96%;
+    --muted: 217 33% 15%;
+    --muted-foreground: 215 20% 65%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 96%;
+    --primary-l: 42%;
+    --debit: 221 83% 65%;
+    --credit: 271 70% 68%;
   }
 }
 
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-debit: hsl(var(--debit));
+  --color-credit: hsl(var(--credit));
+  --color-destructive: hsl(var(--destructive));
+  --color-warning: hsl(var(--warning));
+  --color-success: hsl(var(--success));
+
+  --font-sans: var(--font-latin);
+  --font-arabic: var(--font-arabic);
+  --font-mono: var(--font-mono-latin);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Arabic gets its own face. Latin fonts render Arabic with the wrong
+   proportions and no proper joining, which on a printed voucher looks like a
+   defect to the person signing it. */
+:lang(ar),
+[dir="rtl"] {
+  font-family: var(--font-arabic), system-ui, sans-serif;
+}
+
+:lang(en),
+[dir="ltr"] {
+  font-family: var(--font-latin), system-ui, sans-serif;
+}
+
+/* Money and account codes align on the decimal point when the digits are
+   tabular. Without this a column of figures does not line up, and a cashier
+   reconciling a till reads the wrong row. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Amounts and account codes stay left-to-right even inside Arabic text —
+   otherwise "1,234.56" renders with the minus sign or decimal in the wrong
+   place next to Arabic characters. */
+.numeric {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  /* Vouchers are printed constantly. Print styling is a feature here, not an
+     afterthought. */
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
 }
