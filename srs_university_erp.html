@@ -418,7 +418,7 @@
 
 <h2>2.3 System Invariants & Core Design Principles</h2>
 <ul>
-  <li><span class="req-code">1. Double-Entry Invariant:</span> Every journal voucher must satisfy $\sum	ext{Debits} = \sum	ext{Credits}$ in the functional currency, enforced by database triggers.</li>
+  <li><span class="req-code">1. Double-Entry Invariant:</span> Every journal voucher must satisfy Sum(Debits) = Sum(Credits) in the functional currency, enforced by database triggers.</li>
   <li><span class="req-code">2. Monetary Precision:</span> All financial values use <code>numeric(19,4)</code> to eliminate floating-point rounding errors.</li>
   <li><span class="req-code">3. Idempotent Financial Execution:</span> Every state-changing financial request requires an idempotency key, preventing duplicate transactions on network retry.</li>
   <li><span class="req-code">4. Financial Immutability:</span> Posted transactions cannot be edited or deleted. Corrections require explicit, linked reversal vouchers with audit comments.</li>

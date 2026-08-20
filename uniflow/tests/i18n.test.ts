@@ -94,8 +94,15 @@ describe('English integers', () => {
 
 describe('amount in words on a voucher', () => {
   it('renders a Sudanese Pound amount in Arabic', () => {
-    // A realistic tuition receipt.
-    expect(spellMoney('5000.00', 'SDG', 'ar')).toBe('خمسة آلاف جنيهات سودانية لا غير');
+    // A realistic tuition receipt. Note the SINGULAR noun: in Arabic the
+    // counted noun after آلاف is singular, so it is خمسة آلاف جنيه and never
+    // خمسة آلاف جنيهات.
+    expect(spellMoney('5000.00', 'SDG', 'ar')).toBe('خمسة آلاف جنيه سوداني لا غير');
+  });
+
+  it('uses the plural noun only for counts of 3 to 10', () => {
+    expect(spellMoney('3.00', 'SDG', 'ar')).toBe('ثلاثة جنيهات سودانية لا غير');
+    expect(spellMoney('10.00', 'SDG', 'ar')).toBe('عشرة جنيهات سودانية لا غير');
   });
 
   it('agrees the currency noun with the count', () => {
@@ -109,7 +116,8 @@ describe('amount in words on a voucher', () => {
     const out = spellMoney('1234.56', 'SDG', 'ar');
     expect(out).toContain('ألف ومائتان وأربعة وثلاثون');
     expect(out).toContain('ستة وخمسون');
-    expect(out).toContain('قروش');
+    // 56 is 11+, so the minor-unit noun is singular too.
+    expect(out).toContain('قرش');
     expect(out.endsWith('لا غير')).toBe(true);
   });
 
