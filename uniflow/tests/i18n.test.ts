@@ -46,7 +46,9 @@ describe('Arabic integers', () => {
 
   it('uses the dual for 200 and single words for 300-900', () => {
     expect(spellArabicInteger(100)).toBe('مائة');
-    expect(spellArabicInteger(200)).toBe('مئتان');
+    // مائتان rather than مئتان — both spellings are current, but a voucher
+    // should not mix them, and this one matches مائة either side of it.
+    expect(spellArabicInteger(200)).toBe('مائتان');
     expect(spellArabicInteger(300)).toBe('ثلاثمائة');
     expect(spellArabicInteger(900)).toBe('تسعمائة');
   });
