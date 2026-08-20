@@ -1,0 +1,4 @@
+~Date:26-8-2012~
+~Coder: Ammar Gasim~
+I added a new payment method (in addition to Cash&Bank) to the pay & receive vouchers, and as a result the enternal vaiable "PaymentType" has a new value 'O' in addition to the old ones ('C'& 'B'), I'm not sure what is the consiquence of this step, but the system is working util now.
+

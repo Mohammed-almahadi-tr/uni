@@ -1,0 +1,572 @@
+// UniFlow — Phase 0 schema: ledger invariants and platform spine.
+//
+// Scope note: this covers only what the Phase 0 gate requires (SRS Modules 5,
+// 11 and 12). Students, fees, cashiering, assets and procurement land in
+// Tracks A and B and are deliberately absent here.
+//
+// Two rules govern this file:
+//   1. Every monetary column is Decimal(19,4). Never Float. (Plan decision 4)
+//   2. Constraints that guarantee correctness live in SQL migrations, not
+//      here — Prisma cannot express deferred constraint triggers, RLS
+//      policies or CHECKs. See prisma/sql/invariants.sql.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7 moved connection URLs out of the schema. Migrations read
+  // DIRECT_URL from prisma.config.ts; the runtime client is handed a pg
+  // adapter built from DATABASE_URL. On Supabase those are different
+  // endpoints and are not interchangeable — see .env.example.
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum PeriodStatus {
+  FUTURE
+  OPEN
+  CLOSED
+  PERMANENTLY_CLOSED
+}
+
+enum FiscalYearStatus {
+  FUTURE
+  OPEN
+  CLOSED
+  PERMANENTLY_CLOSED
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+/// Sub-ledger a control-account line points into. A line on a control account
+/// must carry both a type and an id — enforced by CHECK in SQL.
+enum SubledgerType {
+  STUDENT
+  SPONSOR
+  VENDOR
+}
+
+enum VoucherType {
+  JOURNAL
+  STUDENT_RECEIPT
+  GENERAL_RECEIPT
+  PAYMENT
+  REGISTRATION
+  DEPRECIATION
+  REVENUE_RECOGNITION
+  CHEQUE_MOVEMENT
+  FX_REVALUATION
+  OPENING_BALANCE
+  REVERSAL
+  YEAR_END_CLOSE
+}
+
+/// Which module originated a posting. Every ledger entry is traceable to the
+/// business event that caused it — the legacy system's registration and
+/// finance modules were reconciled by hand precisely because this was absent.
+enum SourceModule {
+  MANUAL
+  REGISTRATION
+  CASHIERING
+  CHEQUES
+  FIXED_ASSETS
+  REVENUE_RECOGNITION
+  PROCUREMENT
+  PERIOD_CLOSE
+  ONBOARDING
+}
+
+enum DraftState {
+  DRAFT
+  PENDING_REVIEW
+  PENDING_APPROVAL
+  POSTED
+  REJECTED
+}
+
+enum AuditAction {
+  INSERT
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  REVERSE
+  POST
+  LOGIN
+  PERIOD_OPEN
+  PERIOD_CLOSE
+}
+
+// ---------------------------------------------------------------------------
+// Platform & security
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id                   String   @id @default(uuid()) @db.Uuid
+  slug                 String   @unique
+  nameEn               String   @map("name_en")
+  nameAr               String   @map("name_ar")
+  logoUrl              String?  @map("logo_url")
+  themeConfig          Json?    @map("theme_config")
+  /// The currency the books are kept in. Every balance check and every
+  /// statement is expressed in this currency.
+  functionalCurrency   String   @default("SDG") @map("functional_currency") @db.Char(3)
+  fiscalYearStartMonth Int      @default(1) @map("fiscal_year_start_month") @db.SmallInt
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  users           User[]
+  roles           Role[]
+  fiscalYears     FiscalYear[]
+  accounts        Account[]
+  costCenters     CostCenter[]
+  headers         TransactionHeader[]
+  sequences       DocumentSequence[]
+  auditEntries    AuditLog[]
+  idempotencyKeys IdempotencyKey[]
+  exchangeRates   ExchangeRate[]
+  periodBalances  AccountPeriodBalance[]
+  voucherDrafts   VoucherDraft[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  email        String
+  fullName     String   @map("full_name")
+  passwordHash String   @map("password_hash")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // ---- Second factor (SRS REQ-NFR-05) ----
+  /// Base32 TOTP secret. A bearer credential — encrypt at rest.
+  mfaSecret     String?   @map("mfa_secret")
+  /// Null until a generated code has been verified. A scanned-but-unconfirmed
+  /// secret must not gate approvals, or a mistyped scan locks the approver out.
+  mfaEnrolledAt DateTime? @map("mfa_enrolled_at") @db.Timestamptz(6)
+  /// Last accepted TOTP time step. Refusing to reuse a step stops a code that
+  /// was shoulder-surfed at a shared approval desk from being replayed inside
+  /// its 30-second window.
+  mfaLastStep   BigInt?   @map("mfa_last_step")
+
+  // ---- Session and lockout ----
+  /// Bumped whenever roles change or the password is reset. A live session
+  /// carrying an older version is rejected at its next request, so revoking
+  /// access takes effect immediately rather than at token expiry.
+  sessionVersion   Int       @default(1) @map("session_version")
+  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz(6)
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until") @db.Timestamptz(6)
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roles         UserRole[]
+  postedHeaders TransactionHeader[] @relation("PostedBy")
+  auditEntries  AuditLog[]
+  recoveryCodes RecoveryCode[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+/// Single-use codes for the phone that was lost or reset. Stored hashed,
+/// exactly as passwords are — a recovery code bypasses the second factor, so
+/// storing them in clear would quietly undo the control.
+model RecoveryCode {
+  id       String    @id @default(uuid()) @db.Uuid
+  userId   String    @map("user_id") @db.Uuid
+  codeHash String    @map("code_hash")
+  usedAt   DateTime? @map("used_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("recovery_codes")
+}
+
+model Role {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  name     String
+  nameAr   String @map("name_ar")
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+model Permission {
+  /// Dotted resource.action, e.g. "voucher.approve", "period.close".
+  key         String @id
+  description String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId        String @map("role_id") @db.Uuid
+  permissionKey String @map("permission_key")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+/// Append-only, hash-chained. Each entry carries the hash of its predecessor
+/// within the tenant, so removal or alteration of any entry breaks the chain
+/// and is detected by the verification job. UPDATE and DELETE are blocked by
+/// trigger (SRS REQ-ADM-03).
+model AuditLog {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @map("tenant_id") @db.Uuid
+  /// Monotonic per tenant. Gaps mean tampering.
+  seq          BigInt
+  actorId      String?     @map("actor_id") @db.Uuid
+  ip           String?
+  occurredAt   DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  action       AuditAction
+  resourceType String      @map("resource_type")
+  resourceId   String      @map("resource_id")
+  beforeJson   Json?       @map("before_json")
+  afterJson    Json?       @map("after_json")
+  prevHash     String      @map("prev_hash")
+  hash         String
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [actorId], references: [id])
+
+  @@unique([tenantId, seq])
+  @@index([tenantId, resourceType, resourceId])
+  @@map("audit_log")
+}
+
+/// Guarantees that a replayed financial request creates at most one record.
+/// A cashier double-pressing Save on a slow link is the expected condition at
+/// these campuses, not the exceptional one (SRS REQ-NFR-07).
+model IdempotencyKey {
+  key      String @db.VarChar(255)
+  tenantId String @map("tenant_id") @db.Uuid
+  endpoint String
+  /// SHA-256 of the canonicalised request body. Same key + different body is
+  /// an error, not a replay.
+  requestHash  String    @map("request_hash")
+  responseJson Json?     @map("response_json")
+  /// NULL until the operation completes — an in-flight duplicate is rejected
+  /// rather than served a partial result.
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, key])
+  @@index([createdAt])
+  @@map("idempotency_keys")
+}
+
+/// Voucher numbering. Allocation takes a row lock; MAX(n)+1 is prohibited.
+/// The legacy system used MAX(n)+1 everywhere, and its fixed-asset module
+/// omitted the year filter the other call sites applied, so its numbers
+/// collided with prior years (SRS REQ-FIN-06).
+model DocumentSequence {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @map("tenant_id") @db.Uuid
+  fiscalYearId String      @map("fiscal_year_id") @db.Uuid
+  docType      VoucherType @map("doc_type")
+  nextValue    Int         @default(1) @map("next_value")
+  prefix       String      @default("")
+  padding      Int         @default(6)
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, fiscalYearId, docType])
+  @@map("document_sequences")
+}
+
+// ---------------------------------------------------------------------------
+// Fiscal calendar (SRS Module 12)
+// ---------------------------------------------------------------------------
+
+model FiscalYear {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  name      String
+  startDate DateTime         @map("start_date") @db.Date
+  endDate   DateTime         @map("end_date") @db.Date
+  status    FiscalYearStatus @default(FUTURE)
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periods   FiscalPeriod[]
+  sequences DocumentSequence[]
+  headers   TransactionHeader[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, startDate])
+  @@map("fiscal_years")
+}
+
+model FiscalPeriod {
+  id           String       @id @default(uuid()) @db.Uuid
+  fiscalYearId String       @map("fiscal_year_id") @db.Uuid
+  seq          Int
+  startDate    DateTime     @map("start_date") @db.Date
+  endDate      DateTime     @map("end_date") @db.Date
+  status       PeriodStatus @default(FUTURE)
+  closedAt     DateTime?    @map("closed_at") @db.Timestamptz(6)
+  closedById   String?      @map("closed_by_id") @db.Uuid
+
+  fiscalYear FiscalYear             @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  headers    TransactionHeader[]
+  balances   AccountPeriodBalance[]
+
+  @@unique([fiscalYearId, seq])
+  @@index([fiscalYearId, startDate, endDate])
+  @@map("fiscal_periods")
+}
+
+// ---------------------------------------------------------------------------
+// Chart of accounts (SRS Module 5)
+// ---------------------------------------------------------------------------
+
+model Account {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  code     String
+  nameAr   String  @map("name_ar")
+  nameEn   String  @map("name_en")
+  /// 1 Major Class · 2 Group · 3 Sub-Group · 4 Parent · 5 Detail.
+  level    Int     @db.SmallInt
+  parentId String? @map("parent_id") @db.Uuid
+
+  normalBalance NormalBalance @map("normal_balance")
+  /// Only level-5 accounts may receive postings. Levels 1-4 aggregate.
+  isPostable    Boolean       @default(false) @map("is_postable")
+  /// Control accounts (Student AR, Sponsor AR, Vendor AP) accept postings
+  /// only with sub-ledger identity attached, so the sub-ledger and the
+  /// control account cannot silently diverge.
+  isControlAccount   Boolean        @default(false) @map("is_control_account")
+  subledgerType      SubledgerType? @map("subledger_type")
+  requiresCostCenter Boolean        @default(false) @map("requires_cost_center")
+  isActive           Boolean        @default(true) @map("is_active")
+
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   Account?               @relation("AccountTree", fields: [parentId], references: [id])
+  children Account[]              @relation("AccountTree")
+  lines    TransactionLine[]
+  balances AccountPeriodBalance[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, parentId])
+  @@index([tenantId, level])
+  @@map("chart_of_accounts")
+}
+
+model CostCenter {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  code     String
+  nameAr   String  @map("name_ar")
+  nameEn   String  @map("name_en")
+  isActive Boolean @default(true) @map("is_active")
+
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines    TransactionLine[]
+  balances AccountPeriodBalance[]
+
+  @@unique([tenantId, code])
+  @@map("cost_centers")
+}
+
+// ---------------------------------------------------------------------------
+// General ledger (SRS Module 5)
+// ---------------------------------------------------------------------------
+
+/// Maker-checker staging. Unlike the legacy TempVouchers table, a draft is
+/// NEVER deleted on approval — deleting it destroyed the only evidence the
+/// voucher had been reviewed (SRS REQ-FIN-04).
+model VoucherDraft {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  draftNo        String      @map("draft_no")
+  voucherType    VoucherType @map("voucher_type")
+  docDate        DateTime    @map("doc_date") @db.Date
+  description    String
+  state          DraftState  @default(DRAFT)
+  linesJson      Json        @map("lines_json")
+  createdById    String      @map("created_by_id") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  postedHeaderId String?     @unique @map("posted_header_id") @db.Uuid
+
+  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events ApprovalEvent[]
+  posted TransactionHeader? @relation(fields: [postedHeaderId], references: [id])
+
+  @@unique([tenantId, draftNo])
+  @@index([tenantId, state])
+  @@map("voucher_drafts")
+}
+
+/// Every state transition, including rejections and their mandatory comments.
+model ApprovalEvent {
+  id         String     @id @default(uuid()) @db.Uuid
+  draftId    String     @map("draft_id") @db.Uuid
+  fromState  DraftState @map("from_state")
+  toState    DraftState @map("to_state")
+  actorId    String     @map("actor_id") @db.Uuid
+  comment    String?
+  occurredAt DateTime   @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  draft VoucherDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId, occurredAt])
+  @@map("approval_events")
+}
+
+model TransactionHeader {
+  id             String      @id @default(uuid()) @db.Uuid
+  tenantId       String      @map("tenant_id") @db.Uuid
+  fiscalYearId   String      @map("fiscal_year_id") @db.Uuid
+  fiscalPeriodId String      @map("fiscal_period_id") @db.Uuid
+  voucherType    VoucherType @map("voucher_type")
+  /// Allocated from DocumentSequence under a row lock. Unique per tenant ×
+  /// fiscal year × voucher type.
+  voucherNo      Int         @map("voucher_no")
+  voucherRef     String      @map("voucher_ref")
+  /// The business date of the document. Determines the fiscal period.
+  docDate        DateTime    @map("doc_date") @db.Date
+  /// When it actually hit the ledger. Differs from docDate on back-dated entries.
+  postingDate    DateTime    @default(now()) @map("posting_date") @db.Timestamptz(6)
+  description    String
+
+  sourceModule SourceModule @default(MANUAL) @map("source_module")
+  /// Identifier of the originating business record (registration id, receipt
+  /// id, asset id …) so any ledger entry can be traced back to its cause.
+  sourceRef    String?      @map("source_ref")
+
+  currency       String    @db.Char(3)
+  totalAmount    Decimal   @map("total_amount") @db.Decimal(19, 4)
+  postedById     String?   @map("posted_by_id") @db.Uuid
+  postedAt       DateTime  @default(now()) @map("posted_at") @db.Timestamptz(6)
+  isOpeningEntry Boolean   @default(false) @map("is_opening_entry")
+  /// Set when this voucher has been reversed. Denormalised from reversedBy so
+  /// that "is this live?" does not need a join.
+  reversedAt     DateTime? @map("reversed_at") @db.Timestamptz(6)
+  /// The voucher this one reverses. UNIQUE, so a voucher is reversed at most
+  /// once (SRS REQ-FIN-05).
+  reversesId     String?   @unique @map("reverses_id") @db.Uuid
+  reversalReason String?   @map("reversal_reason")
+
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fiscalYear   FiscalYear         @relation(fields: [fiscalYearId], references: [id])
+  fiscalPeriod FiscalPeriod       @relation(fields: [fiscalPeriodId], references: [id])
+  postedBy     User?              @relation("PostedBy", fields: [postedById], references: [id])
+  reverses     TransactionHeader? @relation("Reversal", fields: [reversesId], references: [id])
+  reversedBy   TransactionHeader? @relation("Reversal")
+  lines        TransactionLine[]
+  draft        VoucherDraft?
+
+  @@unique([tenantId, fiscalYearId, voucherType, voucherNo])
+  @@index([tenantId, docDate])
+  @@index([tenantId, fiscalPeriodId])
+  @@index([tenantId, sourceModule, sourceRef])
+  @@map("transaction_headers")
+}
+
+model TransactionLine {
+  id           String  @id @default(uuid()) @db.Uuid
+  headerId     String  @map("header_id") @db.Uuid
+  lineNo       Int     @map("line_no")
+  accountId    String  @map("account_id") @db.Uuid
+  costCenterId String? @map("cost_center_id") @db.Uuid
+
+  subledgerType SubledgerType? @map("subledger_type")
+  subledgerId   String?        @map("subledger_id")
+
+  /// Currency the transaction was entered in.
+  txnCurrency String  @map("txn_currency") @db.Char(3)
+  txnAmount   Decimal @map("txn_amount") @db.Decimal(19, 4)
+  fxRate      Decimal @default(1) @map("fx_rate") @db.Decimal(19, 8)
+
+  /// Functional-currency amounts. The balance check applies to THESE.
+  debitAmount  Decimal @default(0) @map("debit_amount") @db.Decimal(19, 4)
+  creditAmount Decimal @default(0) @map("credit_amount") @db.Decimal(19, 4)
+  lineDescr    String? @map("line_descr")
+
+  header     TransactionHeader @relation(fields: [headerId], references: [id], onDelete: Cascade)
+  account    Account           @relation(fields: [accountId], references: [id])
+  costCenter CostCenter?       @relation(fields: [costCenterId], references: [id])
+
+  @@unique([headerId, lineNo])
+  @@index([accountId])
+  @@index([subledgerType, subledgerId])
+  @@map("transaction_lines")
+}
+
+/// Maintained incrementally as vouchers post. Reports read from here; the SRS
+/// forbids ad-hoc SUM() over the ledger in report paths, which is what makes
+/// REQ-NFR-02 (<100ms at 1M lines) achievable.
+model AccountPeriodBalance {
+  id             String  @id @default(uuid()) @db.Uuid
+  tenantId       String  @map("tenant_id") @db.Uuid
+  accountId      String  @map("account_id") @db.Uuid
+  costCenterId   String? @map("cost_center_id") @db.Uuid
+  fiscalPeriodId String  @map("fiscal_period_id") @db.Uuid
+
+  openingDebit   Decimal @default(0) @map("opening_debit") @db.Decimal(19, 4)
+  openingCredit  Decimal @default(0) @map("opening_credit") @db.Decimal(19, 4)
+  movementDebit  Decimal @default(0) @map("movement_debit") @db.Decimal(19, 4)
+  movementCredit Decimal @default(0) @map("movement_credit") @db.Decimal(19, 4)
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  costCenter   CostCenter?  @relation(fields: [costCenterId], references: [id])
+  fiscalPeriod FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id], onDelete: Cascade)
+
+  // NULLS NOT DISTINCT is applied in SQL so that a null cost centre collapses
+  // to one row rather than many — see the invariants migration.
+  @@unique([tenantId, accountId, costCenterId, fiscalPeriodId])
+  @@index([tenantId, fiscalPeriodId])
+  @@map("account_period_balances")
+}
+
+model ExchangeRate {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  fromCurrency String   @map("from_currency") @db.Char(3)
+  toCurrency   String   @map("to_currency") @db.Char(3)
+  rateDate     DateTime @map("rate_date") @db.Date
+  rate         Decimal  @db.Decimal(19, 8)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, fromCurrency, toCurrency, rateDate])
+  @@map("exchange_rates")
+}

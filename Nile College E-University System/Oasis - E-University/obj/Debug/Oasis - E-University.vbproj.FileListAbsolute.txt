@@ -1,0 +1,613 @@
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.rpt
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.rpt
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.rpt
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.rpt
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.rpt
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.rpt
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.rpt
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.rpt
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.resx
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.Designer.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.vb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe.config
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\EgyCurr.dll
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBalanceSheetLevels.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBudget.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmCheqClearingSystem.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFinRegestration.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFixedAssets.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeGetBill.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmMedical.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptIncome.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStudID.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStatement.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddAccountOld.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmApprovingVouchers.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBillsArchive.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmChartofAccounts.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStdFinanceStatment.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudantReceiptVoucher.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmUncollectedFees.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVouchersList.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeVoucher.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmLogin.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainFin.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakePayBill.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSelectAccount.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTrialBalance.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVoucherReverse.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAdd_Nationality.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmForm.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddPrograms.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmSerchUNid.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmStudForm2.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTuitionFees.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmListBatches.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainReg.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptProgramsRegStudents.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptStudAccStatement.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptUnpaidList.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStdID.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegForm.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegisteration.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTransferStudent.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfiles.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfileUpdate.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.ReportViewer.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainPanal.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.Resources.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbproj.GenerateResource.Cache
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmReptColegRegis.resources
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbprojResolveAssemblyReference.cache
+C:\Users\aymenread\Desktop\0123\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmDataEntery.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe.config
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.rpt
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.rpt
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.rpt
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.rpt
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.rpt
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.rpt
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.rpt
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.rpt
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.resx
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.Designer.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.vb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\EgyCurr.dll
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbprojResolveAssemblyReference.cache
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBalanceSheetLevels.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBudget.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmCheqClearingSystem.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFinRegestration.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFixedAssets.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeGetBill.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmReptColegRegis.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmDataEntery.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmMedical.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptIncome.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStudID.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStatement.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddAccountOld.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmApprovingVouchers.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBillsArchive.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmChartofAccounts.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStdFinanceStatment.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudantReceiptVoucher.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmUncollectedFees.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVouchersList.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeVoucher.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmLogin.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainFin.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakePayBill.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSelectAccount.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTrialBalance.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVoucherReverse.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAdd_Nationality.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmForm.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddPrograms.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmSerchUNid.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmStudForm2.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTuitionFees.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmListBatches.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainReg.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptProgramsRegStudents.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptStudAccStatement.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptUnpaidList.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStdID.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegForm.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegisteration.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTransferStudent.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfiles.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfileUpdate.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.ReportViewer.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainPanal.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.Resources.resources
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbproj.GenerateResource.Cache
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe.config
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.exe
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.xml
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.pdb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.rpt
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.rpt
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.rpt
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.rpt
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.rpt
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.rpt
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.rpt
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.rpt
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.resx
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.Designer.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.vb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.pdb
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.xml
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\EgyCurr.dll
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbprojResolveAssemblyReference.cache
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBalanceSheetLevels.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBudget.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmCheqClearingSystem.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFinRegestration.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFixedAssets.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeGetBill.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmReptColegRegis.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmDataEntery.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmMedical.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptIncome.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStudID.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStatement.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddAccountOld.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmApprovingVouchers.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBillsArchive.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmChartofAccounts.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStdFinanceStatment.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudantReceiptVoucher.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmUncollectedFees.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVouchersList.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeVoucher.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmLogin.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainFin.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakePayBill.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSelectAccount.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTrialBalance.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVoucherReverse.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAdd_Nationality.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmForm.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddPrograms.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmSerchUNid.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmStudForm2.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTuitionFees.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmListBatches.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainReg.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptProgramsRegStudents.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptStudAccStatement.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptUnpaidList.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStdID.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegForm.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegisteration.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTransferStudent.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfiles.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfileUpdate.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.ReportViewer.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainPanal.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.Resources.resources
+E:\pro\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbproj.GenerateResource.Cache
+C:\Users\aymenread\Desktop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmdelet.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe.config
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.rpt
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.rpt
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.rpt
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.rpt
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.rpt
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.rpt
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.rpt
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.rpt
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.resx
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.Designer.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.vb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\EgyCurr.dll
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbprojResolveAssemblyReference.cache
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBalanceSheetLevels.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBudget.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmCheqClearingSystem.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFinRegestration.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFixedAssets.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeGetBill.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmReptColegRegis.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmDataEntery.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmdelet.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmMedical.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptIncome.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStudID.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStatement.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddAccountOld.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmApprovingVouchers.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBillsArchive.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmChartofAccounts.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStdFinanceStatment.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudantReceiptVoucher.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmUncollectedFees.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVouchersList.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeVoucher.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmLogin.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainFin.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakePayBill.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSelectAccount.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTrialBalance.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVoucherReverse.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAdd_Nationality.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmForm.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddPrograms.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmSerchUNid.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmStudForm2.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTuitionFees.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmListBatches.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainReg.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptProgramsRegStudents.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptStudAccStatement.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptUnpaidList.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStdID.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegForm.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegisteration.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTransferStudent.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfiles.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfileUpdate.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.ReportViewer.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainPanal.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.Resources.resources
+C:\Users\aymenread\Desktop\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbproj.GenerateResource.Cache
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe.config
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.rpt
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.rpt
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.rpt
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.rpt
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.rpt
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.rpt
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.rpt
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.rpt
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.resx
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.Designer.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.vb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\EgyCurr.dll
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBalanceSheetLevels.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBudget.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmCheqClearingSystem.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFinRegestration.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFixedAssets.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeGetBill.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmReptColegRegis.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmDataEntery.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmdelet.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmMedical.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptIncome.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStudID.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStatement.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddAccountOld.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmApprovingVouchers.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBillsArchive.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmChartofAccounts.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStdFinanceStatment.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudantReceiptVoucher.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmUncollectedFees.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVouchersList.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeVoucher.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmLogin.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainFin.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakePayBill.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSelectAccount.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTrialBalance.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVoucherReverse.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAdd_Nationality.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmForm.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddPrograms.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmSerchUNid.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmStudForm2.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTuitionFees.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmListBatches.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainReg.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptProgramsRegStudents.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptStudAccStatement.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptUnpaidList.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStdID.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegForm.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegisteration.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTransferStudent.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfiles.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfileUpdate.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.ReportViewer.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainPanal.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.Resources.resources
+C:\Users\aymenread\Desktop\DeskTop6_2_2022\DesktopFinal\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbproj.GenerateResource.Cache
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.rpt
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.rpt
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.rpt
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.rpt
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.rpt
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.rpt
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.rpt
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.rpt
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.resx
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.Designer.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.vb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe.config
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\EgyCurr.dll
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbprojResolveAssemblyReference.cache
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBalanceSheetLevels.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBudget.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmCheqClearingSystem.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFinRegestration.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFixedAssets.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeGetBill.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmReptColegRegis.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmDataEntery.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmdelet.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmMedical.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptIncome.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStudID.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStatement.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddAccountOld.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmApprovingVouchers.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBillsArchive.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmChartofAccounts.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStdFinanceStatment.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudantReceiptVoucher.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmUncollectedFees.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVouchersList.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeVoucher.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmLogin.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainFin.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakePayBill.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSelectAccount.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTrialBalance.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVoucherReverse.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAdd_Nationality.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmForm.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddPrograms.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmSerchUNid.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmStudForm2.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTuitionFees.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmListBatches.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainReg.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptProgramsRegStudents.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptStudAccStatement.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptUnpaidList.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStdID.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegForm.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegisteration.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTransferStudent.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfiles.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfileUpdate.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.ReportViewer.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainPanal.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.Resources.resources
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbproj.GenerateResource.Cache
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\DeskTop\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe.config
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.rpt
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.rpt
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.rpt
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.rpt
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.rpt
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.rpt
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.rpt
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.rpt
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.resx
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.Designer.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.vb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\EgyCurr.dll
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbprojResolveAssemblyReference.cache
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBalanceSheetLevels.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBudget.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmCheqClearingSystem.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFinRegestration.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFixedAssets.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeGetBill.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmReptColegRegis.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmDataEntery.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmdelet.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmMedical.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptIncome.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStudID.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStatement.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddAccountOld.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmApprovingVouchers.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBillsArchive.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmChartofAccounts.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStdFinanceStatment.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudantReceiptVoucher.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmUncollectedFees.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVouchersList.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeVoucher.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmLogin.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainFin.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakePayBill.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSelectAccount.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTrialBalance.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVoucherReverse.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAdd_Nationality.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmForm.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddPrograms.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmSerchUNid.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmStudForm2.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTuitionFees.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmListBatches.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainReg.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptProgramsRegStudents.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptStudAccStatement.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptUnpaidList.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStdID.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegForm.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegisteration.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTransferStudent.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfiles.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfileUpdate.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.ReportViewer.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainPanal.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.Resources.resources
+C:\Users\aymenread\Desktop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbproj.GenerateResource.Cache
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe.config
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.rpt
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.rpt
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.rpt
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.rpt
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.rpt
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.rpt
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.rpt
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.rpt
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.resx
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.Designer.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Forms\frmMainReg.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesDetails.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramsUnpaidFeesTotal.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\ProgramStudReg.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StdFile.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudenForm.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Registration System\Reports\StudentsUnpaidList.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\ReceiptVoucher.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Financial System\Reports\Vouchers.vb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.exe
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.pdb
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\Oasis - E-University.xml
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\bin\Debug\EgyCurr.dll
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbprojResolveAssemblyReference.cache
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBalanceSheetLevels.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBudget.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmCheqClearingSystem.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFinRegestration.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmFixedAssets.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeGetBill.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmReptColegRegis.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmDataEntery.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmdelet.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmMedical.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptIncome.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStudID.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStatement.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddAccountOld.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmApprovingVouchers.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmBillsArchive.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmChartofAccounts.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStdFinanceStatment.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudantReceiptVoucher.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmUncollectedFees.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVouchersList.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakeVoucher.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmLogin.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainFin.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMakePayBill.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSelectAccount.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTrialBalance.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmVoucherReverse.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAdd_Nationality.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmForm.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmAddPrograms.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmSerchUNid.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.FrmStudForm2.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTuitionFees.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmListBatches.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainReg.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptProgramsRegStudents.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptStudAccStatement.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmRptUnpaidList.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmSearchStdID.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegForm.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentRegisteration.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmTransferStudent.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfiles.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmStudentProfileUpdate.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.ReportViewer.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.frmMainPanal.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\OasisEUniversity.Resources.resources
+C:\Users\aymenread\Desktop\newDeskTop\deskTop27-10-2024\E-Unvevircity\Nile College E-University System\Oasis - E-University\obj\Debug\Oasis - E-University.vbproj.GenerateResource.Cache

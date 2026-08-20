@@ -1,0 +1,582 @@
+{
+  "Nile College E-University System/Backup/ADC Acc App.sln": {
+    "mtime": 1255112044.0,
+    "ast_hash": "fc5472fe8b0c3d0578a483a1c5fbe8da",
+    "semantic_hash": "fc5472fe8b0c3d0578a483a1c5fbe8da"
+  },
+  "Nile College E-University System/Backup/ADC Acc. App/ADC Acc App.vbproj": {
+    "mtime": 1328303810.0,
+    "ast_hash": "3ca489044f5c8af17175d30a4f5673c9",
+    "semantic_hash": "3ca489044f5c8af17175d30a4f5673c9"
+  },
+  "Nile College E-University System/Oasis - E-University.sln": {
+    "mtime": 1561735454.0416882,
+    "ast_hash": "7c480292f7de79e12807d997e82033b4",
+    "semantic_hash": "7c480292f7de79e12807d997e82033b4"
+  },
+  "Nile College E-University System/Oasis - E-University/Oasis - E-University.vbproj": {
+    "mtime": 1673237855.491923,
+    "ast_hash": "1960655f03a0b4bfb7c806a5580be374",
+    "semantic_hash": "1960655f03a0b4bfb7c806a5580be374"
+  },
+  "Nile College System - Ribat Univ/Oasis Computer Systems.sln": {
+    "mtime": 1326558350.0,
+    "ast_hash": "b312c536afddb25ef57ba99b1f585c04",
+    "semantic_hash": "b312c536afddb25ef57ba99b1f585c04"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/Oasis Computer Systems.vbproj": {
+    "mtime": 1334024374.0,
+    "ast_hash": "e8d0a7132e7e3163d0898fc3a4144489",
+    "semantic_hash": "e8d0a7132e7e3163d0898fc3a4144489"
+  },
+  "uniflow/eslint.config.mjs": {
+    "mtime": 1787139767.4645884,
+    "ast_hash": "dfa1f5f6a7037bf39dc510f30b180002",
+    "semantic_hash": "dfa1f5f6a7037bf39dc510f30b180002"
+  },
+  "uniflow/next.config.ts": {
+    "mtime": 1787139767.6427343,
+    "ast_hash": "9b77af189a21a7a64e4bd7a426f64176",
+    "semantic_hash": "9b77af189a21a7a64e4bd7a426f64176"
+  },
+  "uniflow/package.json": {
+    "mtime": 1787151548.74308,
+    "ast_hash": "f5563f9c03f0cad6f966409bb9287dda",
+    "semantic_hash": "f5563f9c03f0cad6f966409bb9287dda"
+  },
+  "uniflow/postcss.config.mjs": {
+    "mtime": 1787139767.5092669,
+    "ast_hash": "239f3ebf717465dc636818a1a619398d",
+    "semantic_hash": "239f3ebf717465dc636818a1a619398d"
+  },
+  "uniflow/prisma.config.ts": {
+    "mtime": 1787140345.3884408,
+    "ast_hash": "de30795d4717928714524f69cb900ea0",
+    "semantic_hash": "de30795d4717928714524f69cb900ea0"
+  },
+  "uniflow/prisma/migrations/20260819115425_init_phase0/migration.sql": {
+    "mtime": 1787140465.994573,
+    "ast_hash": "561ed6495157f6226e34dcc8de1f29b8",
+    "semantic_hash": "561ed6495157f6226e34dcc8de1f29b8"
+  },
+  "uniflow/prisma/migrations/20260819115439_ledger_invariants/migration.sql": {
+    "mtime": 1787140587.124611,
+    "ast_hash": "279ca22e075ecac4dccf9abca99c44d4",
+    "semantic_hash": "279ca22e075ecac4dccf9abca99c44d4"
+  },
+  "uniflow/prisma/migrations/20260819120500_rls_app_role/migration.sql": {
+    "mtime": 1787141759.5596592,
+    "ast_hash": "d9c3275b529dc743f794bba30466b343",
+    "semantic_hash": "d9c3275b529dc743f794bba30466b343"
+  },
+  "uniflow/prisma/seed.ts": {
+    "mtime": 1787140460.0269625,
+    "ast_hash": "e93180d83d98898bad2ab9a3db19cbf8",
+    "semantic_hash": "e93180d83d98898bad2ab9a3db19cbf8"
+  },
+  "uniflow/scripts/bootstrap-role.mjs": {
+    "mtime": 1787141801.3064146,
+    "ast_hash": "911e6bcfc2b3694ae9232997a403c02c",
+    "semantic_hash": "911e6bcfc2b3694ae9232997a403c02c"
+  },
+  "uniflow/scripts/check-roles.mjs": {
+    "mtime": 1787141822.9810479,
+    "ast_hash": "92048161fed430bc9e1a43ba5c5fc050",
+    "semantic_hash": "92048161fed430bc9e1a43ba5c5fc050"
+  },
+  "uniflow/scripts/pg.ts": {
+    "mtime": 1787141347.9414294,
+    "ast_hash": "0ba5b0862b2265d7d5e8b4988f1ff8a5",
+    "semantic_hash": "0ba5b0862b2265d7d5e8b4988f1ff8a5"
+  },
+  "uniflow/scripts/q.mjs": {
+    "mtime": 1787140907.227015,
+    "ast_hash": "c9495b8389de220362b32315befb99c4",
+    "semantic_hash": "c9495b8389de220362b32315befb99c4"
+  },
+  "uniflow/src/app/layout.tsx": {
+    "mtime": 1787139767.75982,
+    "ast_hash": "70f839ece80281c576701dc08f055685",
+    "semantic_hash": "70f839ece80281c576701dc08f055685"
+  },
+  "uniflow/src/app/page.tsx": {
+    "mtime": 1787139768.09749,
+    "ast_hash": "7960d56e7fc48ecd789e2fd32155fa90",
+    "semantic_hash": "7960d56e7fc48ecd789e2fd32155fa90"
+  },
+  "uniflow/src/lib/audit/log.ts": {
+    "mtime": 1787141147.4983404,
+    "ast_hash": "b470da4a8b03516344fc50474099e765",
+    "semantic_hash": "b470da4a8b03516344fc50474099e765"
+  },
+  "uniflow/src/lib/db/client.ts": {
+    "mtime": 1787141784.2869568,
+    "ast_hash": "6f40d6bae354fbe7ae3554e67e36a382",
+    "semantic_hash": "6f40d6bae354fbe7ae3554e67e36a382"
+  },
+  "uniflow/src/lib/idempotency.ts": {
+    "mtime": 1787141585.3960004,
+    "ast_hash": "8daf70cbf0473e55d87acc5992c33b13",
+    "semantic_hash": "8daf70cbf0473e55d87acc5992c33b13"
+  },
+  "uniflow/src/lib/ledger/period.ts": {
+    "mtime": 1787141035.5664186,
+    "ast_hash": "28184f4e394c61095dea722c66802987",
+    "semantic_hash": "28184f4e394c61095dea722c66802987"
+  },
+  "uniflow/src/lib/ledger/posting.ts": {
+    "mtime": 1787142080.051835,
+    "ast_hash": "caae3091d7f6475070f16e45d1550c88",
+    "semantic_hash": "caae3091d7f6475070f16e45d1550c88"
+  },
+  "uniflow/src/lib/ledger/sequence.ts": {
+    "mtime": 1787141014.4219072,
+    "ast_hash": "dbb09dc2e1cdc82ed4f8400630409eef",
+    "semantic_hash": "dbb09dc2e1cdc82ed4f8400630409eef"
+  },
+  "uniflow/src/lib/money.ts": {
+    "mtime": 1787142080.051835,
+    "ast_hash": "29538544fdeb4431a1d761ec504d2eb8",
+    "semantic_hash": "29538544fdeb4431a1d761ec504d2eb8"
+  },
+  "uniflow/tests/audit.test.ts": {
+    "mtime": 1787141967.918346,
+    "ast_hash": "2a731666749e4327fe78b128dcd27a66",
+    "semantic_hash": "2a731666749e4327fe78b128dcd27a66"
+  },
+  "uniflow/tests/concurrency.test.ts": {
+    "mtime": 1787141856.7702074,
+    "ast_hash": "b491296fa0ad2dc7c906970ce8f94183",
+    "semantic_hash": "b491296fa0ad2dc7c906970ce8f94183"
+  },
+  "uniflow/tests/global-setup.ts": {
+    "mtime": 1787141838.2078292,
+    "ast_hash": "ee523b60e2a19ec9c769382602bc96a6",
+    "semantic_hash": "ee523b60e2a19ec9c769382602bc96a6"
+  },
+  "uniflow/tests/helpers.ts": {
+    "mtime": 1787141856.4096415,
+    "ast_hash": "877c2883e4eb942aadef1a3a4463d739",
+    "semantic_hash": "877c2883e4eb942aadef1a3a4463d739"
+  },
+  "uniflow/tests/isolation.test.ts": {
+    "mtime": 1787141918.6127634,
+    "ast_hash": "71c6eea05557fd37c017378881be05cf",
+    "semantic_hash": "71c6eea05557fd37c017378881be05cf"
+  },
+  "uniflow/tests/ledger.test.ts": {
+    "mtime": 1787141856.5745974,
+    "ast_hash": "38d3f508fd26098398b8721265a83bbf",
+    "semantic_hash": "38d3f508fd26098398b8721265a83bbf"
+  },
+  "uniflow/tests/money.test.ts": {
+    "mtime": 1787142009.42933,
+    "ast_hash": "51ea4e1523543f4847aa29022f7d9f69",
+    "semantic_hash": "51ea4e1523543f4847aa29022f7d9f69"
+  },
+  "uniflow/tsconfig.json": {
+    "mtime": 1787142080.0362065,
+    "ast_hash": "ab3e2e71109ced7b5309bd59f46ba0f0",
+    "semantic_hash": "ab3e2e71109ced7b5309bd59f46ba0f0"
+  },
+  "uniflow/vitest.config.ts": {
+    "mtime": 1787223762.836216,
+    "ast_hash": "c10259326365ce2cbca5717473bbb00a",
+    "semantic_hash": "c10259326365ce2cbca5717473bbb00a"
+  },
+  "Ammar's Notes.txt": {
+    "mtime": 1346020132.0,
+    "ast_hash": "f93a07c24937fbb7f3f2756b8b0a643e",
+    "semantic_hash": "f93a07c24937fbb7f3f2756b8b0a643e"
+  },
+  "Documents & Images/New Text Document.txt": {
+    "mtime": 1328643874.0,
+    "ast_hash": "efc70d5cef6c637259314a076015715c",
+    "semantic_hash": "efc70d5cef6c637259314a076015715c"
+  },
+  "Nile College E-University System/Oasis - E-University/obj/Debug/Oasis - E-University.vbproj.FileListAbsolute.txt": {
+    "mtime": 1785774570.2979014,
+    "ast_hash": "b5e3e1572e92b7e48acc5314bede26d5",
+    "semantic_hash": "b5e3e1572e92b7e48acc5314bede26d5"
+  },
+  "Nile College E-University System/Oasis - E-University/obj/Release/Oasis - E-University.vbproj.FileListAbsolute.txt": {
+    "mtime": 1333841830.0,
+    "ast_hash": "6bee8728a0b1272f08ffc59f186908ae",
+    "semantic_hash": "6bee8728a0b1272f08ffc59f186908ae"
+  },
+  "Nile College System - Ribat Univ/Backup/\u0627\u0644\u062a\u0642\u0627\u0631\u064a\u0631 \u0627\u0644\u0645\u0648\u0632\u0648\u0646\u0629 \u062d\u062a\u0649 2 \u0633\u0628\u062a\u0645\u0628\u0631/\u062a\u0642\u0631\u064a\u0631.txt": {
+    "mtime": 1251939178.0,
+    "ast_hash": "08679ef312bf4aef5d7e05d1175813d3",
+    "semantic_hash": "08679ef312bf4aef5d7e05d1175813d3"
+  },
+  "Nile College System - Ribat Univ/DataBase before old stud/read this note.txt": {
+    "mtime": 1254817450.0,
+    "ast_hash": "316c60c879c2ee04d001bcd4941108c7",
+    "semantic_hash": "316c60c879c2ee04d001bcd4941108c7"
+  },
+  "Nile College System - Ribat Univ/New Text Document.txt": {
+    "mtime": 1268205062.0,
+    "ast_hash": "0f93b3e3f06de49fe17ce730480a48e1",
+    "semantic_hash": "0f93b3e3f06de49fe17ce730480a48e1"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/Rebat University Application/obj/Debug/Rebat University Application.vbproj.FileListAbsolute.txt": {
+    "mtime": 1250458080.0,
+    "ast_hash": "ff696c352bddb268f2fe0270c0144b27",
+    "semantic_hash": "ff696c352bddb268f2fe0270c0144b27"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/obj/Debug/Oasis Computer Systems.vbproj.FileListAbsolute.txt": {
+    "mtime": 1337640756.0,
+    "ast_hash": "880a853834e25afda67e63c9c4b968db",
+    "semantic_hash": "880a853834e25afda67e63c9c4b968db"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/obj/Debug/Rebat University Application.vbproj.FileListAbsolute.txt": {
+    "mtime": 1326558310.0,
+    "ast_hash": "3f94676a6b462703e335e1f157fb51cc",
+    "semantic_hash": "3f94676a6b462703e335e1f157fb51cc"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/obj/Debug/RebatUniversityApplication.vbproj.FileListAbsolute.txt": {
+    "mtime": 1245837446.0,
+    "ast_hash": "e8903e0910f9970f0173fd4ea455984b",
+    "semantic_hash": "e8903e0910f9970f0173fd4ea455984b"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/obj/Release/Rebat University Application.vbproj.FileListAbsolute.txt": {
+    "mtime": 1269202028.0,
+    "ast_hash": "080b756dde6d88b266aa87b82f4add45",
+    "semantic_hash": "080b756dde6d88b266aa87b82f4add45"
+  },
+  "Nile College System - Ribat Univ/discount view.txt": {
+    "mtime": 1268205000.0,
+    "ast_hash": "8cc3427072dbd19b53bd16a9bd96c11f",
+    "semantic_hash": "8cc3427072dbd19b53bd16a9bd96c11f"
+  },
+  "graphify-out/converted/Contract_e73cf820.md": {
+    "mtime": 1787151065.922633,
+    "ast_hash": "d5c4da728c1058cfd5a592e0d4f4b8ca",
+    "semantic_hash": "d5c4da728c1058cfd5a592e0d4f4b8ca"
+  },
+  "graphify-out/converted/Cover Letter - Financial System_9b7b35ef.md": {
+    "mtime": 1787151066.1337147,
+    "ast_hash": "4b8ddfd201e70114eae30e49e085041a",
+    "semantic_hash": "4b8ddfd201e70114eae30e49e085041a"
+  },
+  "graphify-out/converted/Den.1st.Y.Attendance 2011-2012_2da0b628.md": {
+    "mtime": 1787151087.0742948,
+    "ast_hash": "d61a39781cc80d68229eb1960c2629cf",
+    "semantic_hash": "d61a39781cc80d68229eb1960c2629cf"
+  },
+  "graphify-out/converted/Financial System Flow_8f5f6a68.md": {
+    "mtime": 1787151066.2504215,
+    "ast_hash": "2b907c53da5e0d8194bf62b6ab19dbbc",
+    "semantic_hash": "2b907c53da5e0d8194bf62b6ab19dbbc"
+  },
+  "graphify-out/converted/Group of Med. 1st.Y.Attendance 2011-2012_8d6e77eb.md": {
+    "mtime": 1787151084.576771,
+    "ast_hash": "311e665578539add57f26ee7a8fc6aff",
+    "semantic_hash": "311e665578539add57f26ee7a8fc6aff"
+  },
+  "graphify-out/converted/MIS.1st.Y.Attendance 2011-2012_32b895f2.md": {
+    "mtime": 1787151086.379395,
+    "ast_hash": "da854cb3e95da7ea071364e149effbb4",
+    "semantic_hash": "da854cb3e95da7ea071364e149effbb4"
+  },
+  "graphify-out/converted/MIS.3rd.Y.Attendance 2011-2012_c0eed044.md": {
+    "mtime": 1787151086.5608304,
+    "ast_hash": "f1116f0246abbd6138c1bb214b0fb980",
+    "semantic_hash": "f1116f0246abbd6138c1bb214b0fb980"
+  },
+  "graphify-out/converted/MIT.1st.Y.Attendance 2011-2012_3588e6b9.md": {
+    "mtime": 1787151086.7480166,
+    "ast_hash": "e060c12aa5be11edc01d76b709d73d5b",
+    "semantic_hash": "e060c12aa5be11edc01d76b709d73d5b"
+  },
+  "graphify-out/converted/MIT.2nd.Y.Attendance 2011-2012_711fdf9a.md": {
+    "mtime": 1787151086.92598,
+    "ast_hash": "172189c0669f68552ef96fee4d106c28",
+    "semantic_hash": "172189c0669f68552ef96fee4d106c28"
+  },
+  "graphify-out/converted/MLS.1st.Y.Attendance 2011-2012_120701e8.md": {
+    "mtime": 1787151086.242388,
+    "ast_hash": "c2885fdde4ad5c3a082d2ee1a33b6782",
+    "semantic_hash": "c2885fdde4ad5c3a082d2ee1a33b6782"
+  },
+  "graphify-out/converted/Med. 1st.Y.Attendance 2011-2012_151bcbad.md": {
+    "mtime": 1787151084.8635623,
+    "ast_hash": "8776d7d20ddff26309c3cebbb18838c7",
+    "semantic_hash": "8776d7d20ddff26309c3cebbb18838c7"
+  },
+  "graphify-out/converted/Med. 2nd .Y.Attendance 2011-2012 (Autosaved)_e7258711.md": {
+    "mtime": 1787151085.134286,
+    "ast_hash": "a74f2c33d58244bd13f2a7dbe2f6f5c9",
+    "semantic_hash": "a74f2c33d58244bd13f2a7dbe2f6f5c9"
+  },
+  "graphify-out/converted/Med. 2nd .Y.Attendance 2011-2012_aabe307c.md": {
+    "mtime": 1787151085.374595,
+    "ast_hash": "dd66a09f4c5aba5efa626f3932829e8c",
+    "semantic_hash": "dd66a09f4c5aba5efa626f3932829e8c"
+  },
+  "graphify-out/converted/Med.3rd .Y.Attendance 2011-2012_48b4c23e.md": {
+    "mtime": 1787151085.6054592,
+    "ast_hash": "81609e3a1d4b8b02789b935568603abc",
+    "semantic_hash": "81609e3a1d4b8b02789b935568603abc"
+  },
+  "graphify-out/converted/Med.4th.Y.Attendance 2011-2012_c9756b08.md": {
+    "mtime": 1787151085.8086016,
+    "ast_hash": "8c5701a992f2e459260d7f2a6960a292",
+    "semantic_hash": "8c5701a992f2e459260d7f2a6960a292"
+  },
+  "graphify-out/converted/Med.5th .Y.Attendance 2011-2012_31b54606.md": {
+    "mtime": 1787151086.0225513,
+    "ast_hash": "92bde0ee33f90af5950c821df42bc656",
+    "semantic_hash": "92bde0ee33f90af5950c821df42bc656"
+  },
+  "graphify-out/converted/Nile College Offer - Financial System_b5c3093c.md": {
+    "mtime": 1787151066.5191793,
+    "ast_hash": "10246b38e212e467a401714f9a5644bc",
+    "semantic_hash": "10246b38e212e467a401714f9a5644bc"
+  },
+  "graphify-out/converted/Nur.1st.Y.Attendance 2011-2012_b6e22d21.md": {
+    "mtime": 1787151082.8939092,
+    "ast_hash": "03a9fb1a7d98292367572f843d23f861",
+    "semantic_hash": "03a9fb1a7d98292367572f843d23f861"
+  },
+  "graphify-out/converted/Nur.2nd.Y.Attendance 2011-2012_7b005f56.md": {
+    "mtime": 1787151083.3754776,
+    "ast_hash": "55da316a8023b2f6a8938e4685e37dab",
+    "semantic_hash": "55da316a8023b2f6a8938e4685e37dab"
+  },
+  "graphify-out/converted/Nur.3rd.Y.Attendance 2011-2012_2bc66423.md": {
+    "mtime": 1787151083.7098377,
+    "ast_hash": "3567666fe2a77cbe135e2c2dd59e74c1",
+    "semantic_hash": "3567666fe2a77cbe135e2c2dd59e74c1"
+  },
+  "graphify-out/converted/Nur.4th.Y.Attendance 2011-2012_a67bcda4.md": {
+    "mtime": 1787151083.9969995,
+    "ast_hash": "175bf70ecab1ac2a1e3d03ca4e47399e",
+    "semantic_hash": "175bf70ecab1ac2a1e3d03ca4e47399e"
+  },
+  "graphify-out/converted/Ph.1st.Y.Attendance 2011-2012_d290b67a.md": {
+    "mtime": 1787151084.1769223,
+    "ast_hash": "32d1d06fc46b874c8452dcb57c817e6b",
+    "semantic_hash": "32d1d06fc46b874c8452dcb57c817e6b"
+  },
+  "graphify-out/converted/Students List_ac3381ba.md": {
+    "mtime": 1787151082.3734975,
+    "ast_hash": "2b03b4ff1a356c6d8c2d6ee193ed7210",
+    "semantic_hash": "2b03b4ff1a356c6d8c2d6ee193ed7210"
+  },
+  "graphify-out/converted/\u0646\u0638\u0627\u0645 \u0627\u0644\u062a\u0633\u062c\u064a\u0644_87e095b7.md": {
+    "mtime": 1787151066.8608024,
+    "ast_hash": "bff718979f68db1d2d87cc66de4c4e90",
+    "semantic_hash": "bff718979f68db1d2d87cc66de4c4e90"
+  },
+  "implementation_plan.md": {
+    "mtime": 1787142298.4435732,
+    "ast_hash": "b8543d1b1f206ee24a90df0e59c7e67b",
+    "semantic_hash": "b8543d1b1f206ee24a90df0e59c7e67b"
+  },
+  "srs_university_erp.md": {
+    "mtime": 1787138221.7614274,
+    "ast_hash": "ded4e07ed5ca69b44ea05ff9c9687523",
+    "semantic_hash": "ded4e07ed5ca69b44ea05ff9c9687523"
+  },
+  "uniflow/AGENTS.md": {
+    "mtime": 1787139849.9743042,
+    "ast_hash": "01e8142356e15c3404e0d84c48187cd0",
+    "semantic_hash": "01e8142356e15c3404e0d84c48187cd0"
+  },
+  "uniflow/CLAUDE.md": {
+    "mtime": 1787139849.9743042,
+    "ast_hash": "5c27369b226fcf2be8a6cfe52224e767",
+    "semantic_hash": "5c27369b226fcf2be8a6cfe52224e767"
+  },
+  "uniflow/README.md": {
+    "mtime": 1787142310.1060233,
+    "ast_hash": "a971fcee83f8c00575058191f90adbef",
+    "semantic_hash": "a971fcee83f8c00575058191f90adbef"
+  },
+  "Documents & Images/NileBG.jpg": {
+    "mtime": 1327796960.0,
+    "ast_hash": "6a3506c1525e7545506240eeac934351",
+    "semantic_hash": "6a3506c1525e7545506240eeac934351"
+  },
+  "Documents & Images/NileLogin.jpg": {
+    "mtime": 1327796524.0,
+    "ast_hash": "e81c0b0f7df78e2a2f3635f987ecada9",
+    "semantic_hash": "e81c0b0f7df78e2a2f3635f987ecada9"
+  },
+  "Documents & Images/alnile 001.jpg": {
+    "mtime": 1327793074.0,
+    "ast_hash": "ab97ab96d8c1ed4ac549d508b0873689",
+    "semantic_hash": "ab97ab96d8c1ed4ac549d508b0873689"
+  },
+  "Documents & Images/alnile Logo.jpg": {
+    "mtime": 1327794868.0,
+    "ast_hash": "20d270379156f9122923f4e85930ef2d",
+    "semantic_hash": "20d270379156f9122923f4e85930ef2d"
+  },
+  "Nile College E-University System/Backup/ADC Acc. App/Resources/BG.jpg": {
+    "mtime": 1255112894.0,
+    "ast_hash": "999a0c7e6ef5f71bf484ffc20f563fbf",
+    "semantic_hash": "999a0c7e6ef5f71bf484ffc20f563fbf"
+  },
+  "Nile College E-University System/Backup/ADC Acc. App/Resources/Logo.jpg": {
+    "mtime": 1255113628.0,
+    "ast_hash": "cd42d5727332da22a7e9c16b461f8053",
+    "semantic_hash": "cd42d5727332da22a7e9c16b461f8053"
+  },
+  "Nile College E-University System/Backup/ADC Acc. App/Resources/Logo.png": {
+    "mtime": 1255113628.0,
+    "ast_hash": "244d257f5caf328513f851cb8dce19a6",
+    "semantic_hash": "244d257f5caf328513f851cb8dce19a6"
+  },
+  "Nile College E-University System/Nile College Screen shots/CreateStudentProfile.jpg": {
+    "mtime": 1337547656.0,
+    "ast_hash": "1b4e4627156ccb2a14f5043fb8eeab7c",
+    "semantic_hash": "1b4e4627156ccb2a14f5043fb8eeab7c"
+  },
+  "Nile College E-University System/Nile College Screen shots/SearchStudentID.JPG": {
+    "mtime": 1337549816.0,
+    "ast_hash": "dba7d70e90712cff7f64d33551adbf8c",
+    "semantic_hash": "dba7d70e90712cff7f64d33551adbf8c"
+  },
+  "Nile College E-University System/Nile College Screen shots/StudentProfileTable.PNG": {
+    "mtime": 1337547814.0,
+    "ast_hash": "80c924af3a8dd02c7066961e19a71af7",
+    "semantic_hash": "80c924af3a8dd02c7066961e19a71af7"
+  },
+  "Nile College E-University System/Nile College Screen shots/StudentRegistration.JPG": {
+    "mtime": 1337643604.0,
+    "ast_hash": "9063a5d6e188b9d870bf42ee8f08b834",
+    "semantic_hash": "9063a5d6e188b9d870bf42ee8f08b834"
+  },
+  "Nile College E-University System/Nile College Screen shots/StudentRegistrationTable.JPG": {
+    "mtime": 1337553532.0,
+    "ast_hash": "0ca35938d9850cf4f872387406ea5d43",
+    "semantic_hash": "0ca35938d9850cf4f872387406ea5d43"
+  },
+  "Nile College E-University System/Nile College Screen shots/StudentTransfer.JPG": {
+    "mtime": 1337553972.0,
+    "ast_hash": "173986ecf66c1c32554d8b4822c9114c",
+    "semantic_hash": "173986ecf66c1c32554d8b4822c9114c"
+  },
+  "Nile College E-University System/Nile College Screen shots/UpdatestudentProfile.JPG": {
+    "mtime": 1337549286.0,
+    "ast_hash": "bf11d6b7238a9442b3c19afa26ce85c9",
+    "semantic_hash": "bf11d6b7238a9442b3c19afa26ce85c9"
+  },
+  "Nile College E-University System/Nile college/CreateStudentProfile.png": {
+    "mtime": 1337547232.0,
+    "ast_hash": "7b63ff4d28f503e190e95c15ddc4ebd0",
+    "semantic_hash": "7b63ff4d28f503e190e95c15ddc4ebd0"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/Add.png": {
+    "mtime": 1328304684.0,
+    "ast_hash": "ca50d0d68b161ee78504337ecfb68f2e",
+    "semantic_hash": "ca50d0d68b161ee78504337ecfb68f2e"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/Add1.png": {
+    "mtime": 1312667652.0,
+    "ast_hash": "ca50d0d68b161ee78504337ecfb68f2e",
+    "semantic_hash": "ca50d0d68b161ee78504337ecfb68f2e"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/AddSub.png": {
+    "mtime": 1312667654.0,
+    "ast_hash": "cbacf006fd70ad453900d649d979efc4",
+    "semantic_hash": "cbacf006fd70ad453900d649d979efc4"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/AddSub1.png": {
+    "mtime": 1312667654.0,
+    "ast_hash": "cbacf006fd70ad453900d649d979efc4",
+    "semantic_hash": "cbacf006fd70ad453900d649d979efc4"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/BG.jpg": {
+    "mtime": 1255112894.0,
+    "ast_hash": "999a0c7e6ef5f71bf484ffc20f563fbf",
+    "semantic_hash": "999a0c7e6ef5f71bf484ffc20f563fbf"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/BG.png": {
+    "mtime": 1328776474.0,
+    "ast_hash": "ba3c639922b21d33d8d82e1508b4f71f",
+    "semantic_hash": "ba3c639922b21d33d8d82e1508b4f71f"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/Delete.png": {
+    "mtime": 1312667654.0,
+    "ast_hash": "6c9627cbcbddc5030cfc79124e7ffd5b",
+    "semantic_hash": "6c9627cbcbddc5030cfc79124e7ffd5b"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/Delete1.png": {
+    "mtime": 1312667654.0,
+    "ast_hash": "6c9627cbcbddc5030cfc79124e7ffd5b",
+    "semantic_hash": "6c9627cbcbddc5030cfc79124e7ffd5b"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/Logo.jpg": {
+    "mtime": 1255113628.0,
+    "ast_hash": "cd42d5727332da22a7e9c16b461f8053",
+    "semantic_hash": "cd42d5727332da22a7e9c16b461f8053"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/Logo.png": {
+    "mtime": 1255113628.0,
+    "ast_hash": "244d257f5caf328513f851cb8dce19a6",
+    "semantic_hash": "244d257f5caf328513f851cb8dce19a6"
+  },
+  "Nile College E-University System/Oasis - E-University/Resources/NileBG.jpg": {
+    "mtime": 1333835670.0,
+    "ast_hash": "6a3506c1525e7545506240eeac934351",
+    "semantic_hash": "6a3506c1525e7545506240eeac934351"
+  },
+  "Nile College E-University System/_UpgradeReport_Files/UpgradeReport_Minus.gif": {
+    "mtime": 1328303892.0,
+    "ast_hash": "96d649718f4173b0ee98438d4ebaa828",
+    "semantic_hash": "96d649718f4173b0ee98438d4ebaa828"
+  },
+  "Nile College E-University System/_UpgradeReport_Files/UpgradeReport_Plus.gif": {
+    "mtime": 1328303892.0,
+    "ast_hash": "18c6542472c7fdadad28c611a0f2fca9",
+    "semantic_hash": "18c6542472c7fdadad28c611a0f2fca9"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/Resources/BG.jpg": {
+    "mtime": 1242422696.0,
+    "ast_hash": "261a0f799b1c3778959dbf2877a995ee",
+    "semantic_hash": "261a0f799b1c3778959dbf2877a995ee"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/Resources/BG1.jpg": {
+    "mtime": 1326558176.0,
+    "ast_hash": "90f0f6a3aad3db3cda861279f492ed0f",
+    "semantic_hash": "90f0f6a3aad3db3cda861279f492ed0f"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/Resources/Logo.png": {
+    "mtime": 1250049058.0,
+    "ast_hash": "00059a67df3fdaec646437299be18ea5",
+    "semantic_hash": "00059a67df3fdaec646437299be18ea5"
+  },
+  "Nile College System - Ribat Univ/Rebat University Application/Resources/Printer.gif": {
+    "mtime": 1249800068.0,
+    "ast_hash": "bae8f69c6990fb3547256e6077d58993",
+    "semantic_hash": "bae8f69c6990fb3547256e6077d58993"
+  },
+  "uniflow/public/file.svg": {
+    "mtime": 1787139767.5211499,
+    "ast_hash": "d09f95206c3fa0bb9bd9fefabfd0ea71",
+    "semantic_hash": "d09f95206c3fa0bb9bd9fefabfd0ea71"
+  },
+  "uniflow/public/globe.svg": {
+    "mtime": 1787139767.540881,
+    "ast_hash": "2aaafa6a49b6563925fe440891e32717",
+    "semantic_hash": "2aaafa6a49b6563925fe440891e32717"
+  },
+  "uniflow/public/next.svg": {
+    "mtime": 1787139767.5596046,
+    "ast_hash": "8e061864f388b47f33a1c3780831193e",
+    "semantic_hash": "8e061864f388b47f33a1c3780831193e"
+  },
+  "uniflow/public/vercel.svg": {
+    "mtime": 1787139767.5780768,
+    "ast_hash": "c0af2f507b369b085b35ef4bbe3bcf1e",
+    "semantic_hash": "c0af2f507b369b085b35ef4bbe3bcf1e"
+  },
+  "uniflow/public/window.svg": {
+    "mtime": 1787139767.5957825,
+    "ast_hash": "a2760511c65806022ad20adf74370ff3",
+    "semantic_hash": "a2760511c65806022ad20adf74370ff3"
+  }
+}

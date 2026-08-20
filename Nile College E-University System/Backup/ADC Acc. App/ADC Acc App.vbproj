@@ -1,0 +1,536 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="3.5" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{3C4A4298-A600-4DA7-901C-3DD18F64EFA1}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <StartupObject>ADC_Acc.App.My.MyApplication</StartupObject>
+    <RootNamespace>ADC_Acc.App</RootNamespace>
+    <AssemblyName>ADC Acc. App</AssemblyName>
+    <FileAlignment>512</FileAlignment>
+    <MyType>WindowsForms</MyType>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionCompare>Binary</OptionCompare>
+    <OptionStrict>Off</OptionStrict>
+    <OptionInfer>On</OptionInfer>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DocumentationFile>ADC Acc. App.xml</DocumentationFile>
+    <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <DefineDebug>false</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DocumentationFile>ADC Acc. App.xml</DocumentationFile>
+    <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="CrystalDecisions.CrystalReports.Engine, Version=10.5.3700.0, Culture=neutral, PublicKeyToken=692fbea5521e1304" />
+    <Reference Include="CrystalDecisions.Enterprise.Framework, Version=10.5.3700.0, Culture=neutral, PublicKeyToken=692fbea5521e1304" />
+    <Reference Include="CrystalDecisions.Enterprise.InfoStore, Version=10.5.3700.0, Culture=neutral, PublicKeyToken=692fbea5521e1304" />
+    <Reference Include="CrystalDecisions.ReportSource, Version=10.5.3700.0, Culture=neutral, PublicKeyToken=692fbea5521e1304" />
+    <Reference Include="CrystalDecisions.Shared, Version=10.5.3700.0, Culture=neutral, PublicKeyToken=692fbea5521e1304" />
+    <Reference Include="CrystalDecisions.Windows.Forms, Version=10.5.3700.0, Culture=neutral, PublicKeyToken=692fbea5521e1304" />
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Deployment" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Services, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\WINDOWS\assembly\GAC_MSIL\System.Web.Services\2.0.0.0__b03f5f7f11d50a3a\System.Web.Services.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Core">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Xml.Linq">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data.DataSetExtensions">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Import Include="Microsoft.VisualBasic" />
+    <Import Include="System" />
+    <Import Include="System.Collections" />
+    <Import Include="System.Collections.Generic" />
+    <Import Include="System.Data" />
+    <Import Include="System.Drawing" />
+    <Import Include="System.Diagnostics" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Linq" />
+    <Import Include="System.Xml.Linq" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="DataSets\DsAcc.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>DsAcc.xsd</DependentUpon>
+    </Compile>
+    <Compile Include="DataSets\DsTrans.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>DsTrans.xsd</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\frmAccStatus.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmAccTransactions.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmAddAcc.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmAddAssets.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmAddPack.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmAddSubAcc.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmAssetsValue.designer.vb">
+      <DependentUpon>frmAssetsValue.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\frmAssetsValue.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmBackUp.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmBalanceSheet.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmBalancing.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmBillsArchive.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmBudget.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmChangePassword.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmChartofAccounts.designer.vb">
+      <DependentUpon>frmChartofAccounts.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\frmChartofAccounts.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmCloseYear.Designer.vb">
+      <DependentUpon>frmCloseYear.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\frmCloseYear.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmDailyAccTrans.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmDailyChainNew.designer.vb">
+      <DependentUpon>frmDailyChainNew.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\frmDailyChainNew.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmDeleteAcc.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmDeleteEmpl.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmDeletePack.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmDeleteSubAcc.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmDestruction.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmEmployees.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmGetBill.designer.vb">
+      <DependentUpon>frmGetBill.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\frmGetBill.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmLogin.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmMain.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmPackDetails.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmPayBill.designer.vb">
+      <DependentUpon>frmPayBill.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\frmPayBill.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmTrialBalance.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\frmVoucherEdit.Designer.vb">
+      <DependentUpon>frmVoucherEdit.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\frmVoucherEdit.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ReportViewer.Designer.vb">
+      <DependentUpon>ReportViewer.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ReportViewer.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="My Project\AssemblyInfo.vb" />
+    <Compile Include="My Project\Application.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+    <Compile Include="My Project\Resources.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="My Project\Settings.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <Compile Include="Reports\Acc.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Acc.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\AccStatus.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>AccStatus.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\AccTransActions.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>AccTransActions.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\AssetsValue.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>AssetsValue.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\BalanceSheet.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>BalanceSheet.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\Bill.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Bill.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\BillsArchive.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>BillsArchive.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\Budget.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Budget.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\DailyAccTrans.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>DailyAccTrans.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\DailyBalancing.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>DailyBalancing.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\DailyChainRpt.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>DailyChainRpt.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Reports\PackDetails.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>PackDetails.rpt</DependentUpon>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Utilities.vb" />
+    <Compile Include="ADC Acc App.vb" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Forms\frmAccStatus.resx">
+      <DependentUpon>frmAccStatus.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmAccTransactions.resx">
+      <DependentUpon>frmAccTransactions.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmAddAcc.resx">
+      <DependentUpon>frmAddAcc.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmAddAssets.resx">
+      <DependentUpon>frmAddAssets.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmAddPack.resx">
+      <DependentUpon>frmAddPack.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmAddSubAcc.resx">
+      <DependentUpon>frmAddSubAcc.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmAssetsValue.resx">
+      <DependentUpon>frmAssetsValue.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmBackUp.resx">
+      <DependentUpon>frmBackUp.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmBalanceSheet.resx">
+      <DependentUpon>frmBalanceSheet.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmBalancing.resx">
+      <DependentUpon>frmBalancing.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmBillsArchive.resx">
+      <DependentUpon>frmBillsArchive.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmBudget.resx">
+      <DependentUpon>frmBudget.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmChangePassword.resx">
+      <DependentUpon>frmChangePassword.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmChartofAccounts.resx">
+      <DependentUpon>frmChartofAccounts.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmCloseYear.resx">
+      <DependentUpon>frmCloseYear.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmDailyAccTrans.resx">
+      <DependentUpon>frmDailyAccTrans.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmDailyChainNew.resx">
+      <DependentUpon>frmDailyChainNew.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmDeleteAcc.resx">
+      <DependentUpon>frmDeleteAcc.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmDeleteEmpl.resx">
+      <DependentUpon>frmDeleteEmpl.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmDeletePack.resx">
+      <DependentUpon>frmDeletePack.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmDeleteSubAcc.resx">
+      <DependentUpon>frmDeleteSubAcc.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmDestruction.resx">
+      <DependentUpon>frmDestruction.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmEmployees.resx">
+      <DependentUpon>frmEmployees.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmGetBill.resx">
+      <DependentUpon>frmGetBill.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmLogin.resx">
+      <DependentUpon>frmLogin.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmMain.resx">
+      <DependentUpon>frmMain.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmPackDetails.resx">
+      <DependentUpon>frmPackDetails.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmPayBill.resx">
+      <DependentUpon>frmPayBill.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmTrialBalance.resx">
+      <DependentUpon>frmTrialBalance.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\frmVoucherEdit.resx">
+      <DependentUpon>frmVoucherEdit.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ReportViewer.resx">
+      <DependentUpon>ReportViewer.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="My Project\Resources.resx">
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\Acc.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>Acc.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\AccStatus.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>AccStatus.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\AccTransActions.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>AccTransActions.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\AssetsValue.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>AssetsValue.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\BalanceSheet.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>BalanceSheet.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\Bill.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>Bill.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\BillsArchive.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>BillsArchive.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\Budget.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>Budget.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\DailyAccTrans.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>DailyAccTrans.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\DailyBalancing.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>DailyBalancing.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\DailyChainRpt.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>DailyChainRpt.vb</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\PackDetails.rpt">
+      <Generator>CrystalDecisions.VSDesigner.CodeGen.ReportCodeGenerator</Generator>
+      <LastGenOutput>PackDetails.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="DataSets\DsAcc.xsc">
+      <DependentUpon>DsAcc.xsd</DependentUpon>
+    </None>
+    <None Include="DataSets\DsAcc.xsd">
+      <Generator>MSDataSetGenerator</Generator>
+      <LastGenOutput>DsAcc.Designer.vb</LastGenOutput>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="DataSets\DsAcc.xss">
+      <DependentUpon>DsAcc.xsd</DependentUpon>
+    </None>
+    <None Include="DataSets\DsAcc.xsx">
+      <DependentUpon>DsAcc.xsd</DependentUpon>
+    </None>
+    <None Include="DataSets\DsTrans.xsc">
+      <DependentUpon>DsTrans.xsd</DependentUpon>
+    </None>
+    <None Include="DataSets\DsTrans.xsd">
+      <Generator>MSDataSetGenerator</Generator>
+      <LastGenOutput>DsTrans.Designer.vb</LastGenOutput>
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="DataSets\DsTrans.xss">
+      <DependentUpon>DsTrans.xsd</DependentUpon>
+    </None>
+    <None Include="DataSets\DsTrans.xsx">
+      <DependentUpon>DsTrans.xsd</DependentUpon>
+    </None>
+    <None Include="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+    <None Include="My Project\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{967B4E0D-AD0C-4609-AB67-0FA40C0206D8}" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\BG.jpg" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Logo.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Logo.jpg" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

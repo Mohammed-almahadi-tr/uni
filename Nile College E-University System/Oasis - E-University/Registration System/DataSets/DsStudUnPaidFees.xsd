@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema id="DsStudUnPaidFees" targetNamespace="http://tempuri.org/DsStudUnPaidFees.xsd" xmlns:mstns="http://tempuri.org/DsStudUnPaidFees.xsd" xmlns="http://tempuri.org/DsStudUnPaidFees.xsd" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" xmlns:msprop="urn:schemas-microsoft-com:xml-msprop" attributeFormDefault="qualified" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:appinfo source="urn:schemas-microsoft-com:xml-msdatasource">
+      <DataSource DefaultConnectionIndex="0" FunctionsComponentName="QueriesTableAdapter" Modifier="AutoLayout, AnsiClass, Class, Public" SchemaSerializationMode="IncludeSchema" xmlns="urn:schemas-microsoft-com:xml-msdatasource">
+        <Connections />
+        <Tables />
+        <Sources />
+      </DataSource>
+    </xs:appinfo>
+  </xs:annotation>
+  <xs:element name="DsStudUnPaidFees" msdata:IsDataSet="true" msdata:UseCurrentLocale="true" msprop:EnableTableAdapterManager="true" msprop:Generator_DataSetName="DsStudUnPaidFees" msprop:Generator_UserDSName="DsStudUnPaidFees">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="StudUnPaidFees" msprop:Generator_TableClassName="StudUnPaidFeesDataTable" msprop:Generator_TableVarName="tableStudUnPaidFees" msprop:Generator_TablePropName="StudUnPaidFees" msprop:Generator_RowDeletingName="StudUnPaidFeesRowDeleting" msprop:Generator_UserTableName="StudUnPaidFees" msprop:Generator_RowChangingName="StudUnPaidFeesRowChanging" msprop:Generator_RowEvHandlerName="StudUnPaidFeesRowChangeEventHandler" msprop:Generator_RowDeletedName="StudUnPaidFeesRowDeleted" msprop:Generator_RowEvArgName="StudUnPaidFeesRowChangeEvent" msprop:Generator_RowChangedName="StudUnPaidFeesRowChanged" msprop:Generator_RowClassName="StudUnPaidFeesRow">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="StudID" msprop:Generator_ColumnVarNameInTable="columnStudID" msprop:Generator_ColumnPropNameInRow="StudID" msprop:Generator_ColumnPropNameInTable="StudIDColumn" msprop:Generator_UserColumnName="StudID" type="xs:string" minOccurs="0" />
+              <xs:element name="StudName" msprop:Generator_ColumnVarNameInTable="columnStudName" msprop:Generator_ColumnPropNameInRow="StudName" msprop:Generator_ColumnPropNameInTable="StudNameColumn" msprop:Generator_UserColumnName="StudName" type="xs:string" minOccurs="0" />
+              <xs:element name="Program" msprop:Generator_ColumnVarNameInTable="columnProgram" msprop:Generator_ColumnPropNameInRow="Program" msprop:Generator_ColumnPropNameInTable="ProgramColumn" msprop:Generator_UserColumnName="Program" type="xs:string" minOccurs="0" />
+              <xs:element name="Class" msprop:Generator_ColumnVarNameInTable="columnClass" msprop:Generator_ColumnPropNameInRow="_Class" msprop:Generator_ColumnPropNameInTable="ClassColumn" msprop:Generator_UserColumnName="Class" type="xs:string" minOccurs="0" />
+              <xs:element name="Balance" msprop:Generator_ColumnVarNameInTable="columnBalance" msprop:Generator_ColumnPropNameInRow="Balance" msprop:Generator_ColumnPropNameInTable="BalanceColumn" msprop:Generator_UserColumnName="Balance" type="xs:double" minOccurs="0" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema id="DSstudVacants" targetNamespace="http://tempuri.org/DSstudVacants.xsd" xmlns:mstns="http://tempuri.org/DSstudVacants.xsd" xmlns="http://tempuri.org/DSstudVacants.xsd" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" xmlns:msprop="urn:schemas-microsoft-com:xml-msprop" attributeFormDefault="qualified" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:appinfo source="urn:schemas-microsoft-com:xml-msdatasource">
+      <DataSource DefaultConnectionIndex="0" FunctionsComponentName="QueriesTableAdapter" Modifier="AutoLayout, AnsiClass, Class, Public" SchemaSerializationMode="IncludeSchema" xmlns="urn:schemas-microsoft-com:xml-msdatasource">
+        <Connections />
+        <Tables />
+        <Sources />
+      </DataSource>
+    </xs:appinfo>
+  </xs:annotation>
+  <xs:element name="DSstudVacants" msdata:IsDataSet="true" msdata:UseCurrentLocale="true" msprop:Generator_UserDSName="DSstudVacants" msprop:Generator_DataSetName="DSstudVacants">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="ViewStudVacants" msprop:Generator_UserTableName="ViewStudVacants" msprop:Generator_RowDeletedName="ViewStudVacantsRowDeleted" msprop:Generator_RowChangedName="ViewStudVacantsRowChanged" msprop:Generator_RowClassName="ViewStudVacantsRow" msprop:Generator_RowChangingName="ViewStudVacantsRowChanging" msprop:Generator_RowEvArgName="ViewStudVacantsRowChangeEvent" msprop:Generator_RowEvHandlerName="ViewStudVacantsRowChangeEventHandler" msprop:Generator_TableClassName="ViewStudVacantsDataTable" msprop:Generator_TableVarName="tableViewStudVacants" msprop:Generator_RowDeletingName="ViewStudVacantsRowDeleting" msprop:Generator_TablePropName="ViewStudVacants">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="College" msprop:Generator_UserColumnName="College" msprop:Generator_ColumnPropNameInRow="College" msprop:Generator_ColumnVarNameInTable="columnCollege" msprop:Generator_ColumnPropNameInTable="CollegeColumn" minOccurs="0">
+                <xs:simpleType>
+                  <xs:restriction base="xs:string">
+                    <xs:maxLength value="250" />
+                  </xs:restriction>
+                </xs:simpleType>
+              </xs:element>
+              <xs:element name="subTotal" msprop:Generator_UserColumnName="subTotal" msprop:Generator_ColumnPropNameInRow="subTotal" msprop:Generator_ColumnVarNameInTable="columnsubTotal" msprop:Generator_ColumnPropNameInTable="subTotalColumn" type="xs:int" minOccurs="0" />
+              <xs:element name="Total" msprop:Generator_UserColumnName="Total" msprop:Generator_ColumnPropNameInRow="Total" msprop:Generator_ColumnVarNameInTable="columnTotal" msprop:Generator_ColumnPropNameInTable="TotalColumn" type="xs:int" minOccurs="0" />
+              <xs:element name="Amount" msprop:Generator_UserColumnName="Amount" msprop:Generator_ColumnVarNameInTable="columnAmount" msprop:Generator_ColumnPropNameInRow="Amount" msprop:Generator_ColumnPropNameInTable="AmountColumn" type="xs:int" minOccurs="0" />
+              <xs:element name="Descr" msprop:Generator_UserColumnName="Descr" msprop:Generator_ColumnPropNameInRow="Descr" msprop:Generator_ColumnVarNameInTable="columnDescr" msprop:Generator_ColumnPropNameInTable="DescrColumn" type="xs:string" minOccurs="0" />
+              <xs:element name="AcdYear" msprop:Generator_UserColumnName="AcdYear" msprop:Generator_ColumnPropNameInRow="AcdYear" msprop:Generator_ColumnVarNameInTable="columnAcdYear" msprop:Generator_ColumnPropNameInTable="AcdYearColumn" type="xs:string" minOccurs="0" />
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
