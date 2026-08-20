@@ -35,9 +35,7 @@ import { PrismaClient } from '@/generated/prisma/client';
 
 declare global {
   // Reused across HMR reloads in development so we do not exhaust connections.
-  // eslint-disable-next-line no-var
   var __uniflowPrisma: PrismaClient | undefined;
-  // eslint-disable-next-line no-var
   var __uniflowSystemPrisma: PrismaClient | undefined;
 }
 

@@ -202,7 +202,10 @@ export const SOD_CONFLICTS: readonly SodConflict[] = [
   },
 ];
 
-export interface SodViolation extends SodConflict {}
+/** A conflict that a proposed permission set actually triggers. Same shape
+ *  as the rule it came from; named separately because the two read very
+ *  differently at call sites. */
+export type SodViolation = SodConflict;
 
 /**
  * Check a proposed permission set against the matrix.

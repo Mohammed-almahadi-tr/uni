@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 import { Prisma } from '@/generated/prisma/client';
 import { prisma, withTenant, type Tx, type TxOptions } from '@/lib/db/client';
 import type { PrismaClient } from '@/generated/prisma/client';
+import { canonicalJson } from '@/lib/canonical-json';
 
 export class IdempotencyConflictError extends Error {
   constructor(readonly key: string) {
@@ -47,21 +48,7 @@ export class IdempotencyInFlightError extends Error {
  * rejecting it as a conflict would be a bug in us, not in them.
  */
 export function hashRequest(body: unknown): string {
-  return createHash('sha256').update(canonicalise(body)).digest('hex');
-}
-
-function canonicalise(value: unknown): string {
-  if (value === null || value === undefined) return 'null';
-  if (value instanceof Date) return JSON.stringify(value.toISOString());
-  if (value instanceof Prisma.Decimal) return JSON.stringify(value.toFixed());
-  if (Array.isArray(value)) return `[${value.map(canonicalise).join(',')}]`;
-  if (typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => v !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalise(v)}`).join(',')}}`;
-  }
-  return JSON.stringify(value);
+  return createHash('sha256').update(canonicalJson(body)).digest('hex');
 }
 
 export interface IdempotentResult<T> {

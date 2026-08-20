@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { post, reverse, UnbalancedVoucherError, InvalidVoucherError } from '@/lib/ledger/posting';
 import { PeriodNotOpenError } from '@/lib/ledger/period';
-import { asSystem, asTenant, makeTenant, testDb, disconnectAll, JAN, MAR, type Fixture } from './helpers';
+import { asSystem, asTenant, makeTenant, disconnectAll, JAN, MAR, type Fixture } from './helpers';
 
 let f: Fixture;
 

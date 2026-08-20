@@ -6,14 +6,13 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 ledger core built and verified; two Phase 0 items remain.**
-Ledger invariants and platform spine are in place. No screens yet — that is
-deliberate: every correctness property of this product lives in the ledger,
-and all of it is cheaper to build before the first screen than after.
+**Status: Phase 0 complete.** Ledger invariants, platform spine, auth/RBAC
+with segregation of duties, and the bilingual RTL shell are all built and
+verified. **172 tests across 9 suites; typecheck, lint and production build
+clean.**
 
-Still outstanding before Tracks A-C start: auth/RBAC with the
-segregation-of-duties matrix (plan §4.8), and the design system, RTL shell and
-Arabic monetary speller (plan §4.9).
+Tracks A (finance), B (student) and C (public surface) may now start in
+parallel.
 
 ---
 
@@ -24,7 +23,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 71 tests
+npm test              # 172 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -156,6 +155,9 @@ built into PostgreSQL 13+ and needs no extension.
 | Idempotency keys | [`src/lib/idempotency.ts`](src/lib/idempotency.ts) | A cashier double-pressing Save on a slow link is the expected condition at these campuses |
 | Hash-chained audit log | [`src/lib/audit/log.ts`](src/lib/audit/log.ts) | Legacy *deleted* the draft row on approval, destroying the only evidence a voucher was ever reviewed |
 | Role-based tenant isolation | [`src/lib/db/client.ts`](src/lib/db/client.ts) | — |
+| Argon2id passwords, sessions, TOTP | [`src/lib/auth/`](src/lib/auth/) | Legacy compared **cleartext** passwords in application code, and `sa` credentials were compiled into the executable |
+| 52 permissions + 13-pair SoD matrix | [`src/lib/auth/permissions.ts`](src/lib/auth/permissions.ts) | Legacy had *no roles at all* — one Enable/Disable flag, and any user could approve any voucher |
+| Arabic تفقيط, Hijri calendar, name search | [`src/lib/i18n/`](src/lib/i18n/) | Legacy printed an English speller with `.Replace("Dollar","Pound")`; Arabic amounts-in-words never worked |
 | Database-enforced invariants | [`prisma/migrations/*_ledger_invariants`](prisma/migrations) | Legacy checked balance in the UI only, so any non-UI code path could post a one-sided entry |
 
 ### The invariants are in the database
@@ -176,8 +178,15 @@ tests/concurrency.test.ts   7  60 parallel postings → 60 gapless numbers;
                                idempotent retry
 tests/isolation.test.ts    13  cross-tenant read/write, at the database layer
 tests/audit.test.ts         7  chain integrity, append-only, tamper detection
-                           ──
-                           71
+tests/auth.test.ts         38  permissions, SoD matrix, passwords, sessions,
+                               authorization, self-approval, TOTP
+tests/auth-flow.test.ts    21  login, lockout, revocation, SoD at assignment,
+                               MFA replay refusal, user tenant isolation
+tests/i18n.test.ts         37  Arabic/English spelling, currency agreement,
+                               Hijri round-trip, Arabic search normalisation
+tests/i18n-catalogue.test.ts 6 message parity, no untranslated strings
+                           ───
+                           172
 ```
 
 ---

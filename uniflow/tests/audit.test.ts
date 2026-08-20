@@ -69,6 +69,45 @@ describe('the chain', () => {
     expect(v.entriesChecked).toBe(25);
   });
 
+  it('survives jsonb reordering the keys of a multi-key payload', async () => {
+    // Regression. Postgres jsonb normalises object keys by length then
+    // bytewise, so a payload written as {nameAr, nameEn, requiresCostCenter,
+    // code} reads back as {code, nameAr, nameEn, requiresCostCenter}. Hashing
+    // the raw JSON.stringify made the verifier report tampering on every
+    // multi-key change — which is nearly every real change. The hash is now
+    // taken over a canonical, key-sorted serialisation.
+    const f = await makeTenant();
+    await asTenant(f.tenantId, (tx) =>
+      audit(tx, f.tenantId, {
+        actorId: f.userId,
+        action: 'UPDATE',
+        resourceType: 'account',
+        resourceId: 'a1',
+        before: { nameAr: 'x', nameEn: 'y', requiresCostCenter: false, code: '51215' },
+        after: { nameAr: 'x', nameEn: 'z', requiresCostCenter: true, code: '51215' },
+      }),
+    );
+
+    const v = await asTenant(f.tenantId, (tx) => verifyChain(tx, f.tenantId));
+    expect(v.ok, v.reason).toBe(true);
+  });
+
+  it('survives nested and array payloads', async () => {
+    const f = await makeTenant();
+    await asTenant(f.tenantId, (tx) =>
+      audit(tx, f.tenantId, {
+        actorId: f.userId,
+        action: 'UPDATE',
+        resourceType: 'role.permissions',
+        resourceId: 'r1',
+        before: { permissions: ['voucher.read', 'coa.read'], meta: { z: 1, a: 2 } },
+        after: { meta: { a: 2, z: 3 }, permissions: ['coa.read', 'voucher.read'] },
+      }),
+    );
+    const v = await asTenant(f.tenantId, (tx) => verifyChain(tx, f.tenantId));
+    expect(v.ok, v.reason).toBe(true);
+  });
+
   it('allocates sequences without forking under concurrent writes', async () => {
     const f = await makeTenant();
     await Promise.all(

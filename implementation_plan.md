@@ -28,19 +28,16 @@ Version 1.0.0 was written from the legacy system's form and report filenames. Re
 
 ## 0.1 Build status
 
-**Phase 0 ledger core is built and verified; two Phase 0 items remain.** The
+**Phase 0 is complete. The gate is closed and Tracks A-C may start.** The
 application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
-path. 71 tests pass, typecheck and production build are clean.
+path.
 
-Done: §4.1-§4.7 and §4.10. Outstanding before the gate closes: **§4.8**
-auth/RBAC/segregation-of-duties enforcement, and **§4.9** the design system,
-RTL shell and Arabic monetary speller. Tracks A-C should not start until those
-land — §4.8 in particular, because every screen built before the permission
-model exists will need retrofitting.
+**172 tests pass across 9 suites; typecheck, lint and production build are all
+clean.** Every item §4.1-§4.10 is built and verified.
 
-Four things were decided or corrected during the build and are recorded here
-because they change what this document said:
+Six things were decided or corrected during the build and are recorded here
+because they change what this document said (D-F are covered below the table):
 
 | # | Decision / correction | Effect |
 | :--- | :--- | :--- |
@@ -86,13 +83,16 @@ another tenant's ledger.
 | §4.5 Idempotency | Claim-before-work with stored response; replay returns the original; same key + different body is an error; failed work releases the claim |
 | §4.6 Multi-tenancy and RLS | Role-based; verified at the database layer, not the API layer |
 | §4.7 Audit log | Hash-chained per tenant, advisory-locked sequence, append-only by trigger; verifier locates both removal and alteration |
-| §4.9 Design system / localisation shell | **Not yet built.** Deferred with Track C; the UTF8 fix (D) is its prerequisite |
+| §4.8 Auth, RBAC, segregation of duties | Argon2id, JWT sessions with immediate revocation, TOTP second factor with replay refusal, 52-permission catalogue, 13-pair SoD matrix enforced at role-save AND at role-assignment, plus per-document self-approval refusal |
+| §4.9 Design system / localisation shell | Tailwind v4 tokens with per-tenant HSL palette, RTL shell (`dir` on `<html>`, Cairo for Arabic), next-intl with parity-tested catalogues, **working Arabic تفقيط**, Hijri/Gregorian dual calendar, Arabic search normalisation |
 | §4.10 Data model accommodates Academic Records | Reviewed; `subledgerType`/`subledgerId`, `sourceModule`/`sourceRef` and the term-agnostic period model leave room for Module 18 without reshaping the ledger |
 
-**Outstanding for the Phase 0 gate:** §4.8 auth/RBAC/SoD enforcement and §4.9
-the design system, RTL shell and Arabic monetary speller. Both are scaffolded
-in the schema (`users`, `roles`, `permissions`, `role_permissions`) but the
-enforcement code and UI are not written.
+### Two further corrections found while closing the gate
+
+| # | Correction | Effect |
+| :--- | :--- | :--- |
+| E | **Next.js 16 renamed Middleware to Proxy** — the file is `src/proxy.ts`, and a `middleware.ts` is simply not picked up | Locale negotiation lives there. Authorisation deliberately does **not**: Next's own guidance is that Proxy is for optimistic checks, not session management or authorisation. `requirePermission()` runs in the data access layer |
+| F | **Arabic noun agreement is not what the first fixtures assumed** | After آلاف the counted noun is *singular* — خمسة آلاف جنيه, not جنيهات — and any count of 11 or more reverts to the singular. Three test fixtures were wrong and the implementation was right; corrected with the rule stated in the test. Getting this wrong prints a malformed amount on every voucher |
 
 ---
 
