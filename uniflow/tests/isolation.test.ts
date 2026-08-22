@@ -233,3 +233,88 @@ describe('missing tenant context is closed by default', () => {
     ).rejects.toThrow(/not a uuid/i);
   });
 });
+
+describe('RLS coverage is structural, not per-table goodwill', () => {
+  // The tests above check the tables that existed when they were written. This
+  // one checks the tables that exist now. Adding a table and forgetting its
+  // policy is silent — the new table simply has no isolation, and every query
+  // against it returns every tenant's rows. Nothing else in the system would
+  // report that.
+  //
+  // Two tables are global on purpose: `permissions` is a catalogue of
+  // capability keys shared by every tenant, and `_prisma_migrations` is the
+  // migration ledger. Anything else appearing here is an omission.
+  const INTENTIONALLY_GLOBAL = new Set(['permissions', '_prisma_migrations']);
+
+  it('protects every table in the schema, or declares it global', async () => {
+    const rows = await asSystem(
+      (tx) => tx.$queryRaw<Array<{ table_name: string; rls: boolean; policies: bigint }>>`
+        SELECT c.relname AS table_name,
+               c.relrowsecurity AS rls,
+               (SELECT count(*) FROM pg_policy p WHERE p.polrelid = c.oid) AS policies
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public'
+           AND c.relkind = 'r'
+         ORDER BY c.relname
+      `,
+    );
+
+    expect(rows.length).toBeGreaterThan(20);
+
+    const unprotected = rows
+      .filter((r) => !INTENTIONALLY_GLOBAL.has(r.table_name))
+      .filter((r) => !r.rls || Number(r.policies) === 0)
+      .map((r) => r.table_name);
+
+    expect(unprotected).toEqual([]);
+  });
+
+  it('confines the newest tables too, not just the ones the suite names', async () => {
+    // Written when draft_sequences and voucher_attachments were added, and
+    // kept as the pattern for the next module: prove the confinement with a
+    // query, from inside another tenant's session.
+    const alphaDraft = await asSystem((tx) =>
+      tx.voucherDraft.create({
+        data: {
+          tenantId: alpha.tenantId,
+          draftNo: 'ISO-0001',
+          voucherType: 'JOURNAL',
+          docDate: JAN,
+          description: 'ALPHA DRAFT',
+          linesJson: [],
+          fiscalYearId: alpha.fiscalYearId,
+          createdById: alpha.userId,
+        },
+        select: { id: true },
+      }),
+    );
+
+    await asSystem((tx) =>
+      tx.voucherAttachment.create({
+        data: {
+          tenantId: alpha.tenantId,
+          draftId: alphaDraft.id,
+          fileName: 'alpha-secret.pdf',
+          contentType: 'application/pdf',
+          byteSize: 10,
+          storageKey: `iso/${alpha.tenantId}/secret.pdf`,
+          sha256: 'b'.repeat(64),
+          uploadedById: alpha.userId,
+        },
+      }),
+    );
+
+    const seen = await asTenant(beta.tenantId, async (tx) => ({
+      drafts: await tx.voucherDraft.count(),
+      attachments: await tx.voucherAttachment.count(),
+      sequences: await tx.$queryRaw<Array<{ n: bigint }>>`
+        SELECT count(*) AS n FROM draft_sequences WHERE tenant_id = ${alpha.tenantId}::uuid
+      `,
+    }));
+
+    expect(seen.drafts).toBe(0);
+    expect(seen.attachments).toBe(0);
+    expect(Number(seen.sequences[0].n)).toBe(0);
+  });
+});

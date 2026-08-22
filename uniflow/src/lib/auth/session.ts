@@ -15,8 +15,10 @@ import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
  * work each request already does.
  *
  * `mfaVerified` is in the token because it is a property of *this session*
- * rather than of the user, and it is what gates approvals above the tenant's
- * threshold.
+ * rather than of the user. It gates every permission in
+ * MFA_REQUIRED_PERMISSIONS — voucher approval and reversal among them —
+ * unconditionally rather than above an amount threshold, since a threshold is
+ * a published figure an attacker can stay under.
  */
 
 const ALG = 'HS256';

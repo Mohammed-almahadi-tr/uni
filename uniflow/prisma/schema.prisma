@@ -90,6 +90,9 @@ enum DraftState {
   PENDING_APPROVAL
   POSTED
   REJECTED
+  /// Abandoned by its maker before review. Distinct from REJECTED, which is a
+  /// checker's verdict and carries their comment. Neither is ever deleted.
+  CANCELLED
 }
 
 enum AuditAction {
@@ -135,6 +138,8 @@ model Tenant {
   exchangeRates   ExchangeRate[]
   periodBalances  AccountPeriodBalance[]
   voucherDrafts   VoucherDraft[]
+  draftSequences  DraftSequence[]
+  attachments     VoucherAttachment[]
 
   @@map("tenants")
 }
@@ -173,6 +178,7 @@ model User {
   postedHeaders TransactionHeader[] @relation("PostedBy")
   auditEntries  AuditLog[]
   recoveryCodes RecoveryCode[]
+  attachments   VoucherAttachment[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -272,9 +278,9 @@ model AuditLog {
 /// A cashier double-pressing Save on a slow link is the expected condition at
 /// these campuses, not the exceptional one (SRS REQ-NFR-07).
 model IdempotencyKey {
-  key      String @db.VarChar(255)
-  tenantId String @map("tenant_id") @db.Uuid
-  endpoint String
+  key          String    @db.VarChar(255)
+  tenantId     String    @map("tenant_id") @db.Uuid
+  endpoint     String
   /// SHA-256 of the canonicalised request body. Same key + different body is
   /// an error, not a replay.
   requestHash  String    @map("request_hash")
@@ -323,10 +329,12 @@ model FiscalYear {
   endDate   DateTime         @map("end_date") @db.Date
   status    FiscalYearStatus @default(FUTURE)
 
-  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  periods   FiscalPeriod[]
-  sequences DocumentSequence[]
-  headers   TransactionHeader[]
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periods        FiscalPeriod[]
+  sequences      DocumentSequence[]
+  headers        TransactionHeader[]
+  drafts         VoucherDraft[]
+  draftSequences DraftSequence[]
 
   @@unique([tenantId, name])
   @@index([tenantId, startDate])
@@ -366,9 +374,9 @@ model Account {
   level    Int     @db.SmallInt
   parentId String? @map("parent_id") @db.Uuid
 
-  normalBalance NormalBalance @map("normal_balance")
+  normalBalance      NormalBalance  @map("normal_balance")
   /// Only level-5 accounts may receive postings. Levels 1-4 aggregate.
-  isPostable    Boolean       @default(false) @map("is_postable")
+  isPostable         Boolean        @default(false) @map("is_postable")
   /// Control accounts (Student AR, Sponsor AR, Vendor AP) accept postings
   /// only with sub-ledger identity attached, so the sub-ledger and the
   /// control account cannot silently diverge.
@@ -413,25 +421,95 @@ model CostCenter {
 /// NEVER deleted on approval — deleting it destroyed the only evidence the
 /// voucher had been reviewed (SRS REQ-FIN-04).
 model VoucherDraft {
-  id             String      @id @default(uuid()) @db.Uuid
-  tenantId       String      @map("tenant_id") @db.Uuid
-  draftNo        String      @map("draft_no")
-  voucherType    VoucherType @map("voucher_type")
-  docDate        DateTime    @map("doc_date") @db.Date
-  description    String
-  state          DraftState  @default(DRAFT)
-  linesJson      Json        @map("lines_json")
-  createdById    String      @map("created_by_id") @db.Uuid
-  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  postedHeaderId String?     @unique @map("posted_header_id") @db.Uuid
+  id          String      @id @default(uuid()) @db.Uuid
+  tenantId    String      @map("tenant_id") @db.Uuid
+  draftNo     String      @map("draft_no")
+  voucherType VoucherType @map("voucher_type")
+  docDate     DateTime    @map("doc_date") @db.Date
+  description String
+  state       DraftState  @default(DRAFT)
+  /// The proposed lines, exactly as the maker entered them. Frozen by trigger
+  /// once the draft leaves DRAFT/REJECTED: a maker who could edit the lines
+  /// after review would have defeated the whole control.
+  linesJson   Json        @map("lines_json")
 
-  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  events ApprovalEvent[]
-  posted TransactionHeader? @relation(fields: [postedHeaderId], references: [id])
+  /// Fiscal year of docDate, resolved when the draft is saved. Carried so the
+  /// work queue can filter by year without touching the period table, and so
+  /// the draft number series is per year.
+  fiscalYearId String  @map("fiscal_year_id") @db.Uuid
+  /// Denormalised total (debits) so a work-queue listing does not have to
+  /// parse linesJson for every row. Recomputed on every save.
+  totalAmount  Decimal @default(0) @map("total_amount") @db.Decimal(19, 4)
+
+  sourceModule SourceModule @default(MANUAL) @map("source_module")
+  sourceRef    String?      @map("source_ref")
+
+  createdById    String   @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  postedHeaderId String?  @unique @map("posted_header_id") @db.Uuid
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fiscalYear  FiscalYear          @relation(fields: [fiscalYearId], references: [id])
+  events      ApprovalEvent[]
+  attachments VoucherAttachment[]
+  posted      TransactionHeader?  @relation(fields: [postedHeaderId], references: [id])
 
   @@unique([tenantId, draftNo])
   @@index([tenantId, state])
+  @@index([tenantId, createdById, state])
   @@map("voucher_drafts")
+}
+
+/// Draft numbering, per tenant x fiscal year.
+///
+/// Deliberately a different series from `document_sequences`: a draft number
+/// identifies a proposal, a voucher number identifies a statutory document.
+/// Sharing one counter would burn voucher numbers on drafts that are never
+/// approved, and an auditor asking why receipt 41 does not exist deserves a
+/// better answer than "someone changed their mind".
+model DraftSequence {
+  tenantId     String @map("tenant_id") @db.Uuid
+  fiscalYearId String @map("fiscal_year_id") @db.Uuid
+  nextValue    Int    @default(1) @map("next_value")
+  prefix       String @default("DFT-")
+  padding      Int    @default(6)
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fiscalYear FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, fiscalYearId])
+  @@map("draft_sequences")
+}
+
+/// Supporting evidence for a draft — the supplier invoice, the bank advice,
+/// the signed request. Only the metadata lives here; the bytes live in object
+/// storage under `storageKey`.
+///
+/// Attachable only while the draft is editable, and frozen by the same trigger
+/// that freezes the lines. A checker approves what they were shown.
+model VoucherAttachment {
+  id          String @id @default(uuid()) @db.Uuid
+  tenantId    String @map("tenant_id") @db.Uuid
+  draftId     String @map("draft_id") @db.Uuid
+  fileName    String @map("file_name")
+  contentType String @map("content_type")
+  byteSize    Int    @map("byte_size")
+  /// Object-storage path. Unique, so two rows can never claim the same blob.
+  storageKey  String @unique @map("storage_key")
+  /// Content digest, recorded at upload. Lets a later audit prove the file
+  /// served today is the file the checker approved.
+  sha256      String @db.Char(64)
+
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  uploadedAt   DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  draft      VoucherDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  uploadedBy User         @relation(fields: [uploadedById], references: [id])
+
+  @@index([draftId])
+  @@map("voucher_attachments")
 }
 
 /// Every state transition, including rejections and their mandatory comments.

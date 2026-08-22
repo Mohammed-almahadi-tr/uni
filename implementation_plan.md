@@ -1,6 +1,6 @@
 # Implementation Plan: UniFlow Multi-Tenant University ERP & White-Label Web Platform
 
-**Version:** 2.0.0 · **Supersedes:** 1.0.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.0.0
+**Version:** 2.1.0 · **Supersedes:** 1.0.0, 2.0.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.1.0
 
 Transformation of the legacy VB.NET / MS SQL desktop university system (Oasis E-University at Nile College; the Ribat University Application at Ribat and UOT) into a multi-tenant web application: student registration and lifecycle management, a double-entry university finance engine, and a white-label landing page per university client, built with **Next.js**, **shadcn UI** and **PostgreSQL**.
 
@@ -33,10 +33,11 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**201 tests pass across 10 suites; typecheck, lint and production build are all
+**259 tests pass across 11 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
-**Track A1 (Chart of Accounts) is also complete** — see §0.2.
+**Track A1 (Chart of Accounts) and A2 (journal vouchers and maker-checker) are
+also complete** — see §0.2.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -135,6 +136,54 @@ serialisation ([`src/lib/canonical-json.ts`](uniflow/src/lib/canonical-json.ts))
 shared with the idempotency key hasher, which needed the same property for the
 same reason. Two regression tests pin it: a multi-key payload, and a nested
 payload with arrays.
+
+### A2 — Journal Vouchers & Maker-Checker · complete
+
+The legacy approval flow, in full: approving a voucher inserted its lines into
+`Transactionees` and then ran `DELETE FROM TempVouchers`
+(frmApprovingVouchers.vb:941-991). No reviewer stage, no reject path, no
+comment, no approver recorded — and the delete destroyed the only evidence
+that a voucher had ever been reviewed. With no roles in the system, anyone who
+could open the approvals screen could approve their own work.
+
+| Delivered | Notes |
+| :--- | :--- |
+| Four-state workflow | `DRAFT → PENDING_REVIEW → PENDING_APPROVAL → POSTED`, `REJECTED` reachable from either checker stage, plus `CANCELLED` for a maker abandoning their own draft. The legal transitions are enforced by trigger as well as in code |
+| Full `approval_events` history | Every transition retained with actor, comment and timestamp. Append-only by trigger, because a rejection comment that can be edited afterwards is not evidence |
+| Mandatory rejection comment | In code *and* as a CHECK constraint. A rejection with no reason produces a resubmission with the same defect |
+| Approver ≠ maker ≠ reviewer | Three independent controls: the SoD matrix on permissions held, `assertNotSelfApproval` per document, and a reviewer check that reads who actually acted on *this* document — the case the matrix cannot see when roles change between stages |
+| Content freeze | Once submitted, lines, date, description and type are immutable until rejection. Enforced at the table, because the attack (submit clean, swap the lines after review, get it approved) works against whichever code path forgets |
+| Drafts are never deleted | Trigger-enforced. This is the single legacy behaviour the module exists to replace |
+| Approval and posting in one transaction | A draft marked POSTED whose ledger entry rolled back cannot exist, and neither can the converse |
+| Separate draft number series | An abandoned draft never burns a statutory voucher number. Allocated by the same row-locked upsert discipline as voucher numbers |
+| Attachments | Metadata plus SHA-256 digest, frozen by the same trigger as the lines — "a checker approves what they were shown" has to include the evidence. Bytes go to object storage when that layer lands |
+| Reversal | Bidirectional linkage, mandatory reason, once-only by UNIQUE constraint, posting into the period of the reversal date rather than the original's |
+| Work queue | `awaitingMe` shows a checker only the stage they hold and never their own drafts; a queue listing items you cannot action trains people to ignore it |
+| 56 tests | Including the four that describe attacks: self-approval, one person taking both checks, editing after review, and two approvers pressing Approve at the same instant |
+
+**On "MFA above the approval threshold".** The threshold is zero, deliberately.
+`voucher.approve` and `voucher.reverse` always demand a verified second factor.
+A threshold below which approvals need no second factor is a documented amount
+an attacker can stay under; the cost of a six-digit code is a few seconds. This
+is stricter than §3 A2 specified, and is recorded here rather than silently
+implemented.
+
+**One refactor worth noting.** The line rules — sides, signs, FX conversion,
+balancing — now live in one place
+([`src/lib/ledger/lines.ts`](uniflow/src/lib/ledger/lines.ts)) shared by the
+posting engine and the voucher grid. They were about to be written twice, once
+throwing and once collecting, and a grid that reports "balanced" against a
+server that reports "out by 0.01" leaves the maker unable to proceed and unable
+to see why. Rounding a foreign-currency line to functional currency is exactly
+where that divergence would have come from; a test now posts an FX voucher and
+asserts the grid total equals the ledger total to the last digit.
+
+**A structural gap closed while building it.** The isolation suite tested the
+tables that existed when it was written. Adding a table and forgetting its RLS
+policy is silent — the table simply has no isolation and every query returns
+every tenant's rows. There is now a sweep over `pg_class` that fails if any
+table in `public` lacks row-level security and a policy, with two names
+declared global on purpose (`permissions`, `_prisma_migrations`).
 
 ---
 

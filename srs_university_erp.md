@@ -1,10 +1,25 @@
 # Software Requirements Specification (SRS)
 ## Multi-Tenant University ERP & White-Label Web Platform
 **Project Name:** UniFlow Enterprise ERP (Next-Gen Transformation of Oasis E-University)
-**Document Version:** 2.0.0
-**Supersedes:** v1.0.0
+**Document Version:** 2.1.0
+**Supersedes:** v1.0.0, v2.0.0
 **Target Audience:** University Management, Technical Architects, Development Team, Product Owners, Quality Assurance
 **Standard Compliance:** IEEE Std 830-1998 / ISO/IEC/IEEE 29148
+
+---
+
+## 0.0 Changes in Version 2.1.0 — corrections made while building
+
+Version 2.0.0 was written before Phase 0 and Track A1/A2 were built. Four of
+its statements turned out to be wrong or weaker than what the build required,
+and are corrected here rather than left to diverge.
+
+| # | Correction | Reason |
+| :--- | :--- | :--- |
+| 1 | REQ-FIN-04: MFA on approval is unconditional, not above a tenant-configured amount threshold | A threshold below which no second factor is needed is a published figure an attacker can stay under. The cost of a six-digit code on an approval is a few seconds |
+| 2 | REQ-FIN-04 gains three requirements the build showed to be necessary: content freeze on submission, a separate draft number series, and approver ≠ reviewer as well as approver ≠ maker | Without the freeze, a maker passes a clean voucher through review and edits it before approval — the standard attack on maker-checker. Without a separate series, abandoned drafts burn statutory voucher numbers |
+| 3 | §4.3: "Posted transactions are immutable" and "Audit log is tamper-evident" are enforced by TRIGGER, not by revoked grants | A table's owner is not bound by `REVOKE`, and on Supabase the default application role owns everything in `public`. The grant-based version would have been inert |
+| 4 | §4.3 gains the maker-checker invariants (drafts never deleted, content frozen, legal transitions, mandatory rejection comment, append-only approval history, posted-draft linkage) | Each is a constraint the build added; the document should say where correctness actually lives |
 
 ---
 
@@ -292,11 +307,15 @@ graph LR
   - Stage 3 — Financial Manager approves or rejects with a mandatory comment.
   - Stage 4 — On approval the voucher receives an immutable sequential number from the allocator (REQ-FIN-06) and is committed to the ledger.
   - **The full state history is retained**, including rejections, comments, actor identity and timestamps. Drafts are never deleted. *(The legacy implementation deleted the draft row on approval, destroying the only evidence the voucher had ever been reviewed.)*
-  - The approver shall not be the maker (REQ-SOD-01).
-  - Approvals above a tenant-configured amount threshold require MFA re-authentication.
+  - A maker may withdraw their own unsubmitted draft; it becomes `Cancelled` and remains visible with its reason. Cancellation is distinct from rejection, which is a checker's verdict.
+  - **Draft content is frozen on submission.** Lines, document date, description and voucher type become immutable until the voucher is rejected back to the maker. Without this a maker can pass a clean voucher through review and alter it before approval, which defeats the entire control.
+  - Drafts are numbered from a series of their own, separate from the statutory voucher series, so an abandoned or rejected draft never consumes a voucher number.
+  - The approver shall be neither the maker nor the reviewer (REQ-SOD-01). The reviewer check is made against the person who actually performed the review of *this document*, not against the roles they currently hold — roles may change between the two stages.
+  - **Approval and posting are one database transaction.** A draft marked posted whose ledger entry failed, or a ledger entry whose draft was not marked, cannot exist.
+  - Approval and reversal always require MFA re-authentication. *(Earlier drafts of this document set a tenant-configured amount threshold below which no second factor was needed. That threshold is a published figure an attacker can stay under, and the cost of a six-digit code on an approval is a few seconds, so it is fixed at zero.)*
 - **REQ-FIN-05: Audit-Compliant Voucher Reversal Engine**
   - Posted vouchers cannot be edited or deleted by any role.
-  - An authorised controller may reverse a posted voucher: the system creates a linked reversal with inverted debits/credits, sets `reversed = TRUE` and `reversal_id` on the original, sets `reverses_id` on the reversal, and requires a mandatory reason with actor and timestamp.
+  - An authorised controller may reverse a posted voucher: the system creates a linked reversal with inverted debits/credits, stamps `reversed_at` on the original, sets `reverses_id` on the reversal, and requires a mandatory reason with actor and timestamp. Either end of the link answers "is this still live?" without a join.
   - A voucher may be reversed at most once. Reversals cannot themselves be reversed; correct by posting anew.
   - Reversal into a closed period is rejected; the reversal posts to the current open period with the original date recorded as a reference.
 - **REQ-FIN-06: Document Numbering & Sequence Allocation**
@@ -691,11 +710,17 @@ These are constraints, not application conventions. Each exists because the lega
 | Nothing posts to a closed period | Trigger on `transaction_headers` checking `fiscal_periods.status = 'Open'` |
 | Only level-5 accounts receive postings | `CHECK` via FK to accounts where `is_postable` |
 | Control accounts carry sub-ledger identity | `CHECK (NOT is_control_account OR subledger_id IS NOT NULL)` |
-| Posted transactions are immutable | Revoked UPDATE/DELETE grants; corrections only via reversal |
+| Posted transactions are immutable | Trigger on `transaction_headers` and `transaction_lines`; corrections only via reversal. **Not** `REVOKE` — a table's owner is not bound by revoked grants, and on Supabase the application role is an owner by default |
 | Money never loses precision | `numeric(19,4)` on every monetary column |
 | Tenant rows never leak | Row-Level Security policy on every tenant-scoped table |
 | A voucher is reversed at most once | `UNIQUE (reverses_id) WHERE reverses_id IS NOT NULL` |
-| Audit log is tamper-evident | Append-only grants; `prev_hash` chain verified by a scheduled job |
+| Audit log is tamper-evident | Append-only trigger; `prev_hash` chain over a canonical key-sorted serialisation, verified by a scheduled job. The canonical form is required because `jsonb` does not preserve object key order |
+| Voucher drafts are never deleted | Trigger on `voucher_drafts` refusing DELETE outright |
+| A submitted draft's content cannot change | Trigger comparing lines, date, description and type against the prior row once the state leaves `Draft`/`Rejected` |
+| Only legal state transitions occur | Trigger enumerating the permitted `(from, to)` pairs |
+| A rejection carries a reason | `CHECK (to_state <> 'REJECTED' OR btrim(comment) <> '')` on `approval_events` |
+| Approval history cannot be rewritten | Append-only trigger on `approval_events` |
+| A posted draft points at its voucher | `CHECK` tying `state = 'Posted'` to a non-null `posted_header_id`, and the converse |
 
 ---
 

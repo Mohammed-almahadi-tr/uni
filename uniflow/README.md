@@ -6,11 +6,13 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete · Track A1 (Chart of Accounts) complete.**
-Ledger invariants, platform spine, auth/RBAC with segregation of duties, the
-bilingual RTL shell, and a normalised chart of accounts with a standard
-university template. **201 tests across 10 suites; typecheck, lint and
-production build clean.**
+**Status: Phase 0 complete · Track A1 (Chart of Accounts) and A2 (journal
+vouchers & maker-checker) complete.** Ledger invariants, platform spine,
+auth/RBAC with segregation of duties, the bilingual RTL shell, a normalised
+chart of accounts with a standard university template, and a four-state
+maker-checker workflow whose drafts are never deleted and whose content is
+frozen the moment a checker is asked to look at it. **259 tests across 11
+suites; typecheck, lint and production build clean.**
 
 Tracks A (finance), B (student) and C (public surface) run in parallel from
 here.
@@ -24,7 +26,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 201 tests
+npm test              # 259 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -177,27 +179,71 @@ tests/ledger.test.ts       28  balance, period lock, postability, control
                                accounts, immutability, reversal, aggregates
 tests/concurrency.test.ts   7  60 parallel postings → 60 gapless numbers;
                                idempotent retry
-tests/isolation.test.ts    13  cross-tenant read/write, at the database layer
-tests/audit.test.ts         7  chain integrity, append-only, tamper detection
+tests/isolation.test.ts    15  cross-tenant read/write at the database layer,
+                               plus a structural sweep that fails if ANY table
+                               is added without a policy
+tests/audit.test.ts         9  chain integrity, append-only, tamper detection,
+                               jsonb key-order regression
 tests/auth.test.ts         38  permissions, SoD matrix, passwords, sessions,
                                authorization, self-approval, TOTP
 tests/auth-flow.test.ts    21  login, lockout, revocation, SoD at assignment,
                                MFA replay refusal, user tenant isolation
 tests/i18n.test.ts         37  Arabic/English spelling, currency agreement,
                                Hijri round-trip, Arabic search normalisation
-tests/i18n-catalogue.test.ts 6 message parity, no untranslated strings
+tests/i18n-catalogue.test.ts 5 message parity, no untranslated strings
 tests/coa.test.ts          27  template integrity, install idempotency, level
                                derivation, sign inheritance, deactivation
+tests/voucher.test.ts      56  live balancing, draft numbering, the four-state
+                               workflow, self-approval and duplicate-checker
+                               refusal, the content freeze, concurrent
+                               approval, attachments, reversal
                            ───
-                           201
+                           259
 ```
+
+---
+
+## What Track A has delivered so far
+
+**A1 — Chart of accounts.** A normalised tree (id, code, parent, derived
+level) replacing five denormalised TEXT columns whose hierarchy was rebuilt by
+five nested cursors on five separate connections. Ships a 60-account
+university template with the three sub-ledger control accounts, accumulated
+depreciation as a contra-asset, unearned fees, and FX difference accounts —
+none of which the legacy chart had.
+
+**A2 — Journal vouchers and maker-checker.** `DRAFT → PENDING_REVIEW →
+PENDING_APPROVAL → POSTED`, with `REJECTED` reachable from either checker
+stage and `CANCELLED` for a maker who abandons their own work. What the legacy
+system did instead: inserted the lines and then
+`DELETE FROM TempVouchers` — no reviewer, no reject path, no comment, no
+approver recorded, and the delete destroyed the only evidence a review had
+happened.
+
+Four properties are enforced at the table, not by convention, because each is
+an attack rather than a mistake:
+
+| Property | Where | What it stops |
+| :--- | :--- | :--- |
+| Drafts are never deleted | `trg_draft_transition` | The legacy behaviour, exactly |
+| Content frozen once submitted | `trg_draft_transition` | Submitting clean, then swapping the lines after review and before approval |
+| Approver ≠ maker ≠ reviewer | [`src/lib/voucher/draft.ts`](src/lib/voucher/draft.ts) | One person taking both checks, which the permission matrix cannot see when roles change between stages |
+| Approval and posting are one transaction | [`src/lib/voucher/draft.ts`](src/lib/voucher/draft.ts) | A draft marked POSTED whose ledger entry rolled back |
+
+Two supporting pieces worth knowing about. Draft numbers come from **their own
+series**, so an abandoned draft never burns a statutory voucher number. And
+the balancing rules live in [`src/lib/ledger/lines.ts`](src/lib/ledger/lines.ts),
+shared by the voucher grid and the posting engine as one implementation rather
+than two specifications — a grid that says "balanced" against a server that
+says "out by 0.01" leaves the maker stuck with no way to see why.
 
 ---
 
 ## Next
 
-Track A (finance), Track B (student) and Track C (public surface) can now run
-in parallel — see the roadmap in
+Track A continues at **A3 — fee catalog, student AR and cashiering**, which is
+the critical path. Track B (student) and Track C (public surface) can run in
+parallel — see the roadmap in
 [`../implementation_plan.md`](../implementation_plan.md). They converge at the
 **registration-posts-to-GL** milestone, which is the integration the legacy
 system never made.

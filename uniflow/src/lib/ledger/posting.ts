@@ -25,27 +25,21 @@
  * exist to produce a sentence a human can act on; the constraints exist so
  * that correctness does not depend on this file being right.
  */
-import { Prisma } from '@/generated/prisma/client';
-import type { SourceModule, SubledgerType, VoucherType } from '@/generated/prisma/enums';
+import type { SourceModule, VoucherType } from '@/generated/prisma/enums';
 import type { Tx } from '@/lib/db/client';
-import { sum, toFunctional, toStorage, ZERO, type Money, type MoneyInput } from '@/lib/money';
+import type { Money } from '@/lib/money';
+import { summariseLines, type LineIssueCode, type PostingLine } from './lines';
 import { allocateDocumentNumber } from './sequence';
 import { resolveOpenPeriod, toDateOnly } from './period';
 
-export interface PostingLine {
-  accountId: string;
-  costCenterId?: string | null;
-  subledgerType?: SubledgerType | null;
-  subledgerId?: string | null;
-  /** Currency this line was entered in. Defaults to the tenant's functional
-   *  currency when omitted. */
-  txnCurrency?: string;
-  /** Rate to the functional currency. 1 when the line is already functional. */
-  fxRate?: MoneyInput;
-  debit?: MoneyInput;
-  credit?: MoneyInput;
-  description?: string | null;
-}
+export type {
+  PostingLine,
+  PreparedLine,
+  LineIssue,
+  LineIssueCode,
+  VoucherSummary,
+} from './lines';
+export { summariseLines } from './lines';
 
 export interface PostingDocument {
   voucherType: VoucherType;
@@ -113,78 +107,28 @@ export async function post(
   });
   const functional = tenant.functionalCurrency.trim();
 
-  if (doc.lines.length < 2) {
-    throw new InvalidVoucherError(
-      `A double entry needs at least two lines; received ${doc.lines.length}.`,
-    );
-  }
   if (doc.reversesId && !doc.reversalReason?.trim()) {
     throw new InvalidVoucherError('A reversal requires a stated reason.');
   }
 
+  // The same rules the voucher grid evaluates live, evaluated once more here.
+  // Shared implementation, not a shared specification — see ledger/lines.ts.
+  const summary = summariseLines(doc.lines, functional);
+  const { lines: prepared, totalDebit, totalCredit } = summary;
+
+  if (!summary.balanced) {
+    // Report the root cause, not its consequence. A one-line voucher is also
+    // unbalanced; telling the maker it is out by 500 when the real problem is
+    // that they entered one side helps nobody.
+    const first = (code: LineIssueCode) => summary.issues.find((i) => i.code === code);
+    const root = first('LINE_COUNT') ?? first('LINE');
+    if (root) throw new InvalidVoucherError(root.message);
+    if (first('UNBALANCED')) throw new UnbalancedVoucherError(totalDebit, totalCredit);
+    throw new InvalidVoucherError(summary.issues[0].message);
+  }
+
   const docDate = toDateOnly(doc.docDate);
   const period = await resolveOpenPeriod(tx, tenantId, docDate);
-
-  // Normalise every line into functional-currency debit/credit amounts.
-  const prepared = doc.lines.map((line, i) => {
-    const debit = toStorage(line.debit ?? 0);
-    const credit = toStorage(line.credit ?? 0);
-
-    if (debit.isNegative() || credit.isNegative()) {
-      throw new InvalidVoucherError(
-        `Line ${i + 1}: amounts must be non-negative. A negative debit is a credit — enter it as one.`,
-      );
-    }
-    if (debit.isZero() && credit.isZero()) {
-      throw new InvalidVoucherError(`Line ${i + 1}: carries neither a debit nor a credit.`);
-    }
-    if (!debit.isZero() && !credit.isZero()) {
-      throw new InvalidVoucherError(
-        `Line ${i + 1}: has both a debit and a credit. Split it into two lines.`,
-      );
-    }
-
-    const txnCurrency = (line.txnCurrency ?? functional).trim();
-    const fxRate = new Prisma.Decimal(line.fxRate ?? 1);
-    if (fxRate.lessThanOrEqualTo(0)) {
-      throw new InvalidVoucherError(`Line ${i + 1}: exchange rate must be positive.`);
-    }
-    if (txnCurrency === functional && !fxRate.equals(1)) {
-      throw new InvalidVoucherError(
-        `Line ${i + 1}: currency is the functional currency (${functional}) but the rate is ${fxRate}.`,
-      );
-    }
-
-    const txnAmount = debit.isZero() ? credit : debit;
-    // Functional amounts are what the balance check operates on. A voucher
-    // balances in one currency or it does not balance.
-    const functionalAmount =
-      txnCurrency === functional ? txnAmount : toFunctional(txnAmount, fxRate);
-
-    return {
-      lineNo: i + 1,
-      accountId: line.accountId,
-      costCenterId: line.costCenterId ?? null,
-      subledgerType: line.subledgerType ?? null,
-      subledgerId: line.subledgerId ?? null,
-      txnCurrency,
-      txnAmount,
-      fxRate,
-      debitAmount: debit.isZero() ? ZERO : functionalAmount,
-      creditAmount: credit.isZero() ? ZERO : functionalAmount,
-      lineDescr: line.description ?? null,
-    };
-  });
-
-  const totalDebit = sum(prepared.map((l) => l.debitAmount));
-  const totalCredit = sum(prepared.map((l) => l.creditAmount));
-
-  if (!totalDebit.equals(totalCredit)) {
-    throw new UnbalancedVoucherError(totalDebit, totalCredit);
-  }
-  if (totalDebit.isZero()) {
-    throw new InvalidVoucherError('A voucher totalling zero carries no information.');
-  }
 
   const { voucherNo, voucherRef } = await allocateDocumentNumber(
     tx,
