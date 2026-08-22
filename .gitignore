@@ -1,0 +1,130 @@
+# ==============================================================================
+# Git Ignore Configuration - UniFlow Enterprise ERP & Root Workspace
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Dependencies & Package Managers
+# ------------------------------------------------------------------------------
+node_modules/
+*/node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ------------------------------------------------------------------------------
+# Next.js, Frontend & Build Artifacts
+# ------------------------------------------------------------------------------
+.next/
+*/.next/
+out/
+*/out/
+build/
+*/build/
+dist/
+*/dist/
+.vercel/
+*/.vercel/
+.turbo/
+*/.turbo/
+
+# TypeScript Build Info
+*.tsbuildinfo
+*/tsconfig.tsbuildinfo
+
+# Generated code / Prisma client
+*/src/generated/
+/src/generated/
+
+# ------------------------------------------------------------------------------
+# Database Files, Binary Logs & Local Data (Prevents GitHub 100MB+ limits)
+# ------------------------------------------------------------------------------
+*.mdf
+*.ldf
+*.ndf
+*.bak
+*.dmp
+*.sqlite
+*.sqlite3
+*.db
+.pgdata/
+*/.pgdata/
+
+# ------------------------------------------------------------------------------
+# Environment Variables & Secrets
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!*/.env.example
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+credentials.json
+
+# ------------------------------------------------------------------------------
+# Python & Virtual Environments
+# ------------------------------------------------------------------------------
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+*/.venv/
+venv/
+*/venv/
+env/
+*/env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# ------------------------------------------------------------------------------
+# Logs, Testing & Diagnostic Dumps
+# ------------------------------------------------------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+coverage/
+*/coverage/
+.system_generated/
+graphify-out/
+
+# ------------------------------------------------------------------------------
+# Operating System & IDE Files
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# IDEs
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln.docstates
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Temporary Files
+*.tmp
+*.temp
+*~
+*.swp
