@@ -6,13 +6,14 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete · Track A1-A3 complete.** Ledger invariants,
+**Status: Phase 0 complete · Track A1-A4 complete.** Ledger invariants,
 platform spine, auth/RBAC with segregation of duties, the bilingual RTL shell,
 a normalised chart of accounts, a four-state maker-checker workflow whose
 drafts are never deleted, and a working cashier desk: fee catalog, student
 sub-ledger, multi-channel receipts, credit balances, deferred-revenue
-recognition and aging. **315 tests across 12 suites; typecheck, lint and
-production build clean.**
+recognition, aging, and a cheque clearing pipeline that posts at every
+transition. **352 tests across 13 suites; typecheck, lint and production build
+clean.**
 
 Tracks A (finance), B (student) and C (public surface) run in parallel from
 here.
@@ -26,7 +27,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 315 tests
+npm test              # 352 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -203,8 +204,12 @@ tests/cashiering.test.ts   56  fee catalog, account roles, Arabic student
                                cancellation, charge reversal, recognition,
                                instalments, statements, aging, and the
                                sub-ledger/control-account reconciliation
+tests/cheques.test.ts      37  the five-state pipeline, custody, batch deposit
+                               and clearing, bounce unwinding, returned-cheque
+                               fees, repeat-bounce reporting, and one test per
+                               legacy defect
                            ───
-                           315
+                           352
 ```
 
 ---
@@ -243,6 +248,20 @@ shared by the voucher grid and the posting engine as one implementation rather
 than two specifications — a grid that says "balanced" against a server that
 says "out by 0.01" leaves the maker stuck with no way to see why.
 
+**A4 — Cheque clearing.** The legacy implementation was a single `CheqClear`
+boolean flipped by a grid click, and it had three defects at once: `0` meant
+both "not presented yet" and "refused", so every cheque in the drawer showed as
+bounced; clearing posted nothing, so the bank balance never moved; and a bounce
+reinstated nothing, so a student whose cheque the bank refused went on showing
+as paid. The third is the expensive one, and it is invisible from every side.
+
+`RECEIVED → SENT_TO_BANK → CLEARED`, with `BOUNCED` reachable from either and
+`CANCELLED` only before presentation — **and a ledger entry at every
+transition**. Cheques on hand and cheques with the bank are separate accounts,
+because "how much paper are we holding" and "where is it" are different
+questions. A bounce splits its debit exactly as the original receipt split its
+credit, which is what keeps the sub-ledger equal to its control accounts.
+
 **A3 — Fee catalog, student AR and cashiering.** The critical path: where money
 actually enters the system. The legacy cashier screen had a fee grid hardcoded
 to two rows, resolved accounts by their Arabic *names* while writing English
@@ -275,9 +294,9 @@ equals its control accounts **to the cent**.
 
 ## Next
 
-Track A continues at **A4 — the cheque clearing pipeline**. Cheque receipts
-already land in cheques-receivable with their bank, due date and drawer, so the
-portfolio exists and is waiting for its state machine. Track B (student) and
+Track A continues at **A5 — fixed assets and depreciation**. It needs the
+durable job runner that A6 dunning and the automatic late-fee rule are also
+waiting on, so that runner is the first thing to build. Track B (student) and
 Track C (public surface) can run in parallel — see the roadmap in
 [`../implementation_plan.md`](../implementation_plan.md). They converge at the
 **registration-posts-to-GL** milestone, which is the integration the legacy

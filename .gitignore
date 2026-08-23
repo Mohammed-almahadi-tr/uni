@@ -3,10 +3,39 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Dependencies & Package Managers
+# Large Files (>90 MB) & Database Dumps / Binary Logs (Prevents GitHub 100MB+ Limit)
+# ------------------------------------------------------------------------------
+Database/
+Database/**
+*.mdf
+*.ldf
+*.ndf
+*.bak
+*.dmp
+*.sqlite
+*.sqlite3
+*.db
+*.iso
+*.tar.gz
+*.zip
+*.7z
+.pgdata/
+*/.pgdata/
+uniflow/.pgdata/
+
+# Specific large binary files
+Database/UOT1.mdf
+Database/UOT1_0.ldf
+Database/NileCollege.mdf
+Database/NileCollege_log.ldf
+Database/Real Database/
+
+# ------------------------------------------------------------------------------
+# Dependencies & Package Managers (Includes large node binaries >90MB)
 # ------------------------------------------------------------------------------
 node_modules/
 */node_modules/
+uniflow/node_modules/
 .pnp
 .pnp.*
 .yarn/*
@@ -20,6 +49,7 @@ node_modules/
 # ------------------------------------------------------------------------------
 .next/
 */.next/
+uniflow/.next/
 out/
 */out/
 build/
@@ -38,20 +68,6 @@ dist/
 # Generated code / Prisma client
 */src/generated/
 /src/generated/
-
-# ------------------------------------------------------------------------------
-# Database Files, Binary Logs & Local Data (Prevents GitHub 100MB+ limits)
-# ------------------------------------------------------------------------------
-*.mdf
-*.ldf
-*.ndf
-*.bak
-*.dmp
-*.sqlite
-*.sqlite3
-*.db
-.pgdata/
-*/.pgdata/
 
 # ------------------------------------------------------------------------------
 # Environment Variables & Secrets

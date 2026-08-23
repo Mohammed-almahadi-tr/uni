@@ -1,6 +1,6 @@
 # Implementation Plan: UniFlow Multi-Tenant University ERP & White-Label Web Platform
 
-**Version:** 2.2.0 · **Supersedes:** 1.0.0, 2.0.0, 2.1.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.2.0
+**Version:** 2.3.0 · **Supersedes:** 1.0.0 - 2.2.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.3.0
 
 Transformation of the legacy VB.NET / MS SQL desktop university system (Oasis E-University at Nile College; the Ribat University Application at Ribat and UOT) into a multi-tenant web application: student registration and lifecycle management, a double-entry university finance engine, and a white-label landing page per university client, built with **Next.js**, **shadcn UI** and **PostgreSQL**.
 
@@ -33,11 +33,12 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**315 tests pass across 12 suites; typecheck, lint and production build are all
+**352 tests pass across 13 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
-**Track A1 (Chart of Accounts), A2 (journal vouchers and maker-checker) and
-A3 (fee catalog, student AR and cashiering) are also complete** — see §0.2.
+**Track A1-A4 are also complete**: chart of accounts, journal vouchers and
+maker-checker, fee catalog / student AR / cashiering, and the cheque clearing
+pipeline — see §0.2.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -253,6 +254,65 @@ Worth watching for elsewhere: the only symptom is a `DeprecationWarning` from
 | Payment-gateway provider adapters (REQ-CSH-05) | The interface is meaningless without a webhook route and a settlement-reconciliation job. `GATEWAY` receipts post to the bank account today and carry their provider reference |
 | Automatic late fees (REQ-CSH-02) | Needs the durable job runner, which A5 (depreciation) and A6 (dunning) also need. The `LATE_FEE` catalog item and the overdue query are in place; only the schedule that raises it is missing |
 | Refund disbursement (REQ-FEE-03) | Follows the payment-voucher workflow, which is A6. The withdrawal refund *policy* is a Track B lifecycle concern |
+
+---
+
+### A4 — Cheque Clearing Pipeline · complete
+
+The legacy implementation was **one boolean**. `CheqClear` sat on the
+`Transactions` row and was flipped by clicking a grid cell, which ran
+`UPDATE Transactions SET CheqClear=1 WHERE TransNo = <concatenated>` and
+nothing else ([frmCheqClearingSystem.vb:71-95](Nile College E-University System/Oasis - E-University/Financial System/Forms/frmCheqClearingSystem.vb#L71-L95)).
+Reading the source turned up a third defect the plan had not recorded:
+
+| # | Defect | Consequence |
+| :--- | :--- | :--- |
+| 1 | `0` rendered as "Rejected", and `0` was also the initial value | Every cheque merely waiting in the drawer was displayed to staff as bounced |
+| 2 | No ledger entry on any transition | Clearing a cheque never moved the bank balance |
+| 3 | A bounce reinstated nothing | A student whose cheque the bank refused went on showing as paid |
+
+Defect 3 is the expensive one, and it is invisible: the institution believes
+it has been paid, the student believes they have paid, and the money is not
+there.
+
+| Delivered | Notes |
+| :--- | :--- |
+| Five-state machine | `RECEIVED → SENT_TO_BANK → CLEARED`, with `BOUNCED` reachable from either and `CANCELLED` only before presentation. Legal transitions enforced by trigger, so a settled cheque cannot be resurrected |
+| A GL entry at **every** transition | deposit `DR Cheques with Bank · CR Cheques on Hand` · clear `DR Bank · CR Cheques with Bank` · bounce and cancel `DR Student AR / Credit · CR` whichever account held it |
+| Two cheque accounts, not one | "What is in our safe" and "what is with the bank" are different questions. REQ-CHQ-01 asks for custody; custody the ledger cannot report is custody nobody can audit |
+| Custody tracked and constrained | `VAULT / WITH_BANK / RETURNED_TO_DRAWER / SETTLED`, tied to status by CHECK so the paper's whereabouts and its state cannot disagree |
+| Batch deposit and clearing | A deposit slip carries many cheques and the bank credits it as one item, so one voucher covers the batch. A mixed batch debits each bank account for its own |
+| Bounce unwinds correctly | The debit splits exactly as the original receipt split its credit: matched money back onto the receivable, unmatched money off the credit-balance liability. Anything else desynchronises the sub-ledger |
+| Returned-cheque fee | Raised as its own document with its own number, in the same transaction as the bounce. Needs `charge.create` — recording the bounce does not |
+| Repeat-bounce reporting (REQ-CHQ-03) | Grouped on a normalised drawer key, so a drawer whose name is spelled two ways is one drawer. An institution that cannot answer this goes on accepting paper from the same payer indefinitely |
+| Append-only history | Every transition with its actor, the bank's refusal code verbatim, and the voucher it posted. The legacy grid let you click Cleared and then Rejected all afternoon and kept only the last click |
+| 37 tests | Including one per legacy defect, which fails if the behaviour returns |
+
+**A new receipt state: dishonoured.** A bounced cheque leaves its receipt in a
+position the system had no word for. It is not cancelled — the cashier did
+nothing wrong and the receipt keeps its number — but the money never arrived,
+so it must stop counting towards what the student has paid. `dishonouredAt` is
+that state, a CHECK forbids a receipt being both cancelled and dishonoured,
+and the three places that ask "what has this student paid" now exclude both.
+
+**A follow-up migration, deliberately separate.** `assert_allocation_live` was
+written in A3 and froze the allocations of a *cancelled* receipt. Dishonour is
+the same situation reached by a different route and needs the same rule, or an
+allocation could be inserted afterwards and settle a charge with money that
+never arrived. Amending the already-applied A3 migration would have been
+dishonest about what shipped when, so it is its own migration.
+
+**On `prisma migrate dev` and non-interactive environments.** Adding a unique
+constraint makes the CLI prompt for confirmation, and there is no terminal
+here to answer it. The migration was generated with
+`prisma migrate diff --from-config-datasource --to-schema` and applied with
+`migrate deploy` — worth knowing for CI, where the same prompt would hang a
+pipeline rather than fail it.
+
+**Deferred:** bank statement import and auto-reconciliation, which belongs with
+the cash-controls module listed under "recommended, not scheduled" in SRS §7.
+The clearing side is complete without it; reconciliation automates the reading
+of the advice, not the accounting for it.
 
 ---
 

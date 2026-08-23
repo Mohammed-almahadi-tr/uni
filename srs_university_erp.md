@@ -1,14 +1,14 @@
 # Software Requirements Specification (SRS)
 ## Multi-Tenant University ERP & White-Label Web Platform
 **Project Name:** UniFlow Enterprise ERP (Next-Gen Transformation of Oasis E-University)
-**Document Version:** 2.2.0
-**Supersedes:** v1.0.0, v2.0.0, v2.1.0
+**Document Version:** 2.3.0
+**Supersedes:** v1.0.0, v2.0.0, v2.1.0, v2.2.0
 **Target Audience:** University Management, Technical Architects, Development Team, Product Owners, Quality Assurance
 **Standard Compliance:** IEEE Std 830-1998 / ISO/IEC/IEEE 29148
 
 ---
 
-## 0.0 Corrections made while building (v2.1.0, v2.2.0)
+## 0.0 Corrections made while building (v2.1.0 - v2.3.0)
 
 Version 2.0.0 was written before any of it was built. Building Phase 0 and
 Track A1-A3 showed several of its statements to be wrong, or weaker than what
@@ -25,6 +25,9 @@ diverge from the system.
 | 6 | New §4.4: **structural account roles**. Modules resolve accounts by role, never by code | The legacy source contained account *names* (`الاصول`, `(مدينون(الطلاب`); renaming an account broke posting, and translating one broke it twice. A tenant may also renumber its chart |
 | 7 | REQ-CSH-01 gains: cash posts to **the cashier's own till account**, and the idempotency key is mandatory rather than recommended | "Which cashier is short today" has to be answerable from the ledger. An optional key means every future caller re-decides whether duplicate receipts matter |
 | 8 | §4.3 gains the sub-ledger invariants (settlement equals its allocations, billed amounts immutable, receipts never deleted, cross-tenant foreign keys refused) | Foreign keys do not carry a tenant, and referential-integrity checks run as the table owner, so the FK alone accepts a cross-tenant reference |
+| 9 | REQ-CHQ-01 splits cheques into **two** accounts — on hand, and with the bank for collection | Custody is a question the ledger has to be able to answer. One account can say how much paper the institution is holding, but not where it is |
+| 10 | New: a receipt whose cheque is refused becomes **dishonoured**, a state distinct from cancelled | A cancellation says the cashier made a mistake; a dishonour says the bank refused. The receipt keeps its number either way, but only one of the two is anybody's fault, and they are counted the same way and reported differently |
+| 11 | §4.3 gains the cheque invariants (legal transitions only, custody agrees with status, history append-only, a cheque matches its receipt) | The legacy grid let a clerk click Cleared and then Rejected all afternoon, keeping only the last click |
 
 ---
 
@@ -364,13 +367,18 @@ graph LR
 ### Module 7: Cheque Management & Clearing Pipeline
 - **REQ-CHQ-01: Cheque Portfolio & Custody Tracking**
   - Central portfolio of post-dated and on-demand cheques from students and sponsors.
-  - Fields: Cheque No, Bank, Branch, Due Date, Drawer Name, Amount, associated Student/Sponsor, and Current Custody (Vault / With Bank).
+  - Fields: Cheque No, Bank, Branch, Due Date, Drawer Name, Amount, associated Student/Sponsor, and Current Custody (Vault / With Bank / Returned to Drawer / Settled).
+  - **Cheques on hand and cheques with the bank are two separate accounts.** Depositing a cheque moves value between them. One account can report how much paper the institution holds; it cannot report where that paper is, and custody nobody can audit is not custody.
+  - Custody and status are constrained to agree: a cheque cannot be `Received` and simultaneously recorded as sitting with the bank.
 - **REQ-CHQ-02: Cheque Clearing Workflow**
   - Lifecycle with a GL consequence at every transition — **not a display flag**:
     $$\text{Received (تحت التحصيل)} \longrightarrow \text{Sent to Bank (برسم التحصيل)} \longrightarrow \begin{cases} \text{Cleared (محصل)} \implies \text{Dr Bank, Cr Cheques Receivable} \\ \text{Bounced (مرتجع)} \implies \text{Dr Student AR, Cr Cheques Receivable} \\ \text{Cancelled (ملغي)} \end{cases}$$
   - Each state is a distinct value with its own semantics. A cheque that has not yet been presented is **not** in the same state as one the bank refused. *(The legacy system conflated these into a single boolean, so every uncleared cheque displayed as "Rejected".)*
 - **REQ-CHQ-03: Bounced Cheque Handling**
   - Marking a cheque Bounced reinstates the student's debt, optionally applies a returned-cheque penalty as a fee-item charge, and logs the bank's refusal reason code.
+  - **The reinstating entry splits exactly as the original receipt did**: whatever the receipt had matched against charges returns to the receivable, and whatever remained as a credit balance comes back off that liability. Debiting the whole amount to receivables would leave the sub-ledger disagreeing with its control accounts.
+  - The receipt behind a refused cheque becomes **dishonoured** — distinct from cancelled, which says the cashier made a mistake. It keeps its number, stops counting towards what the student has paid, and appears on the statement of account as a debit that undoes the payment.
+  - The returned-cheque fee is raised as its own document with its own number, in the same transaction as the bounce. Raising it requires the billing permission; recording the bounce does not, because the bounce records what the bank did rather than a decision of the institution's.
   - Repeat bounces per drawer are reported so the institution can refuse cheques from that payer.
 
 ---
@@ -736,6 +744,11 @@ These are constraints, not application conventions. Each exists because the lega
 | A cancelled receipt's allocations are frozen | Trigger, so dead money cannot be re-pointed at a live charge |
 | Foreign keys stay inside their tenant | Trigger comparing the referenced row's `tenant_id` on every cross-table reference. **Foreign keys do not carry a tenant**, and referential-integrity checks run as the table owner, so the FK alone accepts a cross-tenant id |
 | One national ID per tenant | Partial unique index `WHERE national_id IS NOT NULL`, so unknown IDs do not collide with each other |
+| A cheque moves only forwards | Trigger enumerating the legal `(from, to)` transitions. A settled cheque cannot be resurrected: a bank that refuses a cheque and then honours it is honouring a second cheque |
+| Custody agrees with status | `CHECK` pairing each status with the only place the paper can be |
+| A cheque matches the receipt that took it | Trigger comparing amount, payer and channel. Otherwise the ledger holds one figure in cheques-receivable and the portfolio holds another |
+| Cheque history is append-only | Trigger on `cheque_events` |
+| A receipt is cancelled or dishonoured, never both | `CHECK`. They are two different accounts of where the money went and only one can be true |
 
 ### 4.4 Structural Account Roles
 
