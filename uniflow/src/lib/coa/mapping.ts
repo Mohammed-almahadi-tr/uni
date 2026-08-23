@@ -8,10 +8,10 @@ import { requirePermission, type Principal } from '@/lib/auth/rbac';
  * Which account plays which structural role, per tenant.
  *
  * Cashiering needs "the student AR control account". Cheque clearing needs
- * "cheques receivable". Depreciation needs "accumulated depreciation". Year-end
- * close needs "retained surplus". None of them should know an account *code*,
- * because a tenant may renumber its chart and because the shipped template is
- * a starting point rather than a constraint.
+ * "cheques on hand" and "cheques with the bank". Revaluation needs "unrealised
+ * FX"; year-end close needs "retained surplus". None of them should know an
+ * account *code*, because a tenant may renumber its chart and because the
+ * shipped template is a starting point rather than a constraint.
  *
  * The legacy system solved this by writing account **names** into the code —
  * the student receipt screen queried for accounts literally named `الاصول` and
@@ -174,6 +174,7 @@ export const TEMPLATE_ACCOUNT_ROLES: Record<AccountRole, string> = {
   DEFAULT_CASH: '11111',
   DEFAULT_BANK: '11121',
   CHEQUES_RECEIVABLE: '11231',
+  CHEQUES_WITH_BANK: '11232',
   DEFAULT_DISCOUNT_EXPENSE: '51411',
   FX_REALISED: '52111',
   FX_UNREALISED: '52112',

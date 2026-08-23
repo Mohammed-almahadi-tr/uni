@@ -115,8 +115,18 @@ export const UNIVERSITY_COA: TemplateAccount[] = [
                 code: '1123',
                 nameAr: 'شيكات تحت التحصيل',
                 nameEn: 'Cheques Under Collection',
+                // Two accounts, not one. "What is in our safe" and "what is
+                // with the bank for collection" are different questions, and
+                // a cheque moving between them is a real movement of value —
+                // SRS REQ-CHQ-01 asks for custody, and custody the ledger
+                // cannot report is custody nobody can audit.
                 children: [
-                  { code: '11231', nameAr: 'شيكات برسم التحصيل', nameEn: 'Cheques Receivable' },
+                  { code: '11231', nameAr: 'شيكات بالخزينة', nameEn: 'Cheques on Hand' },
+                  {
+                    code: '11232',
+                    nameAr: 'شيكات بالبنك برسم التحصيل',
+                    nameEn: 'Cheques with Bank for Collection',
+                  },
                 ],
               },
             ],

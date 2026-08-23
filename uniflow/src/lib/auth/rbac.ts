@@ -52,6 +52,10 @@ export const MFA_REQUIRED_PERMISSIONS: readonly PermissionKey[] = [
   // day-to-day work.
   'receipt.cancel',
   'charge.reverse',
+  // Returning an unpresented cheque to its drawer removes a receivable by
+  // discretion rather than by a bank's decision. Clearing and bouncing follow
+  // the bank advice and are ordinary daily work, so they are not here.
+  'cheque.cancel',
 ];
 
 const MFA_SET = new Set<string>(MFA_REQUIRED_PERMISSIONS);

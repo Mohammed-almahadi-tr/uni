@@ -79,7 +79,8 @@ export const PERMISSIONS = [
   { key: 'receipt.create', description: 'Take student fee payments' },
   { key: 'receipt.cancel', description: 'Cancel a receipt issued today' },
   { key: 'payment.create', description: 'Draft payment vouchers' },
-  { key: 'cheque.manage', description: 'Maintain the cheque portfolio and clearing' },
+  { key: 'cheque.manage', description: 'Deposit, clear and record bounced cheques' },
+  { key: 'cheque.cancel', description: 'Return an unpresented cheque to its drawer' },
 
   // ---- Period and budget ------------------------------------------------
   { key: 'period.read', description: 'View the fiscal calendar' },
@@ -194,6 +195,14 @@ export const SOD_CONFLICTS: readonly SodConflict[] = [
     reason:
       'A cashier who can reverse the charge their receipt paid can take cash and leave the ' +
       'student account looking settled with nothing recorded as owed.',
+  },
+  {
+    a: 'receipt.create',
+    b: 'cheque.manage',
+    reason:
+      'A cashier who takes a cheque and can also mark it cleared can make a payment that ' +
+      'never arrived look settled. Clearing follows the bank advice, and belongs to whoever ' +
+      'reads it rather than to whoever took the paper.',
   },
   {
     a: 'receipt.create',
@@ -320,7 +329,7 @@ export const DEFAULT_ROLES: Record<
     nameAr: 'مشرف الصندوق',
     permissions: [
       'student.read', 'registration.read', 'receipt.cancel', 'voucher.read',
-      'cheque.manage', 'period.read', 'report.financial',
+      'cheque.manage', 'cheque.cancel', 'period.read', 'report.financial',
     ],
   },
   Dean: {

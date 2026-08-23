@@ -8,6 +8,7 @@ import { post, reverse, type PostingLine } from '@/lib/ledger/posting';
 import { toDateOnly } from '@/lib/ledger/period';
 import { idempotent } from '@/lib/idempotency';
 import { sum, toStorage, ZERO, type Money, type MoneyInput } from '@/lib/money';
+import { registerCheque } from '@/lib/cheques/pipeline';
 
 /**
  * The cashier's desk (SRS REQ-CSH-01, REQ-CSH-06).
@@ -62,6 +63,8 @@ export interface TakeReceiptInput {
   /** Required for BANK_TRANSFER when the tenant banks in more than one place. */
   bankAccountId?: string | null;
   cheque?: ChequeDetail;
+  /** The refused cheque this one was handed over to replace. */
+  replacesChequeId?: string | null;
   /**
    * Explicit allocation across charges. Omit to settle oldest-due first,
    * which is what a cashier means by "put it against what he owes" and what
@@ -242,6 +245,26 @@ async function takeReceiptInTx(
     },
     select: { id: true },
   });
+
+  // A cheque is a promise, not money. It enters the portfolio here so that
+  // the clearing pipeline has something to work with — the legacy system had
+  // no cheque entity at all, only a boolean on the ledger row.
+  if (input.channel === 'CHEQUE' && input.cheque) {
+    await registerCheque(tx, tenantId, principal.userId, {
+      chequeNo: input.cheque.chequeNo,
+      bankName: input.cheque.bank,
+      branch: input.cheque.branch,
+      drawerName: input.cheque.drawerName,
+      dueDate: input.cheque.dueDate,
+      amount,
+      currency,
+      subledgerType: 'STUDENT',
+      subledgerId: student.id,
+      receivedOn: docDate,
+      receiptId: receipt.id,
+      replacesChequeId: input.replacesChequeId ?? null,
+    });
+  }
 
   for (const p of plan) {
     await tx.receiptAllocation.create({
@@ -524,7 +547,9 @@ export async function applyCreditBalance(
     if (!student) throw new ReceiptError('Student not found in this tenant.');
 
     const receipts = await tx.studentReceipt.findMany({
-      where: { tenantId, studentId, cancelledAt: null },
+      // A dishonoured receipt is money that never arrived, so its unmatched
+      // balance is not a credit the student can spend.
+      where: { tenantId, studentId, cancelledAt: null, dishonouredAt: null },
       orderBy: { docDate: 'asc' },
       select: { id: true, amount: true, allocatedAmount: true },
     });

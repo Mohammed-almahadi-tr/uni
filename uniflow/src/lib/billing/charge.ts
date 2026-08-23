@@ -115,7 +115,13 @@ export async function raiseCharges(
   return result;
 }
 
-async function raiseChargesInTx(
+/**
+ * The body of `raiseCharges`, without the permission check or the idempotency
+ * wrapper, for callers that are already inside a transaction and have already
+ * established the right to bill — the cheque pipeline raising a returned-cheque
+ * fee, for one. The fee and the bounce that caused it must be one transaction.
+ */
+export async function raiseChargesInTx(
   tx: Tx,
   principal: Principal,
   input: RaiseChargesInput,

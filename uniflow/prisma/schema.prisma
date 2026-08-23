@@ -63,7 +63,12 @@ enum AccountRole {
   VENDOR_AP_CONTROL
   DEFAULT_CASH
   DEFAULT_BANK
+  /// Cheques in the vault, not yet presented.
   CHEQUES_RECEIVABLE
+  /// Cheques deposited with the bank for collection. Separate from the vault
+  /// account so "what is in our safe" and "what is with the bank" are two
+  /// figures the ledger can answer rather than one.
+  CHEQUES_WITH_BANK
   DEFAULT_DISCOUNT_EXPENSE
   FX_REALISED
   FX_UNREALISED
@@ -91,6 +96,34 @@ enum PaymentChannel {
 
 /// SRS Module 14. Track B owns the transitions; the states are declared here
 /// because the sub-ledger has to know whether a student is still liable.
+/// SRS REQ-CHQ-02. Each value has its own meaning and its own ledger
+/// consequence. A cheque that has not been presented yet is NOT in the same
+/// state as one the bank refused — the legacy system conflated the two into a
+/// single boolean, so every uncleared cheque displayed as "Rejected".
+enum ChequeStatus {
+  /// In hand, not yet deposited.
+  RECEIVED
+  /// Deposited for collection.
+  SENT_TO_BANK
+  /// The bank paid it.
+  CLEARED
+  /// The bank refused it.
+  BOUNCED
+  /// Returned to the drawer before presentation.
+  CANCELLED
+}
+
+/// Physical location of the paper, which is a different question from its
+/// status: a cheque can be RECEIVED and in the vault, or BOUNCED and back with
+/// the drawer.
+enum ChequeCustody {
+  VAULT
+  WITH_BANK
+  RETURNED_TO_DRAWER
+  /// Presented and paid; the paper no longer matters.
+  SETTLED
+}
+
 enum StudentStatus {
   APPLICANT
   ADMITTED
@@ -203,6 +236,8 @@ model Tenant {
   allocations     ReceiptAllocation[]
   recognitions    RecognitionEntry[]
   instalmentPlans InstalmentPlan[]
+  cheques         Cheque[]
+  chequeEvents    ChequeEvent[]
 
   @@map("tenants")
 }
@@ -243,11 +278,13 @@ model User {
   recoveryCodes RecoveryCode[]
   attachments   VoucherAttachment[]
 
-  till              CashierTill?
-  receiptsTaken     StudentReceipt[] @relation("ReceiptCashier")
-  receiptsCancelled StudentReceipt[] @relation("ReceiptCanceller")
-  chargesRaised     StudentCharge[]  @relation("ChargeCreator")
-  plansCreated      InstalmentPlan[] @relation("PlanCreator")
+  till                CashierTill?
+  receiptsTaken       StudentReceipt[] @relation("ReceiptCashier")
+  receiptsCancelled   StudentReceipt[] @relation("ReceiptCanceller")
+  chargesRaised       StudentCharge[]  @relation("ChargeCreator")
+  plansCreated        InstalmentPlan[] @relation("PlanCreator")
+  chequesTaken        Cheque[]         @relation("ChequeCreator")
+  receiptsDishonoured StudentReceipt[] @relation("ReceiptDishonourer")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -466,6 +503,7 @@ model Account {
   feeRevenueFor  FeeItem[]        @relation("FeeRevenueAccount")
   feeUnearnedFor FeeItem[]        @relation("FeeUnearnedAccount")
   receiptDebits  StudentReceipt[] @relation("ReceiptDebitAccount")
+  chequeDeposits Cheque[]         @relation("ChequeDepositAccount")
 
   @@unique([tenantId, code])
   @@index([tenantId, parentId])
@@ -653,6 +691,8 @@ model TransactionHeader {
   studentReceipt      StudentReceipt?    @relation("ReceiptPosting")
   receiptCancellation StudentReceipt?    @relation("ReceiptCancellationPosting")
   recognitions        RecognitionEntry[] @relation("RecognitionPosting")
+  chequeEvents        ChequeEvent[]      @relation("ChequeEventPosting")
+  receiptDishonours   StudentReceipt[]   @relation("ReceiptDishonourPosting")
 
   @@unique([tenantId, fiscalYearId, voucherType, voucherNo])
   @@index([tenantId, docDate])
@@ -957,6 +997,14 @@ model StudentReceipt {
   cancellationReason   String?   @map("cancellation_reason")
   cancellationHeaderId String?   @unique @map("cancellation_header_id") @db.Uuid
 
+  /// Set when the cheque behind this receipt was refused by the bank. Not a
+  /// cancellation: the cashier did nothing wrong and the receipt was validly
+  /// issued. But the money never arrived, so the receipt stops counting
+  /// towards what the student has paid.
+  dishonouredAt     DateTime? @map("dishonoured_at") @db.Timestamptz(6)
+  dishonouredById   String?   @map("dishonoured_by_id") @db.Uuid
+  dishonourHeaderId String?   @unique @map("dishonour_header_id") @db.Uuid
+
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -967,6 +1015,9 @@ model StudentReceipt {
   cancellationPost TransactionHeader?  @relation("ReceiptCancellationPosting", fields: [cancellationHeaderId], references: [id])
   cashier          User                @relation("ReceiptCashier", fields: [createdById], references: [id])
   cancelledBy      User?               @relation("ReceiptCanceller", fields: [cancelledById], references: [id])
+  dishonouredBy    User?               @relation("ReceiptDishonourer", fields: [dishonouredById], references: [id])
+  dishonourPost    TransactionHeader?  @relation("ReceiptDishonourPosting", fields: [dishonourHeaderId], references: [id])
+  cheque           Cheque?
   allocations      ReceiptAllocation[]
 
   @@unique([tenantId, receiptNo])
@@ -1059,4 +1110,109 @@ model Instalment {
   @@unique([planId, seq])
   @@index([dueDate])
   @@map("instalments")
+}
+
+// ---------------------------------------------------------------------------
+// Cheque portfolio and clearing pipeline (SRS Module 7, Track A4)
+// ---------------------------------------------------------------------------
+
+/// A cheque taken in payment (SRS REQ-CHQ-01).
+///
+/// The legacy system had no cheque entity at all. A cheque was a `CheqClear`
+/// **boolean** on the `Transactions` row, toggled by clicking a grid cell,
+/// which issued `UPDATE Transactions SET CheqClear=1` and posted nothing.
+/// Three consequences, all of them live in production:
+///
+///   · 0 rendered as "Rejected", and 0 was also the initial value, so every
+///     cheque that had simply not been presented yet displayed as bounced;
+///   · clearing a cheque never moved the bank balance, because there was no
+///     ledger entry;
+///   · a bounced cheque never reinstated the student's debt, so a student
+///     whose cheque was refused still showed as paid.
+model Cheque {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  chequeNo   String   @map("cheque_no")
+  bankName   String?  @map("bank_name")
+  branch     String?
+  drawerName String?  @map("drawer_name")
+  /// Normalised drawer identity, for repeat-bounce reporting (REQ-CHQ-03).
+  drawerKey  String   @map("drawer_key")
+  dueDate    DateTime @map("due_date") @db.Date
+  amount     Decimal  @db.Decimal(19, 4)
+  currency   String   @db.Char(3)
+
+  /// Who the cheque came from. A cheque is always somebody's promise.
+  subledgerType SubledgerType @map("subledger_type")
+  subledgerId   String        @map("subledger_id")
+
+  status  ChequeStatus  @default(RECEIVED)
+  custody ChequeCustody @default(VAULT)
+
+  /// The receipt this cheque paid for, when it came in over the counter.
+  /// Null for a cheque registered directly against a sponsor.
+  receiptId String? @unique @map("receipt_id") @db.Uuid
+
+  /// Bank account it was deposited to, once sent for collection.
+  depositAccountId String? @map("deposit_account_id") @db.Uuid
+
+  receivedOn   DateTime  @map("received_on") @db.Date
+  sentToBankOn DateTime? @map("sent_to_bank_on") @db.Date
+  settledOn    DateTime? @map("settled_on") @db.Date
+
+  /// The bank's refusal code and words, kept verbatim (REQ-CHQ-03).
+  bounceReasonCode String? @map("bounce_reason_code")
+  bounceReason     String? @map("bounce_reason")
+
+  /// A replacement handed over after this one was refused.
+  replacesChequeId String? @unique @map("replaces_cheque_id") @db.Uuid
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  receipt        StudentReceipt? @relation(fields: [receiptId], references: [id])
+  depositAccount Account?        @relation("ChequeDepositAccount", fields: [depositAccountId], references: [id])
+  replaces       Cheque?         @relation("ChequeReplacement", fields: [replacesChequeId], references: [id])
+  replacedBy     Cheque?         @relation("ChequeReplacement")
+  createdBy      User            @relation("ChequeCreator", fields: [createdById], references: [id])
+  events         ChequeEvent[]
+
+  @@unique([tenantId, chequeNo, drawerKey])
+  @@index([tenantId, status, dueDate])
+  @@index([tenantId, drawerKey])
+  @@index([tenantId, subledgerType, subledgerId])
+  @@map("cheques")
+}
+
+/// Every transition, with the voucher it posted.
+///
+/// Append-only. The legacy grid let you click "Cleared" and then "Rejected"
+/// on the same row all afternoon, leaving only the last click behind.
+model ChequeEvent {
+  id         String       @id @default(uuid()) @db.Uuid
+  tenantId   String       @map("tenant_id") @db.Uuid
+  chequeId   String       @map("cheque_id") @db.Uuid
+  fromStatus ChequeStatus @map("from_status")
+  toStatus   ChequeStatus @map("to_status")
+  /// Business date of the transition — the date on the bank advice, not the
+  /// day somebody got round to keying it.
+  docDate    DateTime     @map("doc_date") @db.Date
+  reasonCode String?      @map("reason_code")
+  comment    String?
+  actorId    String       @map("actor_id") @db.Uuid
+  occurredAt DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  /// The voucher this transition posted. Null only for transitions that move
+  /// no money, of which there are none today.
+  postedHeaderId String? @map("posted_header_id") @db.Uuid
+
+  tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cheque  Cheque             @relation(fields: [chequeId], references: [id], onDelete: Cascade)
+  posting TransactionHeader? @relation("ChequeEventPosting", fields: [postedHeaderId], references: [id])
+
+  @@index([chequeId, occurredAt])
+  @@index([tenantId, toStatus, docDate])
+  @@map("cheque_events")
 }

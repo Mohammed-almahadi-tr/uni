@@ -57,7 +57,9 @@ async function balanceInTx(
     select: { netAmount: true, settledAmount: true },
   });
   const receipts = await tx.studentReceipt.findMany({
-    where: { tenantId, studentId, cancelledAt: null },
+    // Cancelled receipts never counted; dishonoured ones stopped counting the
+    // moment the bank refused the cheque behind them.
+    where: { tenantId, studentId, cancelledAt: null, dishonouredAt: null },
     select: { amount: true, allocatedAmount: true },
   });
 
@@ -79,7 +81,7 @@ async function balanceInTx(
 
 export interface StatementLine {
   date: Date;
-  kind: 'CHARGE' | 'RECEIPT' | 'REVERSAL' | 'CANCELLATION';
+  kind: 'CHARGE' | 'RECEIPT' | 'REVERSAL' | 'CANCELLATION' | 'DISHONOUR';
   reference: string;
   description: string;
   /** Increases what the student owes. */
@@ -159,6 +161,8 @@ export async function statementOfAccount(
         channel: true,
         cancelledAt: true,
         cancellationHeaderId: true,
+        dishonouredAt: true,
+        dishonourHeaderId: true,
       },
     });
 
@@ -168,6 +172,7 @@ export async function statementOfAccount(
           ...charges.map((c) => c.postedHeaderId),
           ...charges.map((c) => c.reversalHeaderId),
           ...receipts.map((r) => r.cancellationHeaderId),
+          ...receipts.map((r) => r.dishonourHeaderId),
         ].filter((id): id is string => id !== null),
       ),
     ];
@@ -224,6 +229,22 @@ export async function statementOfAccount(
           credit: r.amount.toFixed(4),
         },
       });
+      const dishonour = r.dishonourHeaderId ? headerById.get(r.dishonourHeaderId) : undefined;
+      if (r.dishonouredAt && dishonour) {
+        events.push({
+          date: dishonour.docDate,
+          order: 3,
+          line: {
+            date: dishonour.docDate,
+            kind: 'DISHONOUR',
+            reference: dishonour.voucherRef,
+            description: `Cheque behind receipt ${r.receiptNo} returned unpaid`,
+            debit: r.amount.toFixed(4),
+            credit: '0.0000',
+          },
+        });
+      }
+
       const cancellation = r.cancellationHeaderId
         ? headerById.get(r.cancellationHeaderId)
         : undefined;
@@ -435,7 +456,7 @@ export async function reconcileStudentSubledger(
     select: { netAmount: true, settledAmount: true },
   });
   const receipts = await tx.studentReceipt.findMany({
-    where: { tenantId, cancelledAt: null },
+    where: { tenantId, cancelledAt: null, dishonouredAt: null },
     select: { amount: true, allocatedAmount: true },
   });
 
