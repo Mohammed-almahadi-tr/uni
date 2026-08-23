@@ -54,9 +54,62 @@ enum SubledgerType {
   VENDOR
 }
 
+/// Structural roles an account can play for a tenant. Modules ask for the
+/// role, never for a hardcoded account code — a tenant may renumber its chart.
+enum AccountRole {
+  STUDENT_AR_CONTROL
+  STUDENT_CREDIT_CONTROL
+  SPONSOR_AR_CONTROL
+  VENDOR_AP_CONTROL
+  DEFAULT_CASH
+  DEFAULT_BANK
+  CHEQUES_RECEIVABLE
+  DEFAULT_DISCOUNT_EXPENSE
+  FX_REALISED
+  FX_UNREALISED
+  RETAINED_SURPLUS
+}
+
+/// How often a fee item is billed. Drives the fee matrix and the recognition
+/// schedule, not the accounting.
+enum FeeRecurrence {
+  PER_TERM
+  PER_YEAR
+  ONE_OFF
+}
+
+/// How money arrived (SRS REQ-CSH-01). CREDIT_BALANCE is not a payment — it is
+/// the application of an existing overpayment to a new charge, and it moves
+/// nothing into the institution.
+enum PaymentChannel {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  GATEWAY
+  CREDIT_BALANCE
+}
+
+/// SRS Module 14. Track B owns the transitions; the states are declared here
+/// because the sub-ledger has to know whether a student is still liable.
+enum StudentStatus {
+  APPLICANT
+  ADMITTED
+  ACTIVE
+  DEFERRED
+  SUSPENDED
+  WITHDRAWN
+  DISMISSED
+  TRANSFERRED_OUT
+  GRADUATED
+  ALUMNUS
+}
+
 enum VoucherType {
   JOURNAL
   STUDENT_RECEIPT
+  /// Raising fee charges on a student account. Distinct from REGISTRATION so
+  /// that a library fine does not appear in registration reporting.
+  STUDENT_CHARGE
   GENERAL_RECEIPT
   PAYMENT
   REGISTRATION
@@ -141,6 +194,16 @@ model Tenant {
   draftSequences  DraftSequence[]
   attachments     VoucherAttachment[]
 
+  accountMappings AccountMapping[]
+  cashierTills    CashierTill[]
+  feeItems        FeeItem[]
+  students        Student[]
+  studentCharges  StudentCharge[]
+  studentReceipts StudentReceipt[]
+  allocations     ReceiptAllocation[]
+  recognitions    RecognitionEntry[]
+  instalmentPlans InstalmentPlan[]
+
   @@map("tenants")
 }
 
@@ -179,6 +242,12 @@ model User {
   auditEntries  AuditLog[]
   recoveryCodes RecoveryCode[]
   attachments   VoucherAttachment[]
+
+  till              CashierTill?
+  receiptsTaken     StudentReceipt[] @relation("ReceiptCashier")
+  receiptsCancelled StudentReceipt[] @relation("ReceiptCanceller")
+  chargesRaised     StudentCharge[]  @relation("ChargeCreator")
+  plansCreated      InstalmentPlan[] @relation("PlanCreator")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -351,9 +420,10 @@ model FiscalPeriod {
   closedAt     DateTime?    @map("closed_at") @db.Timestamptz(6)
   closedById   String?      @map("closed_by_id") @db.Uuid
 
-  fiscalYear FiscalYear             @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
-  headers    TransactionHeader[]
-  balances   AccountPeriodBalance[]
+  fiscalYear   FiscalYear             @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  headers      TransactionHeader[]
+  balances     AccountPeriodBalance[]
+  recognitions RecognitionEntry[]
 
   @@unique([fiscalYearId, seq])
   @@index([fiscalYearId, startDate, endDate])
@@ -391,6 +461,12 @@ model Account {
   lines    TransactionLine[]
   balances AccountPeriodBalance[]
 
+  mappings       AccountMapping[]
+  tills          CashierTill[]    @relation("TillCashAccount")
+  feeRevenueFor  FeeItem[]        @relation("FeeRevenueAccount")
+  feeUnearnedFor FeeItem[]        @relation("FeeUnearnedAccount")
+  receiptDebits  StudentReceipt[] @relation("ReceiptDebitAccount")
+
   @@unique([tenantId, code])
   @@index([tenantId, parentId])
   @@index([tenantId, level])
@@ -408,6 +484,7 @@ model CostCenter {
   tenant   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lines    TransactionLine[]
   balances AccountPeriodBalance[]
+  feeItems FeeItem[]
 
   @@unique([tenantId, code])
   @@map("cost_centers")
@@ -571,6 +648,12 @@ model TransactionHeader {
   lines        TransactionLine[]
   draft        VoucherDraft?
 
+  chargesRaised       StudentCharge[]    @relation("ChargePosting")
+  chargesReversed     StudentCharge[]    @relation("ChargeReversalPosting")
+  studentReceipt      StudentReceipt?    @relation("ReceiptPosting")
+  receiptCancellation StudentReceipt?    @relation("ReceiptCancellationPosting")
+  recognitions        RecognitionEntry[] @relation("RecognitionPosting")
+
   @@unique([tenantId, fiscalYearId, voucherType, voucherNo])
   @@index([tenantId, docDate])
   @@index([tenantId, fiscalPeriodId])
@@ -647,4 +730,333 @@ model ExchangeRate {
 
   @@unique([tenantId, fromCurrency, toCurrency, rateDate])
   @@map("exchange_rates")
+}
+
+// ---------------------------------------------------------------------------
+// Fee catalog, student sub-ledger and cashiering (SRS Modules 6 and 13,
+// Track A3)
+// ---------------------------------------------------------------------------
+
+/// Which account plays a given structural role for a tenant.
+///
+/// The cashiering, cheque, depreciation and year-end modules all need to know
+/// "the student AR control account" without hardcoding a code. A tenant may
+/// renumber its chart; it may not have two student control accounts. This is
+/// where that is stated once.
+model AccountMapping {
+  tenantId  String      @map("tenant_id") @db.Uuid
+  role      AccountRole
+  accountId String      @map("account_id") @db.Uuid
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@id([tenantId, role])
+  @@map("account_mappings")
+}
+
+/// The cashier's own safe.
+///
+/// REQ-CSH-01: a cash receipt posts to the account assigned to the cashier who
+/// took it, not to a single shared till. Without this, "which cashier is short
+/// at the end of the day" is not answerable from the ledger — which is exactly
+/// the question the legacy `IncomeListByCollecter` report was written to ask,
+/// and it had to reconstruct the answer from a name column.
+model CashierTill {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  userId        String  @unique @map("user_id") @db.Uuid
+  cashAccountId String  @map("cash_account_id") @db.Uuid
+  isActive      Boolean @default(true) @map("is_active")
+
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cashAccount Account @relation("TillCashAccount", fields: [cashAccountId], references: [id])
+
+  @@index([tenantId])
+  @@map("cashier_tills")
+}
+
+/// A billable item (SRS REQ-FEE-01).
+///
+/// The legacy cashier screen hardcoded exactly two grid rows — tuition and
+/// registration — and wrote the English literals "Current Assets", "Debtors"
+/// and "Students Fees" into a database whose account tree is in Arabic. Real
+/// institutions bill eight to twelve heads, each to its own revenue account.
+model FeeItem {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  code     String
+  nameAr   String @map("name_ar")
+  nameEn   String @map("name_en")
+
+  /// Where the earned revenue lands.
+  revenueAccountId  String  @map("revenue_account_id") @db.Uuid
+  /// Where the billed-but-unearned amount sits until recognised. Required when
+  /// the item is deferrable; enforced by CHECK.
+  unearnedAccountId String? @map("unearned_account_id") @db.Uuid
+  /// Default cost centre for charges of this item. The tuition account in the
+  /// shipped chart requires one.
+  costCenterId      String? @map("cost_center_id") @db.Uuid
+
+  /// Billing credits unearned income and revenue is recognised across the
+  /// term. The legacy system recognised a full year on registration day.
+  isDeferrable   Boolean @default(false) @map("is_deferrable")
+  isDiscountable Boolean @default(true) @map("is_discountable")
+  isRefundable   Boolean @default(true) @map("is_refundable")
+  isTaxable      Boolean @default(false) @map("is_taxable")
+
+  recurrence    FeeRecurrence @default(PER_TERM)
+  /// Catalogue price. The fee matrix (Track B) overrides it per programme and
+  /// batch; this is what an ad-hoc charge defaults to.
+  defaultAmount Decimal?      @map("default_amount") @db.Decimal(19, 4)
+  sortOrder     Int           @default(0) @map("sort_order")
+  isActive      Boolean       @default(true) @map("is_active")
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  revenueAccount  Account         @relation("FeeRevenueAccount", fields: [revenueAccountId], references: [id])
+  unearnedAccount Account?        @relation("FeeUnearnedAccount", fields: [unearnedAccountId], references: [id])
+  costCenter      CostCenter?     @relation(fields: [costCenterId], references: [id])
+  charges         StudentCharge[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive, sortOrder])
+  @@map("fee_items")
+}
+
+/// The finance-facing slice of a student.
+///
+/// Track B owns the full profile — programme, batch, contact, documents,
+/// photograph, medical record. This model exists now because A3 is on the
+/// critical path and a cashier cannot take money from a student the system
+/// has never heard of. Track B extends this table rather than replacing it;
+/// the sub-ledger attaches by `id`.
+model Student {
+  id         String  @id @default(uuid()) @db.Uuid
+  tenantId   String  @map("tenant_id") @db.Uuid
+  studentNo  String  @map("student_no")
+  fullNameAr String  @map("full_name_ar")
+  fullNameEn String  @map("full_name_en")
+  /// Alef/hamza/taa-marbuta-normalised name, for search (REQ-ST-03). Written
+  /// by the application, never by hand.
+  searchKey  String  @map("search_key")
+  nationalId String? @map("national_id")
+
+  status     StudentStatus @default(ACTIVE)
+  admittedOn DateTime?     @map("admitted_on") @db.Date
+  isActive   Boolean       @default(true) @map("is_active")
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  charges  StudentCharge[]
+  receipts StudentReceipt[]
+  plans    InstalmentPlan[]
+
+  @@unique([tenantId, studentNo])
+  @@index([tenantId, searchKey])
+  @@index([tenantId, status])
+  @@map("students")
+}
+
+/// One billed fee item on one student's account.
+///
+/// The sub-ledger. Its total across live charges, less what has been settled,
+/// must equal the Student AR control account balance to the cent — asserted by
+/// test, because the legacy system had no control account and its student
+/// balances drifted from the ledger with nothing able to detect it.
+model StudentCharge {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+  feeItemId String @map("fee_item_id") @db.Uuid
+
+  /// Free text until Track B owns terms — "2026/1", "Spring 2026".
+  termLabel String?   @map("term_label")
+  docDate   DateTime  @map("doc_date") @db.Date
+  dueDate   DateTime? @map("due_date") @db.Date
+
+  /// Catalogue price before any discount.
+  grossAmount    Decimal @map("gross_amount") @db.Decimal(19, 4)
+  /// Scholarship or staff-child discount. Held as an expense, not netted off
+  /// revenue, so discount exposure is reportable on its own line.
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(19, 4)
+  /// What the student owes: gross − discount.
+  netAmount      Decimal @map("net_amount") @db.Decimal(19, 4)
+  /// Maintained as receipts allocate against it. Never exceeds netAmount.
+  settledAmount  Decimal @default(0) @map("settled_amount") @db.Decimal(19, 4)
+
+  /// True when billing credited unearned income rather than revenue.
+  isDeferred       Boolean @default(false) @map("is_deferred")
+  recognisedAmount Decimal @default(0) @map("recognised_amount") @db.Decimal(19, 4)
+
+  currency String @db.Char(3)
+
+  /// The voucher that raised it. Several charges share one voucher when a
+  /// term is billed in a single document.
+  postedHeaderId   String    @map("posted_header_id") @db.Uuid
+  reversedAt       DateTime? @map("reversed_at") @db.Timestamptz(6)
+  reversalHeaderId String?   @map("reversal_header_id") @db.Uuid
+  reversalReason   String?   @map("reversal_reason")
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student      Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeItem      FeeItem             @relation(fields: [feeItemId], references: [id])
+  posting      TransactionHeader   @relation("ChargePosting", fields: [postedHeaderId], references: [id])
+  reversal     TransactionHeader?  @relation("ChargeReversalPosting", fields: [reversalHeaderId], references: [id])
+  createdBy    User                @relation("ChargeCreator", fields: [createdById], references: [id])
+  allocations  ReceiptAllocation[]
+  recognitions RecognitionEntry[]
+
+  @@index([tenantId, studentId, reversedAt])
+  @@index([tenantId, dueDate])
+  @@map("student_charges")
+}
+
+/// Money taken from a student (SRS REQ-CSH-01).
+///
+/// The highest-risk duplicate-creation path in the product: a cashier on an
+/// unreliable link presses Save twice. Every call carries an idempotency key.
+model StudentReceipt {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  /// The allocated voucher reference — the number printed on the paper the
+  /// student walks away with.
+  receiptNo String         @map("receipt_no")
+  docDate   DateTime       @map("doc_date") @db.Date
+  channel   PaymentChannel
+  amount    Decimal        @db.Decimal(19, 4)
+  currency  String         @db.Char(3)
+
+  /// Cash safe, bank account, or cheques-receivable — whichever the channel
+  /// debits.
+  debitAccountId String @map("debit_account_id") @db.Uuid
+
+  /// Bank slip number, transfer reference or gateway payment id.
+  reference String?
+
+  // ---- Cheque detail (channel = CHEQUE). Feeds the Module 7 pipeline. ----
+  chequeNo      String?   @map("cheque_no")
+  chequeBank    String?   @map("cheque_bank")
+  chequeBranch  String?   @map("cheque_branch")
+  chequeDueDate DateTime? @map("cheque_due_date") @db.Date
+  drawerName    String?   @map("drawer_name")
+
+  /// How much of `amount` has been matched to charges. The remainder is the
+  /// student's credit balance.
+  allocatedAmount Decimal @default(0) @map("allocated_amount") @db.Decimal(19, 4)
+
+  postedHeaderId String @unique @map("posted_header_id") @db.Uuid
+
+  cancelledAt          DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelledById        String?   @map("cancelled_by_id") @db.Uuid
+  cancellationReason   String?   @map("cancellation_reason")
+  cancellationHeaderId String?   @unique @map("cancellation_header_id") @db.Uuid
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student          Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  debitAccount     Account             @relation("ReceiptDebitAccount", fields: [debitAccountId], references: [id])
+  posting          TransactionHeader   @relation("ReceiptPosting", fields: [postedHeaderId], references: [id])
+  cancellationPost TransactionHeader?  @relation("ReceiptCancellationPosting", fields: [cancellationHeaderId], references: [id])
+  cashier          User                @relation("ReceiptCashier", fields: [createdById], references: [id])
+  cancelledBy      User?               @relation("ReceiptCanceller", fields: [cancelledById], references: [id])
+  allocations      ReceiptAllocation[]
+
+  @@unique([tenantId, receiptNo])
+  @@index([tenantId, studentId])
+  @@index([tenantId, docDate, createdById])
+  @@map("student_receipts")
+}
+
+/// Which receipt paid which charge.
+///
+/// Sub-ledger detail with no general-ledger effect of its own: the receipt
+/// already credited AR when it was taken. This is what makes aging and
+/// "which charges are still outstanding" answerable, and it is what a student
+/// disputing their balance is shown.
+model ReceiptAllocation {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  receiptId String   @map("receipt_id") @db.Uuid
+  chargeId  String   @map("charge_id") @db.Uuid
+  amount    Decimal  @db.Decimal(19, 4)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  receipt StudentReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  charge  StudentCharge  @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+
+  @@unique([receiptId, chargeId])
+  @@index([chargeId])
+  @@map("receipt_allocations")
+}
+
+/// One period's slice of a deferred charge (SRS REQ-FEE-02).
+///
+/// Written when the charge is raised, posted by the period-end batch. Holding
+/// the whole schedule up front means the batch is a lookup rather than a
+/// calculation, and re-running it cannot produce a different answer.
+model RecognitionEntry {
+  id             String  @id @default(uuid()) @db.Uuid
+  tenantId       String  @map("tenant_id") @db.Uuid
+  chargeId       String  @map("charge_id") @db.Uuid
+  fiscalPeriodId String  @map("fiscal_period_id") @db.Uuid
+  amount         Decimal @db.Decimal(19, 4)
+
+  recognisedAt   DateTime? @map("recognised_at") @db.Timestamptz(6)
+  postedHeaderId String?   @map("posted_header_id") @db.Uuid
+
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  charge       StudentCharge      @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  fiscalPeriod FiscalPeriod       @relation(fields: [fiscalPeriodId], references: [id])
+  posting      TransactionHeader? @relation("RecognitionPosting", fields: [postedHeaderId], references: [id])
+
+  @@unique([chargeId, fiscalPeriodId])
+  @@index([tenantId, fiscalPeriodId, recognisedAt])
+  @@map("recognition_entries")
+}
+
+/// A payment schedule over a term's charges (SRS REQ-CSH-02).
+///
+/// The legacy equivalent was a `ChkBoPrem` checkbox that wrote a `Remain`
+/// balance and a `PaymentStatus` flag onto the registration row — no dates, no
+/// instalment records, and therefore no way to say what was overdue.
+model InstalmentPlan {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  studentId   String   @map("student_id") @db.Uuid
+  termLabel   String?  @map("term_label")
+  totalAmount Decimal  @map("total_amount") @db.Decimal(19, 4)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("PlanCreator", fields: [createdById], references: [id])
+  instalments Instalment[]
+
+  @@index([tenantId, studentId])
+  @@map("instalment_plans")
+}
+
+model Instalment {
+  id      String   @id @default(uuid()) @db.Uuid
+  planId  String   @map("plan_id") @db.Uuid
+  seq     Int
+  dueDate DateTime @map("due_date") @db.Date
+  amount  Decimal  @db.Decimal(19, 4)
+
+  plan InstalmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, seq])
+  @@index([dueDate])
+  @@map("instalments")
 }

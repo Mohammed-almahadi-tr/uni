@@ -70,6 +70,11 @@ export const PERMISSIONS = [
   { key: 'voucher.approve', description: 'Approve and post a voucher (checker, stage 2)' },
   { key: 'voucher.reverse', description: 'Reverse a posted voucher' },
 
+  // ---- Student billing --------------------------------------------------
+  { key: 'charge.create', description: 'Raise fee charges on a student account' },
+  { key: 'charge.reverse', description: 'Reverse a billed charge' },
+  { key: 'revenue.recognise', description: 'Run the deferred-revenue recognition batch' },
+
   // ---- Cash -------------------------------------------------------------
   { key: 'receipt.create', description: 'Take student fee payments' },
   { key: 'receipt.cancel', description: 'Cancel a receipt issued today' },
@@ -177,6 +182,20 @@ export const SOD_CONFLICTS: readonly SodConflict[] = [
       'can be sealed into a closed period by the person who made it.',
   },
   {
+    a: 'charge.create',
+    b: 'charge.reverse',
+    reason:
+      'Whoever bills a student must not be able to unbill them. That pair lets one person ' +
+      'raise a charge, collect against it, and then make the charge disappear.',
+  },
+  {
+    a: 'charge.reverse',
+    b: 'receipt.create',
+    reason:
+      'A cashier who can reverse the charge their receipt paid can take cash and leave the ' +
+      'student account looking settled with nothing recorded as owed.',
+  },
+  {
     a: 'receipt.create',
     b: 'receipt.cancel',
     reason:
@@ -261,15 +280,17 @@ export const DEFAULT_ROLES: Record<
       'academic.read', 'feematrix.read', 'application.read', 'application.decide',
       'student.read', 'student.manage', 'student.status', 'medical.read',
       'registration.read', 'registration.create', 'registration.cancel',
-      'registration.transfer', 'hold.manage', 'discount.apply', 'report.student',
+      'registration.transfer', 'hold.manage', 'discount.apply', 'charge.create',
+      'report.student',
     ],
   },
   'Financial Controller': {
     nameAr: 'المدير المالي',
     permissions: [
       'coa.read', 'voucher.read', 'voucher.approve', 'voucher.reverse',
-      'period.read', 'period.close', 'budget.read', 'budget.approve',
-      'discount.approve', 'po.approve', 'report.financial', 'audit.read',
+      'charge.reverse', 'period.read', 'period.close', 'budget.read',
+      'budget.approve', 'discount.approve', 'po.approve', 'report.financial',
+      'audit.read',
     ],
   },
   'Financial Auditor': {
@@ -285,7 +306,7 @@ export const DEFAULT_ROLES: Record<
       'coa.read', 'coa.manage', 'voucher.read', 'voucher.create',
       'payment.create', 'cheque.manage', 'asset.manage', 'asset.depreciate',
       'budget.read', 'budget.manage', 'grn.create', 'period.read',
-      'report.financial',
+      'revenue.recognise', 'feematrix.read', 'report.financial',
     ],
   },
   Cashier: {

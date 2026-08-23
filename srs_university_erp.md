@@ -1,18 +1,19 @@
 # Software Requirements Specification (SRS)
 ## Multi-Tenant University ERP & White-Label Web Platform
 **Project Name:** UniFlow Enterprise ERP (Next-Gen Transformation of Oasis E-University)
-**Document Version:** 2.1.0
-**Supersedes:** v1.0.0, v2.0.0
+**Document Version:** 2.2.0
+**Supersedes:** v1.0.0, v2.0.0, v2.1.0
 **Target Audience:** University Management, Technical Architects, Development Team, Product Owners, Quality Assurance
 **Standard Compliance:** IEEE Std 830-1998 / ISO/IEC/IEEE 29148
 
 ---
 
-## 0.0 Changes in Version 2.1.0 — corrections made while building
+## 0.0 Corrections made while building (v2.1.0, v2.2.0)
 
-Version 2.0.0 was written before Phase 0 and Track A1/A2 were built. Four of
-its statements turned out to be wrong or weaker than what the build required,
-and are corrected here rather than left to diverge.
+Version 2.0.0 was written before any of it was built. Building Phase 0 and
+Track A1-A3 showed several of its statements to be wrong, or weaker than what
+correctness actually required. They are corrected here rather than left to
+diverge from the system.
 
 | # | Correction | Reason |
 | :--- | :--- | :--- |
@@ -20,6 +21,10 @@ and are corrected here rather than left to diverge.
 | 2 | REQ-FIN-04 gains three requirements the build showed to be necessary: content freeze on submission, a separate draft number series, and approver ≠ reviewer as well as approver ≠ maker | Without the freeze, a maker passes a clean voucher through review and edits it before approval — the standard attack on maker-checker. Without a separate series, abandoned drafts burn statutory voucher numbers |
 | 3 | §4.3: "Posted transactions are immutable" and "Audit log is tamper-evident" are enforced by TRIGGER, not by revoked grants | A table's owner is not bound by `REVOKE`, and on Supabase the default application role owns everything in `public`. The grant-based version would have been inert |
 | 4 | §4.3 gains the maker-checker invariants (drafts never deleted, content frozen, legal transitions, mandatory rejection comment, append-only approval history, posted-draft linkage) | Each is a constraint the build added; the document should say where correctness actually lives |
+| 5 | REQ-CSH-01: an unallocated overpayment credits a **control account** for student credit balances, with per-student identity | A credit balance tracked only in the sub-ledger has nothing in the general ledger to reconcile against — which is exactly how the legacy `Remain` column drifted. It is also a liability, so crediting it to receivables would report a debt as an asset |
+| 6 | New §4.4: **structural account roles**. Modules resolve accounts by role, never by code | The legacy source contained account *names* (`الاصول`, `(مدينون(الطلاب`); renaming an account broke posting, and translating one broke it twice. A tenant may also renumber its chart |
+| 7 | REQ-CSH-01 gains: cash posts to **the cashier's own till account**, and the idempotency key is mandatory rather than recommended | "Which cashier is short today" has to be answerable from the ledger. An optional key means every future caller re-decides whether duplicate receipts matter |
+| 8 | §4.3 gains the sub-ledger invariants (settlement equals its allocations, billed amounts immutable, receipts never deleted, cross-tenant foreign keys refused) | Foreign keys do not carry a tenant, and referential-integrity checks run as the table owner, so the FK alone accepts a cross-tenant reference |
 
 ---
 
@@ -333,9 +338,11 @@ graph LR
     - **Bank Transfer / Deposit (إيداع بنكي):** university bank account, slip/reference number, deposit date.
     - **Cheque (شيك):** cheque number, drawee bank, due date, drawer name → enters the cheque pipeline (Module 7).
     - **Online Payment Gateway (دفع إلكتروني):** see REQ-CSH-05.
-  - Amount and allocation across fee items (tuition, registration, exam, lab, fines, hostel, transport). Unallocated overpayment posts to a student credit balance.
+  - Amount and allocation across fee items (tuition, registration, exam, lab, fines, hostel, transport). Allocation defaults to oldest-due-first, which is what makes the aging report honest, and may be directed explicitly.
+  - **Unallocated overpayment credits a Student Credit Balances control account** carrying the student's identity — a liability, not a reduction of a receivable that does not exist. Crediting the whole receipt to AR would leave the control account carrying a negative student balance, which reports a debt as an asset.
+  - **Cash posts to the till account assigned to the cashier who took it**, not to a single shared safe, so takings are attributable per cashier in the ledger itself. (The legacy `IncomeListByCollecter` report reconstructed this from a name column.)
   - On submission: allocate a receipt number (REQ-FIN-06); post Debit Cash/Bank/Cheques Receivable, Credit Student AR; update the balance; render a bilingual receipt as thermal or A4/A5 PDF, with the amount in words (REQ-NFR-09).
-  - The request carries an idempotency key. **This is the single highest-risk duplicate-creation path in the product**: a cashier on an unreliable connection will press Save twice.
+  - The request carries an idempotency key, and the key is **mandatory**. **This is the single highest-risk duplicate-creation path in the product**: a cashier on an unreliable connection will press Save twice. An optional key would mean every future caller decides afresh whether duplicate receipts matter, and the answer is always the same.
 - **REQ-CSH-02: Payment Installment Plans & Due Dates**
   - Configurable instalment schedules per programme or per student (e.g. 50% at registration, 25% mid-term, 25% pre-finals).
   - Automated SMS/Email reminders for upcoming and overdue instalments.
@@ -721,6 +728,37 @@ These are constraints, not application conventions. Each exists because the lega
 | A rejection carries a reason | `CHECK (to_state <> 'REJECTED' OR btrim(comment) <> '')` on `approval_events` |
 | Approval history cannot be rewritten | Append-only trigger on `approval_events` |
 | A posted draft points at its voucher | `CHECK` tying `state = 'Posted'` to a non-null `posted_header_id`, and the converse |
+| A charge's settlement equals its allocations | Deferred constraint trigger comparing `settled_amount` with `SUM(receipt_allocations.amount)`. The denormalised total exists for query cost and is exactly the thing that drifts |
+| A receipt's allocated total equals its allocations | The same, from the receipt side |
+| Nothing is settled beyond what is owed | `CHECK (settled_amount BETWEEN 0 AND net_amount)`, and `net_amount = gross_amount - discount_amount` |
+| Billed amounts are immutable once posted | Trigger on `student_charges`; settlement, recognition and the reversal stamp may move, nothing else. Correction is by reversal |
+| Receipts are cancelled, never deleted | Trigger on `student_receipts`. A cancelled receipt keeps its number — a gap in a receipt book is a question an auditor will ask |
+| A cancelled receipt's allocations are frozen | Trigger, so dead money cannot be re-pointed at a live charge |
+| Foreign keys stay inside their tenant | Trigger comparing the referenced row's `tenant_id` on every cross-table reference. **Foreign keys do not carry a tenant**, and referential-integrity checks run as the table owner, so the FK alone accepts a cross-tenant id |
+| One national ID per tenant | Partial unique index `WHERE national_id IS NOT NULL`, so unknown IDs do not collide with each other |
+
+### 4.4 Structural Account Roles
+
+Modules resolve accounts by **role**, never by code: cashiering asks for
+`STUDENT_AR_CONTROL`, cheque clearing for `CHEQUES_RECEIVABLE`, revaluation for
+`FX_UNREALISED`, year-end close for `RETAINED_SURPLUS`. A per-tenant mapping
+binds each role to one account, populated from the shipped chart at onboarding
+and editable afterwards.
+
+Two reasons this is normative rather than a convenience:
+
+- The legacy system embedded account **names** in its source. The student
+  receipt screen queried for accounts literally named `الاصول` and
+  `(مدينون(الطلاب`, then wrote the English strings `"Current Assets"`,
+  `"Debtors"` and `"Students Fees"` into the grid. Renaming an account broke
+  posting; translating one broke it twice.
+- A tenant may renumber its chart. The shipped codes are a starting point, not
+  a constraint.
+
+A role that requires a sub-ledger (student, sponsor, vendor) may only be bound
+to a control account of that sub-ledger, and no role may be bound to a
+non-postable heading. Both are validated at bind time, because the alternative
+is discovering it when a cashier's first receipt of the day is refused.
 
 ---
 

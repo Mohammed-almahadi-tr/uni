@@ -122,9 +122,23 @@ describe('the shipped template', () => {
     }
   });
 
-  it('ships the three control accounts the sub-ledgers need', () => {
+  it('ships a control account for every sub-ledger, and both sides of the student one', () => {
     const controls = walkTemplate().filter((a) => a.isControlAccount);
-    expect(controls.map((c) => c.subledgerType).sort()).toEqual(['SPONSOR', 'STUDENT', 'VENDOR']);
+    const byCode = new Map(controls.map((c) => [c.code, c]));
+
+    // What a student owes, and what the institution owes a student who has
+    // overpaid. Both are per-student balances, so both need a control account
+    // — a credit balance tracked only in the sub-ledger has nothing in the
+    // general ledger to reconcile against, which is precisely how the legacy
+    // `Remain` column drifted.
+    expect(byCode.get('11211')?.subledgerType).toBe('STUDENT');
+    expect(byCode.get('21221')?.subledgerType).toBe('STUDENT');
+    expect(byCode.get('11221')?.subledgerType).toBe('SPONSOR');
+    expect(byCode.get('21211')?.subledgerType).toBe('VENDOR');
+
+    expect(new Set(controls.map((c) => c.subledgerType))).toEqual(
+      new Set(['STUDENT', 'SPONSOR', 'VENDOR']),
+    );
   });
 
   it('carries accumulated depreciation as a contra-asset', () => {

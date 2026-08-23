@@ -80,7 +80,7 @@ export async function initialiseSequences(
       fiscalYearId,
       docType,
       nextValue: 1,
-      prefix: `${DEFAULT_PREFIX[docType] ?? 'DOC'}-${yearLabel}-`,
+      prefix: `${DEFAULT_PREFIX[docType]}-${yearLabel}-`,
       padding: 6,
     })),
     skipDuplicates: true,
@@ -91,9 +91,17 @@ function formatReference(prefix: string, value: number, padding: number): string
   return `${prefix}${String(value).padStart(padding, '0')}`;
 }
 
-export const DEFAULT_PREFIX: Partial<Record<VoucherType, string>> = {
+/**
+ * Reference prefix per document type.
+ *
+ * Exhaustive rather than partial, so adding a `VoucherType` without deciding
+ * what its documents are called is a compile error rather than a series of
+ * vouchers numbered "DOC-".
+ */
+export const DEFAULT_PREFIX: Record<VoucherType, string> = {
   JOURNAL: 'JV',
   STUDENT_RECEIPT: 'SRV',
+  STUDENT_CHARGE: 'CHG',
   GENERAL_RECEIPT: 'RV',
   PAYMENT: 'PV',
   REGISTRATION: 'REG',
@@ -105,6 +113,15 @@ export const DEFAULT_PREFIX: Partial<Record<VoucherType, string>> = {
   REVERSAL: 'REVR',
   YEAR_END_CLOSE: 'YEC',
 };
+
+/**
+ * Every document type, for opening a fiscal year.
+ *
+ * Derived from DEFAULT_PREFIX rather than written out again: a type that has a
+ * prefix but no counter would fail at the first posting of the year, in
+ * production, on a document somebody is waiting for.
+ */
+export const ALL_VOUCHER_TYPES = Object.keys(DEFAULT_PREFIX) as VoucherType[];
 
 export class SequenceNotConfiguredError extends Error {
   constructor(

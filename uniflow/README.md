@@ -6,13 +6,13 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete · Track A1 (Chart of Accounts) and A2 (journal
-vouchers & maker-checker) complete.** Ledger invariants, platform spine,
-auth/RBAC with segregation of duties, the bilingual RTL shell, a normalised
-chart of accounts with a standard university template, and a four-state
-maker-checker workflow whose drafts are never deleted and whose content is
-frozen the moment a checker is asked to look at it. **259 tests across 11
-suites; typecheck, lint and production build clean.**
+**Status: Phase 0 complete · Track A1-A3 complete.** Ledger invariants,
+platform spine, auth/RBAC with segregation of duties, the bilingual RTL shell,
+a normalised chart of accounts, a four-state maker-checker workflow whose
+drafts are never deleted, and a working cashier desk: fee catalog, student
+sub-ledger, multi-channel receipts, credit balances, deferred-revenue
+recognition and aging. **315 tests across 12 suites; typecheck, lint and
+production build clean.**
 
 Tracks A (finance), B (student) and C (public surface) run in parallel from
 here.
@@ -26,7 +26,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 259 tests
+npm test              # 315 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -197,8 +197,14 @@ tests/voucher.test.ts      56  live balancing, draft numbering, the four-state
                                workflow, self-approval and duplicate-checker
                                refusal, the content freeze, concurrent
                                approval, attachments, reversal
+tests/cashiering.test.ts   56  fee catalog, account roles, Arabic student
+                               search, gross billing with discounts, the four
+                               payment channels, credit balances, same-day
+                               cancellation, charge reversal, recognition,
+                               instalments, statements, aging, and the
+                               sub-ledger/control-account reconciliation
                            ───
-                           259
+                           315
 ```
 
 ---
@@ -237,13 +243,42 @@ shared by the voucher grid and the posting engine as one implementation rather
 than two specifications — a grid that says "balanced" against a server that
 says "out by 0.01" leaves the maker stuck with no way to see why.
 
+**A3 — Fee catalog, student AR and cashiering.** The critical path: where money
+actually enters the system. The legacy cashier screen had a fee grid hardcoded
+to two rows, resolved accounts by their Arabic *names* while writing English
+literals into the grid, numbered receipts with `MAX(MoveNo) + 1`, recognised a
+full year's tuition on registration day, and had no student control account at
+all.
+
+What replaces it, and why each piece is shaped the way it is:
+
+| Piece | Shape | Because |
+| :--- | :--- | :--- |
+| [Fee catalog](src/lib/fees/catalog.ts) | 15 heads, each with its own revenue account and deferral behaviour | The grid had two rows, so revenue could not be attributed to what it was for |
+| [Account roles](src/lib/coa/mapping.ts) | Modules ask for `STUDENT_AR_CONTROL`, never for code `11211` | The legacy source contained account *names*; renaming an account broke posting, translating one broke it twice |
+| [Billing](src/lib/billing/charge.ts) | Gross, with the discount as its own expense line and deferrable fees crediting a liability | Netting the discount off hides scholarship exposure; crediting revenue on day one overstates it for the rest of the term |
+| [Cashiering](src/lib/cashier/receipt.ts) | Cash lands in the cashier's own till; unmatched money credits a liability control account | "Which cashier is short today" has to be answerable from the ledger; an overpayment is a debt, not a negative asset |
+| [Recognition](src/lib/billing/recognition.ts) | Schedule written at billing time, batch is a lookup | A batch that recalculates can produce a different answer on a re-run |
+| [Reconciliation](src/lib/students/account.ts) | Sub-ledger vs control account, both directions | The check the legacy design made impossible |
+
+**The idempotency key on `takeReceipt` is a required argument, not an option.**
+A cashier on an unreliable link presses Save, sees nothing, and presses it
+again. Making the key optional would mean every future caller decides afresh
+whether duplicate receipts matter, and the answer is always the same.
+
+The suite's central assertion: after a scripted term — twelve students, mixed
+discounts, cash and bank receipts, an overpayment, a same-day cancellation, a
+partly-paid charge reversed, two recognition runs — the student sub-ledger
+equals its control accounts **to the cent**.
+
 ---
 
 ## Next
 
-Track A continues at **A3 — fee catalog, student AR and cashiering**, which is
-the critical path. Track B (student) and Track C (public surface) can run in
-parallel — see the roadmap in
+Track A continues at **A4 — the cheque clearing pipeline**. Cheque receipts
+already land in cheques-receivable with their bank, due date and drawer, so the
+portfolio exists and is waiting for its state machine. Track B (student) and
+Track C (public surface) can run in parallel — see the roadmap in
 [`../implementation_plan.md`](../implementation_plan.md). They converge at the
 **registration-posts-to-GL** milestone, which is the integration the legacy
 system never made.

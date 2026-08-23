@@ -1,6 +1,6 @@
 # Implementation Plan: UniFlow Multi-Tenant University ERP & White-Label Web Platform
 
-**Version:** 2.1.0 · **Supersedes:** 1.0.0, 2.0.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.1.0
+**Version:** 2.2.0 · **Supersedes:** 1.0.0, 2.0.0, 2.1.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.2.0
 
 Transformation of the legacy VB.NET / MS SQL desktop university system (Oasis E-University at Nile College; the Ribat University Application at Ribat and UOT) into a multi-tenant web application: student registration and lifecycle management, a double-entry university finance engine, and a white-label landing page per university client, built with **Next.js**, **shadcn UI** and **PostgreSQL**.
 
@@ -33,11 +33,11 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**259 tests pass across 11 suites; typecheck, lint and production build are all
+**315 tests pass across 12 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
-**Track A1 (Chart of Accounts) and A2 (journal vouchers and maker-checker) are
-also complete** — see §0.2.
+**Track A1 (Chart of Accounts), A2 (journal vouchers and maker-checker) and
+A3 (fee catalog, student AR and cashiering) are also complete** — see §0.2.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -186,6 +186,76 @@ table in `public` lacks row-level security and a policy, with two names
 declared global on purpose (`permissions`, `_prisma_migrations`).
 
 ---
+
+### A3 — Fee Catalog, Student AR & Cashiering · complete
+
+The critical path, and the part of the legacy system furthest from correct.
+Its cashier screen had a fee grid **hardcoded to two rows**, looked accounts up
+by their Arabic *names* and then wrote the English literals `"Current Assets"`,
+`"Debtors"` and `"Students Fees"` into the grid, numbered receipts with
+`MAX(MoveNo) + 1` read inside the transaction, recognised a full year's tuition
+on registration day, and had no student control account at all — so a student's
+balance and the general ledger could disagree indefinitely with nothing capable
+of noticing.
+
+| Delivered | Notes |
+| :--- | :--- |
+| Fee item catalog (REQ-FEE-01) | All fifteen heads, each with its own revenue account and its own deferrable / discountable / refundable flags. Installed at onboarding, idempotent by code |
+| Structural account roles | Modules ask for `STUDENT_AR_CONTROL`, not for account code `11211`. A tenant may renumber its chart; the legacy system wrote account *names* into the source, so renaming an account broke posting |
+| Student master (finance slice) | Number, bilingual name, national ID, status. Arabic-normalised search key, so a cashier typing احمد finds أحمد. National ID unique per tenant by partial index — duplicate applicants are the start of duplicate ledgers. Track B extends this table rather than replacing it |
+| Charge raising (REQ-FEE-02) | `DR Student AR (net) · DR Discounts (discount) · CR Unearned or Revenue (gross)`. Gross billing keeps scholarship exposure on its own line — the number `viewDiscount` existed to reconstruct. Idempotency-keyed |
+| Multi-channel cashiering (REQ-CSH-01) | Cash to the cashier's **own till**, bank transfer, cheque into cheques-receivable with its clearing detail, gateway. FIFO settlement by due date. **The idempotency key is a required argument, not an option** |
+| Credit balances (REQ-FEE-04) | Unmatched money credits a *liability control account*, not receivables. Crediting the whole receipt to AR would leave a negative student balance sitting in an asset account. Applied to the next term's charges without burning a receipt number |
+| Receipt cancellation (REQ-CSH-06) | Same day only, by a supervisor, with MFA; produces a linked reversal and keeps the number. After that day it goes through the voucher workflow and gets a second signature |
+| Charge reversal | Unwinds recognised revenue and unearned income **in the proportions that apply now**, and returns money already paid to the student as credit rather than quietly keeping it |
+| Revenue recognition (REQ-FEE-02) | The schedule is written when the charge is raised, so the period-end batch is a lookup and cannot arrive at a different answer on a re-run. Idempotent per period, period-locked, and it skips reversed charges |
+| Instalment plans (REQ-CSH-02) | Dated schedules with exact-sum allocation. Overdue is cross-checked against the actual balance: a student who paid up front is not dunned because a date passed |
+| Statement of account, aging | Running balance with a real opening figure carried into a date window. Aging from the due date, falling back to the document date |
+| Fiscal year opening | Year, periods and **document counters in one transaction**, because a year without counters fails at its first posting |
+| 56 tests | Including the reconciliation test below |
+
+**The test that matters most.** After a scripted term — twelve students, mixed
+discounts, cash and bank receipts, an overpayment, a same-day cancellation, a
+partly-paid charge reversed, and two recognition runs — the student sub-ledger
+equals its two control accounts **to the cent, with zero variance**. That check
+is trivial to write against this design and was impossible against the legacy
+one.
+
+**Two ordering bugs, both mine, both caught by the database.**
+
+1. Receipt cancellation released its allocations *after* stamping the
+   cancellation. A cancelled receipt's allocations are frozen by trigger —
+   which is what stops anyone re-pointing dead money at a live charge — so the
+   database refused. The comment in the code had confidently asserted the
+   opposite order was required. Fixed; the trigger is why this surfaced in a
+   test rather than in a bursar's office.
+2. `settled_amount` on a charge is denormalised so a screen listing forty
+   charges does not aggregate the allocation table forty times. Denormalised
+   totals are exactly what drifts, and a drifted student balance is what the
+   legacy system shipped. A deferred constraint trigger now requires
+   `settled_amount` to equal the sum of its allocations at commit, and a test
+   proves a hand-written `UPDATE` cannot break it.
+
+**A Prisma 7 interaction worth recording.** The statement-of-account query
+originally pulled three sibling relations at once. Prisma 7's query interpreter
+fans those loads out **concurrently onto the transaction's single connection**;
+`pg` currently queues them and emits a deprecation warning, and will refuse
+outright at pg 9. Correct today, an upgrade blocker tomorrow. The query now
+resolves voucher references in one explicit pass — a fixed number of round
+trips whatever the length of the history, which is the better shape anyway.
+Worth watching for elsewhere: the only symptom is a `DeprecationWarning` from
+`pg`, and nothing else.
+
+**Deliberately not built yet, and why**
+
+| Deferred | Reason |
+| :--- | :--- |
+| Payment-gateway provider adapters (REQ-CSH-05) | The interface is meaningless without a webhook route and a settlement-reconciliation job. `GATEWAY` receipts post to the bank account today and carry their provider reference |
+| Automatic late fees (REQ-CSH-02) | Needs the durable job runner, which A5 (depreciation) and A6 (dunning) also need. The `LATE_FEE` catalog item and the overdue query are in place; only the schedule that raises it is missing |
+| Refund disbursement (REQ-FEE-03) | Follows the payment-voucher workflow, which is A6. The withdrawal refund *policy* is a Track B lifecycle concern |
+
+---
+
 
 ## 1. Architecture Decisions Requiring Sign-Off
 

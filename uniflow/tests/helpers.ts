@@ -7,10 +7,17 @@
  * side for tuition — so the tests exercise the same relationships the real
  * product will.
  */
-import type { VoucherType } from '@/generated/prisma/enums';
 import { prisma, systemPrisma, withSystem, withTenant, type Tx } from '@/lib/db/client';
-import { initialiseSequences } from '@/lib/ledger/sequence';
+import { ALL_VOUCHER_TYPES, initialiseSequences } from '@/lib/ledger/sequence';
 import { monthlyPeriods } from '@/lib/ledger/period';
+import { provisionFiscalYear } from '@/lib/ledger/fiscal-year';
+import { provisionTenant, syncPermissions } from '@/lib/auth/provisioning';
+import { installChartOfAccounts } from '@/lib/coa/template';
+import { installFeeCatalog } from '@/lib/fees/catalog';
+import type { Principal } from '@/lib/auth/rbac';
+import type { PermissionKey } from '@/lib/auth/permissions';
+
+export { ALL_VOUCHER_TYPES };
 
 /**
  * The suite uses the application's OWN clients, not separate ones.
@@ -29,20 +36,6 @@ export const testDb = prisma;
 /** Owner role — bypasses RLS. Fixture setup and cross-tenant assertions only. */
 export const testSystemDb = systemPrisma;
 
-export const ALL_VOUCHER_TYPES: VoucherType[] = [
-  'JOURNAL',
-  'STUDENT_RECEIPT',
-  'GENERAL_RECEIPT',
-  'PAYMENT',
-  'REGISTRATION',
-  'DEPRECIATION',
-  'REVENUE_RECOGNITION',
-  'CHEQUE_MOVEMENT',
-  'FX_REVALUATION',
-  'OPENING_BALANCE',
-  'REVERSAL',
-  'YEAR_END_CLOSE',
-];
 
 export interface Fixture {
   tenantId: string;
@@ -264,3 +257,158 @@ export async function disconnectAll() {
 export const JAN = new Date(Date.UTC(2026, 0, 15));
 /** March 15th — inside period 3, which the fixture leaves FUTURE. */
 export const MAR = new Date(Date.UTC(2026, 2, 15));
+
+// ---------------------------------------------------------------------------
+// Full tenant onboarding (SRS §6), for the modules that need a real chart
+// ---------------------------------------------------------------------------
+
+/**
+ * A university as it exists five minutes after onboarding: default roles, the
+ * standard chart with its structural account mappings, the fee catalog, and an
+ * open fiscal year with its document counters.
+ *
+ * `makeTenant` above builds a hand-rolled minimal chart, which is right for
+ * testing the posting engine in isolation. Anything that resolves accounts by
+ * ROLE — cashiering, billing, recognition — needs the real thing.
+ */
+export interface University {
+  tenantId: string;
+  adminUserId: string;
+  roleIds: Record<string, string>;
+  fiscalYearId: string;
+  /** Index 0 is period 1. Periods 1-3 are OPEN; the rest FUTURE. */
+  periodIds: string[];
+  accounts: Record<string, string>;
+  feeItems: Record<string, string>;
+  costCenterId: string;
+}
+
+let uniCounter = 0;
+
+export async function makeUniversity(
+  opts: { year?: number; openPeriods?: number[] } = {},
+): Promise<University> {
+  uniCounter += 1;
+  const year = opts.year ?? 2026;
+  const slug = `u${Date.now().toString(36)}${uniCounter}`;
+
+  await syncPermissions();
+  const t = await provisionTenant({
+    slug,
+    nameEn: `Test University ${uniCounter}`,
+    nameAr: `جامعة اختبار ${uniCounter}`,
+    admin: {
+      email: `admin@${slug}.test`,
+      fullName: 'Onboarding Admin',
+      password: 'Khartoum2026Uni',
+    },
+  });
+
+  await installChartOfAccounts(t.tenantId, t.adminUserId);
+  await installFeeCatalog(t.tenantId, t.adminUserId);
+
+  const { fiscalYearId, periodIds } = await withSystem(
+    (tx) =>
+      provisionFiscalYear(tx, t.tenantId, {
+        name: String(year),
+        startYear: year,
+        startMonth: 1,
+        openPeriods: opts.openPeriods ?? [1, 2, 3],
+      }),
+    {},
+    testSystemDb,
+  );
+
+  const { accounts, feeItems, costCenterId } = await withSystem(
+    async (tx) => {
+      const accs = await tx.account.findMany({
+        where: { tenantId: t.tenantId },
+        select: { id: true, code: true },
+      });
+      const items = await tx.feeItem.findMany({
+        where: { tenantId: t.tenantId },
+        select: { id: true, code: true },
+      });
+      const cc = await tx.costCenter.findFirstOrThrow({
+        where: { tenantId: t.tenantId, code: 'CC-MED' },
+        select: { id: true },
+      });
+      return {
+        accounts: Object.fromEntries(accs.map((a) => [a.code, a.id])),
+        feeItems: Object.fromEntries(items.map((i) => [i.code, i.id])),
+        costCenterId: cc.id,
+      };
+    },
+    {},
+    testSystemDb,
+  );
+
+  // Tuition posts to an account that requires a cost centre, and the shipped
+  // catalog deliberately leaves it unset because the right answer is the
+  // student's faculty. Tests are not exercising faculty routing, so give it
+  // one.
+  await withSystem(
+    (tx) =>
+      tx.feeItem.update({
+        where: { id: feeItems.TUITION },
+        data: { costCenterId },
+      }),
+    {},
+    testSystemDb,
+  );
+
+  return {
+    tenantId: t.tenantId,
+    adminUserId: t.adminUserId,
+    roleIds: t.roleIds,
+    fiscalYearId,
+    periodIds,
+    accounts,
+    feeItems,
+    costCenterId,
+  };
+}
+
+/** A user holding exactly the permissions named, and nothing else. */
+export async function makePrincipal(
+  tenantId: string,
+  permissions: PermissionKey[],
+  opts: { mfaVerified?: boolean; name?: string } = {},
+): Promise<Principal> {
+  uniCounter += 1;
+  const label = opts.name ?? `user${uniCounter}`;
+
+  const userId = await withSystem(
+    async (tx) => {
+      const u = await tx.user.create({
+        data: {
+          tenantId,
+          email: `${label}.${uniCounter}@fixture.test`,
+          fullName: label,
+          passwordHash: 'x',
+        },
+        select: { id: true },
+      });
+      const role = await tx.role.create({
+        data: { tenantId, name: `${label}-${uniCounter}`, nameAr: label },
+        select: { id: true },
+      });
+      if (permissions.length > 0) {
+        await tx.rolePermission.createMany({
+          data: permissions.map((permissionKey) => ({ roleId: role.id, permissionKey })),
+        });
+      }
+      await tx.userRole.create({ data: { userId: u.id, roleId: role.id } });
+      return u.id;
+    },
+    {},
+    testSystemDb,
+  );
+
+  return {
+    tenantId,
+    userId,
+    mfaVerified: opts.mfaVerified ?? true,
+    permissions: new Set(permissions),
+  };
+}

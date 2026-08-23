@@ -2,6 +2,7 @@ import 'server-only';
 import type { NormalBalance, SubledgerType } from '@/generated/prisma/enums';
 import { withSystem } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
+import { TEMPLATE_ACCOUNT_ROLES } from './mapping';
 
 /**
  * Standard university chart of accounts (SRS §6 step 1).
@@ -241,8 +242,18 @@ export const UNIVERSITY_COA: TemplateAccount[] = [
                 nameAr: 'أرصدة دائنة للطلاب',
                 nameEn: 'Student Credit Balances',
                 // SRS REQ-FEE-04: overpayments are a liability, not revenue.
+                // A control account with student identity, exactly like AR —
+                // otherwise a per-student credit balance is a number in the
+                // sub-ledger with nothing in the general ledger to check it
+                // against, which is how the legacy `Remain` column drifted.
                 children: [
-                  { code: '21221', nameAr: 'مدفوعات زائدة للطلاب', nameEn: 'Student Overpayments' },
+                  {
+                    code: '21221',
+                    nameAr: 'مدفوعات زائدة للطلاب',
+                    nameEn: 'Student Overpayments',
+                    isControlAccount: true,
+                    subledgerType: 'STUDENT',
+                  },
                 ],
               },
             ],
@@ -344,6 +355,25 @@ export const UNIVERSITY_COA: TemplateAccount[] = [
                   { code: '41213', nameAr: 'رسوم المعامل', nameEn: 'Laboratory Fees' },
                   { code: '41214', nameAr: 'رسوم البطاقات والشهادات', nameEn: 'Cards and Certificates' },
                   { code: '41215', nameAr: 'غرامات', nameEn: 'Fines and Penalties' },
+                  // The fee catalogue (REQ-FEE-01) bills fifteen heads. Several
+                  // share a revenue line on purpose: the fee item carries the
+                  // granularity a bursar needs, the account carries the
+                  // granularity a financial statement needs.
+                  {
+                    code: '41216',
+                    nameAr: 'رسوم المكتبة والخدمات الطلابية',
+                    nameEn: 'Library and Student Services',
+                  },
+                  {
+                    code: '41217',
+                    nameAr: 'رسوم السكن والترحيل',
+                    nameEn: 'Accommodation and Transport',
+                  },
+                  {
+                    code: '41218',
+                    nameAr: 'رسوم التأمين والدمغة',
+                    nameEn: 'Insurance and Stamp Duty',
+                  },
                 ],
               },
             ],
@@ -511,6 +541,8 @@ export const DEFAULT_COST_CENTERS = [
 export interface InstallResult {
   accounts: number;
   costCenters: number;
+  /** Structural roles bound to accounts — see coa/mapping.ts. */
+  mappings: number;
 }
 
 /**
@@ -578,17 +610,42 @@ export async function installChartOfAccounts(
       skipDuplicates: true,
     });
 
+    // Bind the structural roles the rest of the product asks for by name.
+    // Without these a freshly onboarded tenant has a complete chart and no way
+    // to take a payment, because nothing knows which account is student AR.
+    const byCode = new Map(
+      (
+        await tx.account.findMany({
+          where: { tenantId },
+          select: { id: true, code: true },
+        })
+      ).map((a) => [a.code, a.id]),
+    );
+
+    let mappings = 0;
+    for (const [role, code] of Object.entries(TEMPLATE_ACCOUNT_ROLES)) {
+      const accountId = byCode.get(code);
+      if (!accountId) continue;
+      const result = await tx.accountMapping.upsert({
+        where: { tenantId_role: { tenantId, role: role as never } },
+        create: { tenantId, role: role as never, accountId },
+        update: {},
+        select: { accountId: true },
+      });
+      if (result.accountId === accountId) mappings += 1;
+    }
+
     if (actorId) {
       await audit(tx, tenantId, {
         actorId,
         action: 'INSERT',
         resourceType: 'chart_of_accounts',
         resourceId: tenantId,
-        after: { accountsCreated: accounts, costCentresCreated: cc.count },
+        after: { accountsCreated: accounts, costCentresCreated: cc.count, mappings },
       });
     }
 
-    return { accounts, costCenters: cc.count };
+    return { accounts, costCenters: cc.count, mappings };
   });
 }
 

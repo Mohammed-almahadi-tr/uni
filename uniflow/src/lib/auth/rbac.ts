@@ -46,6 +46,12 @@ export const MFA_REQUIRED_PERMISSIONS: readonly PermissionKey[] = [
   'role.manage',
   'user.manage',
   'openingbalance.manage',
+  // Cancelling a receipt and reversing a charge are the two ways a recorded
+  // debt stops being recorded. Both are how cash walks out of a bursar's
+  // office without a trace, so both sit here rather than with ordinary
+  // day-to-day work.
+  'receipt.cancel',
+  'charge.reverse',
 ];
 
 const MFA_SET = new Set<string>(MFA_REQUIRED_PERMISSIONS);
