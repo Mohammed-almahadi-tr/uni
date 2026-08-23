@@ -99,6 +99,7 @@ export const PERMISSIONS = [
   // ---- Assets and reports ----------------------------------------------
   { key: 'asset.manage', description: 'Maintain the fixed asset register' },
   { key: 'asset.depreciate', description: 'Run the depreciation batch' },
+  { key: 'asset.dispose', description: 'Sell, scrap or write off a fixed asset' },
   { key: 'report.financial', description: 'Run financial statements' },
   { key: 'report.student', description: 'Run student and registration reports' },
 ] as const;
@@ -217,6 +218,13 @@ export const SOD_CONFLICTS: readonly SodConflict[] = [
     reason: 'A cashier must not approve the ledger entries their own till produces.',
   },
   {
+    a: 'asset.manage',
+    b: 'asset.dispose',
+    reason:
+      'Whoever maintains the asset register must not also be able to write assets off it. ' +
+      'That pair lets one person retire equipment on paper and walk out with it.',
+  },
+  {
     a: 'budget.manage',
     b: 'budget.approve',
     reason: 'A budget must be approved by someone other than the person who prepared it.',
@@ -298,8 +306,8 @@ export const DEFAULT_ROLES: Record<
     permissions: [
       'coa.read', 'voucher.read', 'voucher.approve', 'voucher.reverse',
       'charge.reverse', 'period.read', 'period.close', 'budget.read',
-      'budget.approve', 'discount.approve', 'po.approve', 'report.financial',
-      'audit.read',
+      'budget.approve', 'discount.approve', 'po.approve', 'asset.dispose',
+      'report.financial', 'audit.read',
     ],
   },
   'Financial Auditor': {

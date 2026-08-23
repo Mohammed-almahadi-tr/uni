@@ -1,14 +1,14 @@
 # Software Requirements Specification (SRS)
 ## Multi-Tenant University ERP & White-Label Web Platform
 **Project Name:** UniFlow Enterprise ERP (Next-Gen Transformation of Oasis E-University)
-**Document Version:** 2.3.0
-**Supersedes:** v1.0.0, v2.0.0, v2.1.0, v2.2.0
+**Document Version:** 2.4.0
+**Supersedes:** v1.0.0 - v2.3.0
 **Target Audience:** University Management, Technical Architects, Development Team, Product Owners, Quality Assurance
 **Standard Compliance:** IEEE Std 830-1998 / ISO/IEC/IEEE 29148
 
 ---
 
-## 0.0 Corrections made while building (v2.1.0 - v2.3.0)
+## 0.0 Corrections made while building (v2.1.0 - v2.4.0)
 
 Version 2.0.0 was written before any of it was built. Building Phase 0 and
 Track A1-A3 showed several of its statements to be wrong, or weaker than what
@@ -28,6 +28,9 @@ diverge from the system.
 | 9 | REQ-CHQ-01 splits cheques into **two** accounts — on hand, and with the bank for collection | Custody is a question the ledger has to be able to answer. One account can say how much paper the institution is holding, but not where it is |
 | 10 | New: a receipt whose cheque is refused becomes **dishonoured**, a state distinct from cancelled | A cancellation says the cashier made a mistake; a dishonour says the bank refused. The receipt keeps its number either way, but only one of the two is anybody's fault, and they are counted the same way and reported differently |
 | 11 | §4.3 gains the cheque invariants (legal transitions only, custody agrees with status, history append-only, a cheque matches its receipt) | The legacy grid let a clerk click Cleared and then Rejected all afternoon, keeping only the last click |
+| 12 | REQ-AST-01 restated: the legacy system has **no asset entity**. An asset was a row in the chart of accounts with a `DeprPerc` column | v2.0.0 described the legacy fixed-asset module as though a register existed. It did not, so every field in REQ-AST-01 is new work rather than migrated |
+| 13 | New §4.5: **durable batch runs**. Every period-end job records when it ran, by whom, what it posted, and why it failed | Idempotency alone makes a batch safe; it does not make it accountable. "Was depreciation run for March" has to be answerable without reading the ledger |
+| 14 | REQ-AST-02 gains the residue rule: the final period absorbs rounding so the schedule sums to exactly cost − salvage | Otherwise an asset that should be fully written down keeps a balance of a few piastres forever, and nothing ever clears it |
 
 ---
 
@@ -401,10 +404,14 @@ graph LR
 - **REQ-AST-01: Fixed Asset Registry**
   - Laboratory equipment, IT, furniture, vehicles, buildings, library collections.
   - Fields: Asset Code, Barcode/QR, Serial Number, Category, Purchase Date, In-Service Date, Purchase Cost, Salvage Value, Useful Life, Location/Room, Assigned Custodian, and the GL asset/accumulated-depreciation/expense account triple for its category.
+  - *(All of this is new work. The legacy system has no asset entity: an "asset" is a row in the `Acc` chart-of-accounts table with `Acc1 = 'Fixed Assets'` and a `DeprPerc` column, and it holds none of the fields above — including no accumulated-depreciation account, which is why net book value was not derivable.)*
+  - **Capitalisation always posts.** An asset whose cost is not in the ledger cannot be reconciled against the asset accounts, and reconciling them is the point; an asset arriving at go-live is funded from the opening-balance account like anything else.
 - **REQ-AST-02: Depreciation Engine**
   - Straight-line as the default method: $\text{Annual Depreciation} = \dfrac{\text{Cost} - \text{Salvage}}{\text{Useful Life in Years}}$
   - A **persisted depreciation schedule** per asset, generated at capitalisation, holding one row per period with its planned charge. Accumulated Depreciation and NBV are derived from posted schedule rows, not recomputed ad hoc.
-  - First and final periods are prorated from the in-service date.
+  - First and final periods are prorated from the in-service date, **by days**: an asset installed on the 20th of a 31-day month takes 12/31 of a month's charge.
+  - **The final period absorbs the rounding residue**, so the schedule sums to exactly cost − salvage. Without this an asset that should be fully written down carries a few piastres forever and nothing ever clears them.
+  - Reducing balance is offered alongside straight line, bounded twice — it stops at salvage and at the end of the useful life. *(The legacy calculation was `balance × DeprPerc / 100` against the account's current balance, which is reducing-balance by accident, has neither bound, and produced a different answer every time the screen was opened.)*
 - **REQ-AST-03: Automated Depreciation Journal Dispatch**
   - Period-end batch posting: **Debit** Depreciation Expense (by cost centre), **Credit** Accumulated Depreciation (contra-asset, per asset category).
   - **The run is idempotent and period-locked.** A period already depreciated cannot be depreciated again; the batch is keyed on (tenant, period) and a repeat invocation is a no-op that reports what was already posted. The run is rejected if the period is closed. *(The legacy batch had neither protection and would double-post on a second click.)*
@@ -749,6 +756,10 @@ These are constraints, not application conventions. Each exists because the lega
 | A cheque matches the receipt that took it | Trigger comparing amount, payer and channel. Otherwise the ledger holds one figure in cheques-receivable and the portfolio holds another |
 | Cheque history is append-only | Trigger on `cheque_events` |
 | A receipt is cancelled or dishonoured, never both | `CHECK`. They are two different accounts of where the money went and only one can be true |
+| An asset's cost and depreciation basis are fixed once capitalised | Trigger. Every charge already taken depends on them; correction is by disposal and re-capitalisation |
+| A posted depreciation charge is never deleted or moved | Trigger on `depreciation_entries`. A disposal cancels the *unposted* remainder only |
+| Asset custody history is append-only | Trigger on `asset_movements` |
+| A succeeded batch run is final | Trigger on `job_runs`. Re-running means a new key, not editing the record of the last run |
 
 ### 4.4 Structural Account Roles
 
@@ -772,6 +783,27 @@ A role that requires a sub-ledger (student, sponsor, vendor) may only be bound
 to a control account of that sub-ledger, and no role may be bound to a
 non-postable heading. Both are validated at bind time, because the alternative
 is discovering it when a cashier's first receipt of the day is refused.
+
+### 4.5 Durable Batch Runs
+
+Period-end work — depreciation, revenue recognition, dunning, FX revaluation
+— shares one shape and one hazard: it posts a great deal of money at once,
+and running it twice doubles everything it did.
+
+Every such batch runs through a shared runner and leaves a durable record:
+
+- **At most once per key.** The key is normally the period. A repeat
+  invocation replays the stored result rather than repeating the work.
+- **Visible.** When it ran, who asked for it, how long it took, what it
+  posted, how many attempts it took, and — on failure — the error. Idempotency
+  alone makes a batch safe; it does not make it accountable, and "was
+  depreciation run for March" must be answerable without reading the ledger.
+- **Retryable after failure, never after success.** A transient failure must
+  not strand a period-end; a succeeded run is final, enforced by trigger.
+
+*(The legacy depreciation batch had none of this. A second click posted the
+whole run again, against voucher numbers taken from an unfiltered
+`MAX(MoveNo)`, and nothing anywhere recorded that a run had happened.)*
 
 ---
 

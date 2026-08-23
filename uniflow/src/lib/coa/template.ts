@@ -162,7 +162,12 @@ export const UNIVERSITY_COA: TemplateAccount[] = [
                 code: '1213',
                 nameAr: 'الأثاث والتجهيزات',
                 nameEn: 'Furniture and Fittings',
-                children: [{ code: '12131', nameAr: 'الأثاث', nameEn: 'Furniture' }],
+                children: [
+                  { code: '12131', nameAr: 'الأثاث', nameEn: 'Furniture' },
+                  // REQ-AST-01 names library collections as a depreciable
+                  // class of their own.
+                  { code: '12132', nameAr: 'مقتنيات المكتبة', nameEn: 'Library Collections' },
+                ],
               },
               {
                 code: '1214',
@@ -503,6 +508,36 @@ export const UNIVERSITY_COA: TemplateAccount[] = [
                 children: [
                   { code: '51411', nameAr: 'منح دراسية', nameEn: 'Scholarship Awards' },
                   { code: '51412', nameAr: 'خصومات أبناء العاملين', nameEn: 'Staff Child Discounts' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        code: '53',
+        nameAr: 'أرباح وخسائر أخرى',
+        nameEn: 'Other Gains and Losses',
+        children: [
+          {
+            code: '531',
+            nameAr: 'التصرف في الأصول',
+            nameEn: 'Asset Disposal',
+            children: [
+              {
+                code: '5311',
+                nameAr: 'أرباح وخسائر بيع الأصول',
+                nameEn: 'Gain or Loss on Disposal',
+                // SRS REQ-AST-04. Held on one account rather than two, in the
+                // same way FX gain and loss share 5211: the figure that
+                // matters is the net, and splitting it invites a disposal
+                // being booked to the wrong side of a pair.
+                children: [
+                  {
+                    code: '53111',
+                    nameAr: 'أرباح وخسائر التصرف في الأصول',
+                    nameEn: 'Gain or Loss on Asset Disposal',
+                  },
                 ],
               },
             ],

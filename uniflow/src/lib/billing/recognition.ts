@@ -3,7 +3,7 @@ import { withTenant, type Tx } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { post, type PostingLine } from '@/lib/ledger/posting';
-import { idempotent } from '@/lib/idempotency';
+import { runJob } from '@/lib/jobs/runner';
 import { sum, type Money } from '@/lib/money';
 
 /**
@@ -29,8 +29,9 @@ import { sum, type Money } from '@/lib/money';
  * Two protections, both learned from the legacy depreciation batch — which had
  * neither, so running it twice in a month simply doubled the charge:
  *
- *   · an idempotency key of (tenant, period), so a retry replays rather than
- *     re-posts;
+ *   · a job key of (tenant, period) through the durable runner, so a retry
+ *     replays rather than re-posts — and leaves a record that says when it ran
+ *     and what it posted;
  *   · the period lock in the posting engine, so a closed period refuses.
  */
 
@@ -63,11 +64,16 @@ export async function runRecognition(
 ): Promise<RecognitionResult> {
   requirePermission(principal, 'revenue.recognise');
 
-  const { result } = await idempotent(
-    principal.tenantId,
-    `revenue-recognition:${fiscalPeriodId}`,
-    'billing.runRecognition',
-    { fiscalPeriodId },
+  // Same runner as depreciation. Both are period-end batches that post a lot
+  // of money at once and must not run twice, and both need to be visible
+  // afterwards — "was recognition run for March" is a question somebody asks.
+  const { result } = await runJob(
+    principal,
+    {
+      type: 'revenue-recognition',
+      key: `revenue-recognition:${fiscalPeriodId}`,
+      description: 'Deferred fee income recognised for the period',
+    },
     (tx) => runRecognitionInTx(tx, principal, fiscalPeriodId, opts),
   );
   return result;

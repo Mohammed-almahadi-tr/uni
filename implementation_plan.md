@@ -1,6 +1,6 @@
 # Implementation Plan: UniFlow Multi-Tenant University ERP & White-Label Web Platform
 
-**Version:** 2.3.0 · **Supersedes:** 1.0.0 - 2.2.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.3.0
+**Version:** 2.4.0 · **Supersedes:** 1.0.0 - 2.3.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.4.0
 
 Transformation of the legacy VB.NET / MS SQL desktop university system (Oasis E-University at Nile College; the Ribat University Application at Ribat and UOT) into a multi-tenant web application: student registration and lifecycle management, a double-entry university finance engine, and a white-label landing page per university client, built with **Next.js**, **shadcn UI** and **PostgreSQL**.
 
@@ -33,12 +33,12 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**352 tests pass across 13 suites; typecheck, lint and production build are all
+**395 tests pass across 14 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
-**Track A1-A4 are also complete**: chart of accounts, journal vouchers and
-maker-checker, fee catalog / student AR / cashiering, and the cheque clearing
-pipeline — see §0.2.
+**Track A1-A5 are also complete**: chart of accounts, journal vouchers and
+maker-checker, fee catalog / student AR / cashiering, the cheque clearing
+pipeline, and fixed assets with the durable job runner — see §0.2.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -313,6 +313,97 @@ pipeline rather than fail it.
 the cash-controls module listed under "recommended, not scheduled" in SRS §7.
 The clearing side is complete without it; reconciliation automates the reading
 of the advice, not the accounting for it.
+
+---
+
+### A5 — Fixed Assets, Depreciation & the Job Runner · complete
+
+Reading the legacy source turned up a worse starting point than the plan had
+recorded. **There was no asset entity at all.** An "asset" was a row in the
+chart of accounts — `Acc` with `Acc1 = 'Fixed Assets'` — carrying a
+`DeprPerc` column and nothing else: no purchase date, no in-service date, no
+salvage value, no useful life, no serial number, no custodian, no location.
+There was no accumulated-depreciation account either, so **net book value was
+not derivable from anything the system held**.
+
+The depreciation run ([frmFixedAssetsManagement.vb:272-313](Nile College E-University System/Oasis - E-University/Financial System/Forms/frmFixedAssetsManagement.vb#L272-L313)):
+
+```vb
+cmd.CommandText = "Select IsNull(Max(MoveNo),0) From Transactions"   ' no filter at all
+...
+cmd.Parameters.AddWithValue("@Acc1", "Fixed Assets")                 ' English literals
+cmd.Parameters.AddWithValue("@Acc3", "Depreciation Expenses")        ' into an Arabic chart
+```
+
+and the charge itself was `balance × DeprPerc / 100`, evaluated in a grid
+against whatever the account's **current** balance happened to be. That is
+reducing-balance by accident rather than by decision, it never terminates, and
+because it read the live balance it produced a different answer every time the
+screen was opened. Nothing stopped a second click posting the whole batch
+again.
+
+#### The durable job runner, built first
+
+A6 dunning and the automatic late-fee rule need it too, so it is a module
+rather than a helper inside depreciation.
+
+| Guarantee | Mechanism |
+| :--- | :--- |
+| At most once per key | `(tenant, job_key)` unique, claimed before the work starts. A repeat invocation replays the stored result |
+| Visible | Every run leaves a row: when, by whom, how long, what it posted, and why it failed. "When was depreciation last run" is a query, not archaeology |
+| Retryable after failure, never after success | A failed run can be re-attempted under the same key with `attempts` incremented; a succeeded one is final, enforced by trigger |
+
+Not the idempotency-key table: that is a request-level mechanism whose rows are
+prunable and invisible to staff. A period-end batch is an operational event
+somebody has to be able to look at months later. **Revenue recognition was
+migrated onto the same runner**, so the two period-end batches are now one
+concept rather than two.
+
+#### Fixed assets
+
+| Delivered | Notes |
+| :--- | :--- |
+| Real asset register | Cost, salvage, useful life, purchase *and* in-service dates, serial, barcode, custodian, location, status — none of which existed |
+| Six categories, each bound to an account triple | Asset · accumulated depreciation · expense. Installed at onboarding, idempotent |
+| Persisted schedule (REQ-AST-02) | Generated at capitalisation, one row per period. Accumulated depreciation and NBV are **derived from posted rows**, never recomputed |
+| First period prorated by days | An asset installed on the 20th of a 31-day month takes 12/31 of a month's charge |
+| The last period absorbs the residue | So the schedule sums to exactly cost − salvage. Same discipline as `allocate()`, and for the same reason: a schedule a few piastres short leaves a balance nothing ever clears |
+| Reducing balance, bounded | Stops at salvage *and* at the end of the useful life. The legacy curve had neither bound |
+| Idempotent, period-locked batch (REQ-AST-03) | Charge by cost centre, credit by category. Reports what it skipped and why |
+| Schedule extension | A forty-year building outlives any calendar on the day it is bought; opening a fiscal year extends the schedules into it without touching posted rows |
+| Disposal (REQ-AST-04) | Derecognises cost *and* accumulated depreciation, books gain or loss against proceeds, cancels the unposted schedule and keeps the posted rows |
+| Custody history | Append-only. "Where was this in March" is what a physical count asks |
+| 43 tests | Including a six-asset, five-period reconciliation with a sale at a gain and a write-off |
+
+**The central check:** the asset register equals the general ledger, both for
+cost and for accumulated depreciation, after a run of activity. Impossible
+against the legacy design for the same reason the student one was — there was
+no register and no contra-asset account, so there were not two numbers to
+compare.
+
+#### One test caught doing the very thing the product forbids
+
+The schedule test summed its rows with
+`rows.reduce((a, r) => a + Number(r.amount), 0)` and failed at
+`9999.999999999998`. **The code was right; the test had reintroduced
+floating-point error in the act of checking for it.** Summing through
+`Number` is exactly what the legacy system did with VB `Double`. Corrected to
+sum as `Decimal`, with the reason stated in the test — a test that reintroduces
+the defect it is checking for proves nothing.
+
+#### The Prisma sibling-relation threshold, now pinned
+
+A4 recorded that three sibling relations in one query make Prisma 7 fan the
+loads out concurrently onto the transaction's single connection. A5 hit it
+again and the boundary is now established rather than guessed: **two sibling
+relations are fine, three are not.** The symptom is a `DeprecationWarning`
+from `pg` and nothing else; it becomes a hard failure at pg 9. Both occurrences
+were fixed by resolving the extra relations in one explicit lookup, which is a
+fixed number of round trips rather than a fan-out — the better shape anyway.
+
+**Deferred:** componentisation, revaluation and QR-based physical count, all
+listed under "recommended, not scheduled" in SRS §7. The register carries a
+`barcode` field so a count app has something to scan when that lands.
 
 ---
 

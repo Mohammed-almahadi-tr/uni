@@ -14,6 +14,7 @@ import { provisionFiscalYear } from '@/lib/ledger/fiscal-year';
 import { provisionTenant, syncPermissions } from '@/lib/auth/provisioning';
 import { installChartOfAccounts } from '@/lib/coa/template';
 import { installFeeCatalog } from '@/lib/fees/catalog';
+import { installAssetCategories } from '@/lib/assets/register';
 import type { Principal } from '@/lib/auth/rbac';
 import type { PermissionKey } from '@/lib/auth/permissions';
 
@@ -280,6 +281,7 @@ export interface University {
   periodIds: string[];
   accounts: Record<string, string>;
   feeItems: Record<string, string>;
+  assetCategories: Record<string, string>;
   costCenterId: string;
 }
 
@@ -306,6 +308,7 @@ export async function makeUniversity(
 
   await installChartOfAccounts(t.tenantId, t.adminUserId);
   await installFeeCatalog(t.tenantId, t.adminUserId);
+  await installAssetCategories(t.tenantId, t.adminUserId);
 
   const { fiscalYearId, periodIds } = await withSystem(
     (tx) =>
@@ -319,13 +322,17 @@ export async function makeUniversity(
     testSystemDb,
   );
 
-  const { accounts, feeItems, costCenterId } = await withSystem(
+  const { accounts, feeItems, assetCategories, costCenterId } = await withSystem(
     async (tx) => {
       const accs = await tx.account.findMany({
         where: { tenantId: t.tenantId },
         select: { id: true, code: true },
       });
       const items = await tx.feeItem.findMany({
+        where: { tenantId: t.tenantId },
+        select: { id: true, code: true },
+      });
+      const cats = await tx.assetCategory.findMany({
         where: { tenantId: t.tenantId },
         select: { id: true, code: true },
       });
@@ -336,6 +343,7 @@ export async function makeUniversity(
       return {
         accounts: Object.fromEntries(accs.map((a) => [a.code, a.id])),
         feeItems: Object.fromEntries(items.map((i) => [i.code, i.id])),
+        assetCategories: Object.fromEntries(cats.map((c) => [c.code, c.id])),
         costCenterId: cc.id,
       };
     },
@@ -365,6 +373,7 @@ export async function makeUniversity(
     periodIds,
     accounts,
     feeItems,
+    assetCategories,
     costCenterId,
   };
 }

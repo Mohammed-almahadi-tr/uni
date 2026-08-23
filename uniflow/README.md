@@ -6,14 +6,14 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete · Track A1-A4 complete.** Ledger invariants,
+**Status: Phase 0 complete · Track A1-A5 complete.** Ledger invariants,
 platform spine, auth/RBAC with segregation of duties, the bilingual RTL shell,
 a normalised chart of accounts, a four-state maker-checker workflow whose
 drafts are never deleted, and a working cashier desk: fee catalog, student
 sub-ledger, multi-channel receipts, credit balances, deferred-revenue
-recognition, aging, and a cheque clearing pipeline that posts at every
-transition. **352 tests across 13 suites; typecheck, lint and production build
-clean.**
+recognition, aging, a cheque clearing pipeline that posts at every transition,
+and a fixed-asset register with an idempotent depreciation batch. **395 tests
+across 14 suites; typecheck, lint and production build clean.**
 
 Tracks A (finance), B (student) and C (public surface) run in parallel from
 here.
@@ -27,7 +27,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 352 tests
+npm test              # 395 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -208,8 +208,13 @@ tests/cheques.test.ts      37  the five-state pipeline, custody, batch deposit
                                and clearing, bounce unwinding, returned-cheque
                                fees, repeat-bounce reporting, and one test per
                                legacy defect
+tests/assets.test.ts       43  schedule arithmetic, proration, residue,
+                               reducing-balance termination, capitalisation,
+                               the idempotent batch, disposal gain and loss,
+                               custody history, the job runner, and the
+                               register/ledger reconciliation
                            ───
-                           352
+                           395
 ```
 
 ---
@@ -247,6 +252,26 @@ the balancing rules live in [`src/lib/ledger/lines.ts`](src/lib/ledger/lines.ts)
 shared by the voucher grid and the posting engine as one implementation rather
 than two specifications — a grid that says "balanced" against a server that
 says "out by 0.01" leaves the maker stuck with no way to see why.
+
+**A5 — Fixed assets, depreciation, and the job runner.** The legacy system had
+**no asset entity**: an "asset" was a row in the chart of accounts carrying a
+`DeprPerc` column — no dates, no salvage, no useful life, no custodian, and no
+accumulated-depreciation account, so net book value was not derivable. Its
+batch read `MAX(MoveNo)` with no filter, posted against hardcoded English
+strings into an Arabic chart, and would post the whole run again on a second
+click.
+
+The schedule is now **persisted at capitalisation**, so the period-end batch is
+a lookup — and a lookup cannot produce a different answer on a re-run. The
+first period is prorated by days and the last absorbs the rounding residue, so
+a schedule sums to exactly cost − salvage.
+
+The **durable job runner** ([`src/lib/jobs/runner.ts`](src/lib/jobs/runner.ts))
+was built here because A6 dunning and the automatic late-fee rule need it too.
+It runs a batch at most once per key, records when it ran and what it posted,
+and lets a *failed* run be retried while making a *succeeded* one final.
+Revenue recognition was migrated onto it, so the two period-end batches are one
+concept.
 
 **A4 — Cheque clearing.** The legacy implementation was a single `CheqClear`
 boolean flipped by a grid click, and it had three defects at once: `0` meant
@@ -294,10 +319,12 @@ equals its control accounts **to the cent**.
 
 ## Next
 
-Track A continues at **A5 — fixed assets and depreciation**. It needs the
-durable job runner that A6 dunning and the automatic late-fee rule are also
-waiting on, so that runner is the first thing to build. Track B (student) and
-Track C (public surface) can run in parallel — see the roadmap in
+Track A continues at **A6 — budget, encumbrance and procurement/AP**, the
+largest remaining finance module and the one that makes REQ-BDG-02/03 coherent:
+a purchase order creates a commitment against a budget line, a goods receipt
+turns it into an accrual, and payment clears it. The job runner it needs is now
+in place. Track B (student) and Track C (public surface) can run in parallel —
+see the roadmap in
 [`../implementation_plan.md`](../implementation_plan.md). They converge at the
 **registration-posts-to-GL** milestone, which is the integration the legacy
 system never made.

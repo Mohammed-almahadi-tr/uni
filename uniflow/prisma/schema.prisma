@@ -70,6 +70,8 @@ enum AccountRole {
   /// figures the ledger can answer rather than one.
   CHEQUES_WITH_BANK
   DEFAULT_DISCOUNT_EXPENSE
+  /// Where gain or loss on disposing of a fixed asset lands.
+  ASSET_DISPOSAL_GAIN_LOSS
   FX_REALISED
   FX_UNREALISED
   RETAINED_SURPLUS
@@ -100,6 +102,31 @@ enum PaymentChannel {
 /// consequence. A cheque that has not been presented yet is NOT in the same
 /// state as one the bank refused — the legacy system conflated the two into a
 /// single boolean, so every uncleared cheque displayed as "Rejected".
+enum JobStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// SRS REQ-AST-02. Straight line is the default; reducing balance exists
+/// because it is what the legacy system did by accident — it multiplied an
+/// account's *current balance* by a percentage — and a tenant carrying that
+/// policy forward should be able to say so rather than have it happen to them.
+enum DepreciationMethod {
+  STRAIGHT_LINE
+  REDUCING_BALANCE
+  /// Land, and anything else that does not depreciate.
+  NONE
+}
+
+enum AssetStatus {
+  IN_SERVICE
+  /// Sold or scrapped. Cost and accumulated depreciation are off the books.
+  DISPOSED
+  /// Written off with no proceeds.
+  WRITTEN_OFF
+}
+
 enum ChequeStatus {
   /// In hand, not yet deposited.
   RECEIVED
@@ -238,6 +265,11 @@ model Tenant {
   instalmentPlans InstalmentPlan[]
   cheques         Cheque[]
   chequeEvents    ChequeEvent[]
+  jobRuns         JobRun[]
+  assetCategories AssetCategory[]
+  assets          FixedAsset[]
+  depreciation    DepreciationEntry[]
+  assetMovements  AssetMovement[]
 
   @@map("tenants")
 }
@@ -285,6 +317,9 @@ model User {
   plansCreated        InstalmentPlan[] @relation("PlanCreator")
   chequesTaken        Cheque[]         @relation("ChequeCreator")
   receiptsDishonoured StudentReceipt[] @relation("ReceiptDishonourer")
+  jobsRequested       JobRun[]         @relation("JobRequester")
+  assetsRegistered    FixedAsset[]     @relation("AssetCreator")
+  assetsHeld          FixedAsset[]     @relation("AssetCustodian")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -461,6 +496,7 @@ model FiscalPeriod {
   headers      TransactionHeader[]
   balances     AccountPeriodBalance[]
   recognitions RecognitionEntry[]
+  depreciation DepreciationEntry[]
 
   @@unique([fiscalYearId, seq])
   @@index([fiscalYearId, startDate, endDate])
@@ -498,12 +534,15 @@ model Account {
   lines    TransactionLine[]
   balances AccountPeriodBalance[]
 
-  mappings       AccountMapping[]
-  tills          CashierTill[]    @relation("TillCashAccount")
-  feeRevenueFor  FeeItem[]        @relation("FeeRevenueAccount")
-  feeUnearnedFor FeeItem[]        @relation("FeeUnearnedAccount")
-  receiptDebits  StudentReceipt[] @relation("ReceiptDebitAccount")
-  chequeDeposits Cheque[]         @relation("ChequeDepositAccount")
+  mappings            AccountMapping[]
+  tills               CashierTill[]    @relation("TillCashAccount")
+  feeRevenueFor       FeeItem[]        @relation("FeeRevenueAccount")
+  feeUnearnedFor      FeeItem[]        @relation("FeeUnearnedAccount")
+  receiptDebits       StudentReceipt[] @relation("ReceiptDebitAccount")
+  chequeDeposits      Cheque[]         @relation("ChequeDepositAccount")
+  categoryAsset       AssetCategory[]  @relation("CategoryAssetAccount")
+  categoryAccumulated AssetCategory[]  @relation("CategoryAccumulatedAccount")
+  categoryExpense     AssetCategory[]  @relation("CategoryExpenseAccount")
 
   @@unique([tenantId, code])
   @@index([tenantId, parentId])
@@ -523,6 +562,7 @@ model CostCenter {
   lines    TransactionLine[]
   balances AccountPeriodBalance[]
   feeItems FeeItem[]
+  assets   FixedAsset[]           @relation("AssetCostCenter")
 
   @@unique([tenantId, code])
   @@map("cost_centers")
@@ -686,13 +726,16 @@ model TransactionHeader {
   lines        TransactionLine[]
   draft        VoucherDraft?
 
-  chargesRaised       StudentCharge[]    @relation("ChargePosting")
-  chargesReversed     StudentCharge[]    @relation("ChargeReversalPosting")
-  studentReceipt      StudentReceipt?    @relation("ReceiptPosting")
-  receiptCancellation StudentReceipt?    @relation("ReceiptCancellationPosting")
-  recognitions        RecognitionEntry[] @relation("RecognitionPosting")
-  chequeEvents        ChequeEvent[]      @relation("ChequeEventPosting")
-  receiptDishonours   StudentReceipt[]   @relation("ReceiptDishonourPosting")
+  chargesRaised        StudentCharge[]     @relation("ChargePosting")
+  chargesReversed      StudentCharge[]     @relation("ChargeReversalPosting")
+  studentReceipt       StudentReceipt?     @relation("ReceiptPosting")
+  receiptCancellation  StudentReceipt?     @relation("ReceiptCancellationPosting")
+  recognitions         RecognitionEntry[]  @relation("RecognitionPosting")
+  chequeEvents         ChequeEvent[]       @relation("ChequeEventPosting")
+  receiptDishonours    StudentReceipt[]    @relation("ReceiptDishonourPosting")
+  assetCapitalisations FixedAsset[]        @relation("AssetCapitalisation")
+  assetDisposal        FixedAsset?         @relation("AssetDisposal")
+  depreciationEntries  DepreciationEntry[] @relation("DepreciationPosting")
 
   @@unique([tenantId, fiscalYearId, voucherType, voucherNo])
   @@index([tenantId, docDate])
@@ -1215,4 +1258,200 @@ model ChequeEvent {
   @@index([chequeId, occurredAt])
   @@index([tenantId, toStatus, docDate])
   @@map("cheque_events")
+}
+
+// ---------------------------------------------------------------------------
+// Durable job runs (Track A5)
+// ---------------------------------------------------------------------------
+
+/// One invocation of a period-end batch.
+///
+/// Two things the idempotency-key table cannot give: a *visible* record of when
+/// depreciation was last run and by whom, and a place for a failed run to
+/// leave its error so somebody can act on it. The legacy depreciation screen
+/// had neither — clicking Save twice posted twice, and there was nowhere to
+/// look afterwards to find out that it had.
+model JobRun {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  /// What kind of batch: "depreciation", "revenue-recognition", "dunning".
+  jobType String @map("job_type")
+  /// The natural key of this particular run — normally the period it covers.
+  /// Unique per tenant, which is what makes a repeat invocation a replay.
+  jobKey  String @map("job_key")
+
+  status     JobStatus @default(RUNNING)
+  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  /// The result of the successful run, replayed verbatim to a retry.
+  resultJson Json?   @map("result_json")
+  /// Why it failed, kept so a failure is diagnosable after the fact.
+  errorText  String? @map("error_text")
+  /// How many attempts it has taken. A number above one is worth looking at.
+  attempts   Int     @default(1)
+
+  requestedById String @map("requested_by_id") @db.Uuid
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User   @relation("JobRequester", fields: [requestedById], references: [id])
+
+  @@unique([tenantId, jobKey])
+  @@index([tenantId, jobType, startedAt])
+  @@map("job_runs")
+}
+
+// ---------------------------------------------------------------------------
+// Fixed assets (SRS Module 9, Track A5)
+// ---------------------------------------------------------------------------
+
+/// A class of asset and the three accounts its postings use.
+///
+/// The legacy system had no asset entity at all: an "asset" was a row in the
+/// chart of accounts (`Acc` with `Acc1 = 'Fixed Assets'`) carrying a
+/// `DeprPerc` column. There was no purchase date, no in-service date, no
+/// salvage value, no useful life, no serial number, no custodian and no
+/// location — and no accumulated-depreciation account, so net book value was
+/// not derivable.
+model AssetCategory {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  code     String
+  nameAr   String @map("name_ar")
+  nameEn   String @map("name_en")
+
+  /// Where cost sits.
+  assetAccountId       String @map("asset_account_id") @db.Uuid
+  /// The contra-asset that accumulates the charge.
+  accumulatedAccountId String @map("accumulated_account_id") @db.Uuid
+  /// Where the periodic charge is expensed.
+  expenseAccountId     String @map("expense_account_id") @db.Uuid
+
+  defaultMethod           DepreciationMethod @default(STRAIGHT_LINE) @map("default_method")
+  defaultUsefulLifeMonths Int                @map("default_useful_life_months")
+  /// Salvage as a fraction of cost, e.g. 0.05 for 5%. Overridable per asset.
+  defaultSalvageRate      Decimal            @default(0) @map("default_salvage_rate") @db.Decimal(9, 6)
+  isActive                Boolean            @default(true) @map("is_active")
+
+  tenant             Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assetAccount       Account      @relation("CategoryAssetAccount", fields: [assetAccountId], references: [id])
+  accumulatedAccount Account      @relation("CategoryAccumulatedAccount", fields: [accumulatedAccountId], references: [id])
+  expenseAccount     Account      @relation("CategoryExpenseAccount", fields: [expenseAccountId], references: [id])
+  assets             FixedAsset[]
+
+  @@unique([tenantId, code])
+  @@map("asset_categories")
+}
+
+model FixedAsset {
+  id         String  @id @default(uuid()) @db.Uuid
+  tenantId   String  @map("tenant_id") @db.Uuid
+  assetCode  String  @map("asset_code")
+  barcode    String?
+  serialNo   String? @map("serial_no")
+  categoryId String  @map("category_id") @db.Uuid
+
+  nameAr String @map("name_ar")
+  nameEn String @map("name_en")
+
+  purchaseDate  DateTime @map("purchase_date") @db.Date
+  /// When it started being used, which is when depreciation starts — not the
+  /// day it was bought. A lab bench delivered in June and installed in
+  /// September depreciates from September.
+  inServiceDate DateTime @map("in_service_date") @db.Date
+  purchaseCost  Decimal  @map("purchase_cost") @db.Decimal(19, 4)
+  salvageValue  Decimal  @default(0) @map("salvage_value") @db.Decimal(19, 4)
+  currency      String   @db.Char(3)
+
+  method           DepreciationMethod @default(STRAIGHT_LINE)
+  usefulLifeMonths Int                @map("useful_life_months")
+
+  /// Where the periodic charge is expensed to. The shipped depreciation
+  /// expense account requires one.
+  costCenterId String? @map("cost_center_id") @db.Uuid
+  location     String?
+  custodianId  String? @map("custodian_id") @db.Uuid
+
+  status AssetStatus @default(IN_SERVICE)
+
+  /// The voucher that brought the asset onto the books.
+  capitalisationHeaderId String @map("capitalisation_header_id") @db.Uuid
+
+  disposedOn       DateTime? @map("disposed_on") @db.Date
+  disposalProceeds Decimal?  @map("disposal_proceeds") @db.Decimal(19, 4)
+  disposalReason   String?   @map("disposal_reason")
+  disposalHeaderId String?   @unique @map("disposal_header_id") @db.Uuid
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category       AssetCategory       @relation(fields: [categoryId], references: [id])
+  costCenter     CostCenter?         @relation("AssetCostCenter", fields: [costCenterId], references: [id])
+  custodian      User?               @relation("AssetCustodian", fields: [custodianId], references: [id])
+  createdBy      User                @relation("AssetCreator", fields: [createdById], references: [id])
+  capitalisation TransactionHeader   @relation("AssetCapitalisation", fields: [capitalisationHeaderId], references: [id])
+  disposal       TransactionHeader?  @relation("AssetDisposal", fields: [disposalHeaderId], references: [id])
+  schedule       DepreciationEntry[]
+  movements      AssetMovement[]
+
+  @@unique([tenantId, assetCode])
+  @@index([tenantId, status, categoryId])
+  @@index([tenantId, custodianId])
+  @@map("fixed_assets")
+}
+
+/// One period's planned charge for one asset (SRS REQ-AST-02).
+///
+/// Generated at capitalisation, posted by the period-end batch. Accumulated
+/// depreciation and net book value are derived from posted rows, never
+/// recomputed — the legacy screen multiplied the account's *current balance*
+/// by a percentage every time it was opened, which is reducing-balance by
+/// accident and never terminates.
+model DepreciationEntry {
+  id             String  @id @default(uuid()) @db.Uuid
+  tenantId       String  @map("tenant_id") @db.Uuid
+  assetId        String  @map("asset_id") @db.Uuid
+  fiscalPeriodId String  @map("fiscal_period_id") @db.Uuid
+  seq            Int
+  amount         Decimal @db.Decimal(19, 4)
+
+  postedAt       DateTime? @map("posted_at") @db.Timestamptz(6)
+  postedHeaderId String?   @map("posted_header_id") @db.Uuid
+
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  asset        FixedAsset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fiscalPeriod FiscalPeriod       @relation(fields: [fiscalPeriodId], references: [id])
+  posting      TransactionHeader? @relation("DepreciationPosting", fields: [postedHeaderId], references: [id])
+
+  @@unique([assetId, fiscalPeriodId])
+  @@index([tenantId, fiscalPeriodId, postedAt])
+  @@map("depreciation_entries")
+}
+
+/// Custodian and location history (SRS REQ-AST-04).
+///
+/// Who had it and where it was, retained. An asset register that only knows
+/// where something is now cannot answer the question a physical count asks.
+model AssetMovement {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  assetId  String @map("asset_id") @db.Uuid
+
+  fromLocation    String? @map("from_location")
+  toLocation      String? @map("to_location")
+  fromCustodianId String? @map("from_custodian_id") @db.Uuid
+  toCustodianId   String? @map("to_custodian_id") @db.Uuid
+
+  movedOn    DateTime @map("moved_on") @db.Date
+  reason     String?
+  actorId    String   @map("actor_id") @db.Uuid
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  asset  FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, occurredAt])
+  @@map("asset_movements")
 }

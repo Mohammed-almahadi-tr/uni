@@ -56,6 +56,9 @@ export const MFA_REQUIRED_PERMISSIONS: readonly PermissionKey[] = [
   // discretion rather than by a bank's decision. Clearing and bouncing follow
   // the bank advice and are ordinary daily work, so they are not here.
   'cheque.cancel',
+  // Disposing of an asset takes it off the books and can book a loss against
+  // the difference. It is the paper half of equipment leaving the building.
+  'asset.dispose',
 ];
 
 const MFA_SET = new Set<string>(MFA_REQUIRED_PERMISSIONS);
