@@ -271,6 +271,25 @@ export const UNIVERSITY_COA: TemplateAccount[] = [
                   },
                 ],
               },
+              {
+                code: '2123',
+                nameAr: 'مستحقات مشتريات',
+                nameEn: 'Purchase Accruals',
+                // SRS REQ-PRC-02. Holds the obligation between the moment
+                // something arrives and the moment its bill does, so an
+                // expense keeps the date it was incurred. The legacy
+                // frmMakePayBill posted expense straight against cash at
+                // payment time, so goods received in March and paid for in
+                // June were reported in June — and nothing in between could
+                // say what the institution owed.
+                children: [
+                  {
+                    code: '21231',
+                    nameAr: 'بضاعة واردة لم ترد فاتورتها',
+                    nameEn: 'Goods Received Not Invoiced',
+                  },
+                ],
+              },
             ],
           },
         ],

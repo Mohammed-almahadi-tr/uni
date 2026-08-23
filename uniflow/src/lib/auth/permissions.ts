@@ -79,6 +79,7 @@ export const PERMISSIONS = [
   { key: 'receipt.create', description: 'Take student fee payments' },
   { key: 'receipt.cancel', description: 'Cancel a receipt issued today' },
   { key: 'payment.create', description: 'Draft payment vouchers' },
+  { key: 'payment.approve', description: 'Approve a payment voucher and release the money' },
   { key: 'cheque.manage', description: 'Deposit, clear and record bounced cheques' },
   { key: 'cheque.cancel', description: 'Return an unpresented cheque to its drawer' },
 
@@ -91,10 +92,13 @@ export const PERMISSIONS = [
   { key: 'budget.approve', description: 'Approve a budget version' },
 
   // ---- Procurement ------------------------------------------------------
-  { key: 'vendor.manage', description: 'Maintain vendors, including bank details' },
+  { key: 'vendor.manage', description: 'Maintain vendors and propose bank-detail changes' },
+  { key: 'vendor.approve', description: 'Approve a change to a vendor’s bank details' },
   { key: 'po.create', description: 'Raise purchase requisitions and orders' },
   { key: 'po.approve', description: 'Approve purchase orders (creates encumbrance)' },
   { key: 'grn.create', description: 'Record goods and service receipts' },
+  { key: 'apinvoice.record', description: 'Record vendor invoices and run the three-way match' },
+  { key: 'apinvoice.approve', description: 'Release an invoice held outside match tolerance' },
 
   // ---- Assets and reports ----------------------------------------------
   { key: 'asset.manage', description: 'Maintain the fixed asset register' },
@@ -168,6 +172,42 @@ export const SOD_CONFLICTS: readonly SodConflict[] = [
     a: 'po.create',
     b: 'po.approve',
     reason: 'A purchase order must be approved by someone other than the person who raised it.',
+  },
+  {
+    a: 'vendor.manage',
+    b: 'vendor.approve',
+    reason:
+      'Changing where a vendor’s money goes needs two people. One person holding both ' +
+      'sides of that reduces the control to a formality.',
+  },
+  {
+    a: 'payment.create',
+    b: 'payment.approve',
+    reason:
+      'Whoever prepares a payment must not be the one who releases it. This is the last ' +
+      'control before money leaves the institution.',
+  },
+  {
+    a: 'apinvoice.record',
+    b: 'apinvoice.approve',
+    reason:
+      'An invoice that failed the three-way match is being paid on somebody’s judgement ' +
+      'rather than on the evidence. That judgement must not be the judgement of whoever ' +
+      'keyed the invoice in.',
+  },
+  {
+    a: 'apinvoice.record',
+    b: 'payment.approve',
+    reason:
+      'Entering a bill and releasing the money for it is the whole of accounts-payable ' +
+      'fraud in two clicks. Recording what is owed and deciding to pay it are different jobs.',
+  },
+  {
+    a: 'grn.create',
+    b: 'apinvoice.approve',
+    reason:
+      'Confirming that goods arrived and waiving the evidence that they did are opposite ' +
+      'sides of the same check.',
   },
   {
     a: 'po.approve',
@@ -307,6 +347,7 @@ export const DEFAULT_ROLES: Record<
       'coa.read', 'voucher.read', 'voucher.approve', 'voucher.reverse',
       'charge.reverse', 'period.read', 'period.close', 'budget.read',
       'budget.approve', 'discount.approve', 'po.approve', 'asset.dispose',
+      'payment.approve', 'vendor.approve', 'apinvoice.approve',
       'report.financial', 'audit.read',
     ],
   },
@@ -322,7 +363,7 @@ export const DEFAULT_ROLES: Record<
     permissions: [
       'coa.read', 'coa.manage', 'voucher.read', 'voucher.create',
       'payment.create', 'cheque.manage', 'asset.manage', 'asset.depreciate',
-      'budget.read', 'budget.manage', 'grn.create', 'period.read',
+      'budget.read', 'budget.manage', 'apinvoice.record', 'period.read',
       'revenue.recognise', 'feematrix.read', 'report.financial',
     ],
   },
@@ -350,5 +391,13 @@ export const DEFAULT_ROLES: Record<
   'Procurement Officer': {
     nameAr: 'مسؤول المشتريات',
     permissions: ['vendor.manage', 'po.create', 'budget.read'],
+  },
+  // Receives what was ordered, and holds nothing else on purpose. Confirming
+  // delivery is the one independent piece of evidence in the three-way match,
+  // and it is worth nothing if the person giving it also placed the order or
+  // waived the bill.
+  'Stores Officer': {
+    nameAr: 'أمين المخازن',
+    permissions: ['grn.create', 'voucher.read'],
   },
 };

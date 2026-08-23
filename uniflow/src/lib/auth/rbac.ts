@@ -40,9 +40,13 @@ export class MfaRequiredError extends Error {
 export const MFA_REQUIRED_PERMISSIONS: readonly PermissionKey[] = [
   'voucher.approve',
   'voucher.reverse',
-  'payment.create',
+  'payment.approve',
   'period.close',
+  // Proposing a change to where a vendor's money goes is half of the
+  // highest-value fraud in accounts payable; approving one is the other half.
+  // A stolen session is the usual way in, so both want the second factor.
   'vendor.manage',
+  'vendor.approve',
   'role.manage',
   'user.manage',
   'openingbalance.manage',
