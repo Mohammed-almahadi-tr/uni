@@ -289,6 +289,13 @@ export async function openCommitments(
   requirePermission(principal, 'budget.read');
 
   return withTenant(principal.tenantId, async (tx) => {
+    // Deliberately flat. Prisma 7's query interpreter runs a query's relation
+    // loads concurrently on the transaction's single connection, and `pg`
+    // meets that with a deprecation warning today and a hard failure at
+    // pg 9. The budget for one query is two loads, counting nested ones —
+    // this shape wanted five, so the extras are resolved as their own
+    // lookups. A fixed number of round trips rather than a fan-out, which is
+    // the better shape in any case.
     const rows = await tx.encumbrance.findMany({
       where: { tenantId: principal.tenantId, fiscalYearId, status: 'OPEN' },
       select: {
@@ -296,28 +303,44 @@ export async function openCommitments(
         amount: true,
         releasedAmount: true,
         status: true,
-        purchaseOrder: { select: { poNo: true, vendor: { select: { nameEn: true } } } },
-        budgetLine: {
-          select: {
-            account: { select: { code: true } },
-            costCenter: { select: { code: true } },
-          },
-        },
+        purchaseOrderId: true,
+        budgetLineId: true,
       },
       orderBy: { createdAt: 'asc' },
     });
+    if (rows.length === 0) return [];
 
-    return rows.map((e) => ({
-      encumbranceId: e.id,
-      poNo: e.purchaseOrder.poNo,
-      vendorName: e.purchaseOrder.vendor.nameEn,
-      accountCode: e.budgetLine.account.code,
-      costCenterCode: e.budgetLine.costCenter?.code ?? null,
-      amount: e.amount.toFixed(4),
-      released: e.releasedAmount.toFixed(4),
-      outstanding: e.amount.minus(e.releasedAmount).toFixed(4),
-      status: e.status,
-    }));
+    const orders = await tx.purchaseOrder.findMany({
+      where: { id: { in: [...new Set(rows.map((r) => r.purchaseOrderId))] } },
+      select: { id: true, poNo: true, vendor: { select: { nameEn: true } } },
+    });
+    const orderById = new Map(orders.map((o) => [o.id, o]));
+
+    const budgetLines = await tx.budgetLine.findMany({
+      where: { id: { in: [...new Set(rows.map((r) => r.budgetLineId))] } },
+      select: {
+        id: true,
+        account: { select: { code: true } },
+        costCenter: { select: { code: true } },
+      },
+    });
+    const lineById = new Map(budgetLines.map((l) => [l.id, l]));
+
+    return rows.map((e) => {
+      const order = orderById.get(e.purchaseOrderId)!;
+      const line = lineById.get(e.budgetLineId)!;
+      return {
+        encumbranceId: e.id,
+        poNo: order.poNo,
+        vendorName: order.vendor.nameEn,
+        accountCode: line.account.code,
+        costCenterCode: line.costCenter?.code ?? null,
+        amount: e.amount.toFixed(4),
+        released: e.releasedAmount.toFixed(4),
+        outstanding: e.amount.minus(e.releasedAmount).toFixed(4),
+        status: e.status,
+      };
+    });
   });
 }
 
