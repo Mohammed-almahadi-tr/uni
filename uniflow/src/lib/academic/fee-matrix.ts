@@ -1,5 +1,9 @@
 import 'server-only';
-import type { FeeRecurrence, NationalityCategory } from '@/generated/prisma/enums';
+import type {
+  FeeRecurrence,
+  FeeScheduleStatus,
+  NationalityCategory,
+} from '@/generated/prisma/enums';
 import { withTenant, type Tx } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
 import {
@@ -453,12 +457,17 @@ export async function resolveFeeSchedule(
 ): Promise<ResolvedFeeSchedule | null> {
   const day = toDateOnly(key.onDate);
 
+  // APPROVED *and* SUPERSEDED. A superseded version still prices the days it
+  // was in force, and answering "what did this student owe when they
+  // registered" two years later is the property the legacy DELETE destroyed.
+  // Only DRAFT prices nothing. The exclusion constraint covers both published
+  // states, so at most one of them can match any given day.
   const inForce = {
     tenantId,
     programmeId: key.programmeId,
     batchId: key.batchId,
     admissionCategoryId: key.admissionCategoryId,
-    status: 'APPROVED' as const,
+    status: { in: ['APPROVED', 'SUPERSEDED'] as FeeScheduleStatus[] },
     effectiveFrom: { lte: day },
     OR: [{ effectiveTo: null }, { effectiveTo: { gte: day } }],
   };

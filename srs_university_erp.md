@@ -1,14 +1,14 @@
 # Software Requirements Specification (SRS)
 ## Multi-Tenant University ERP & White-Label Web Platform
 **Project Name:** UniFlow Enterprise ERP (Next-Gen Transformation of Oasis E-University)
-**Document Version:** 2.6.0
-**Supersedes:** v1.0.0 - v2.5.0
+**Document Version:** 2.7.0
+**Supersedes:** v1.0.0 - v2.6.0
 **Target Audience:** University Management, Technical Architects, Development Team, Product Owners, Quality Assurance
 **Standard Compliance:** IEEE Std 830-1998 / ISO/IEC/IEEE 29148
 
 ---
 
-## 0.0 Corrections made while building (v2.1.0 - v2.6.0)
+## 0.0 Corrections made while building (v2.1.0 - v2.7.0)
 
 Version 2.0.0 was written before any of it was built. Building Phase 0 and
 Track A1-A3 showed several of its statements to be wrong, or weaker than what
@@ -40,6 +40,9 @@ diverge from the system.
 | 21 | REQ-RPT-03's claim that the legacy trial balance was a closing-balance-since-inception report is **corrected and sharpened** | It is worse than that. `Sum(TotalValueIn)-Sum(TotalValueOut)` is aliased to *both* the debit and the credit column ([frmTrialBalance.vb:161-168](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmTrialBalance.vb#L161-L168)), so the report prints one net figure twice and always appears to balance whatever the ledger holds. It also reads `Transactionees` while the balance sheet reads `Transactions` — the institution's two headline statements were built from different halves of its books |
 | 22 | Module 10's implicit assumption that a legacy income statement existed is **withdrawn** | `frmRptIncome` selects `StudID, StudName, Program, Class, TuitionFees1, RegsFees` from `View_1`. It is a student fee-collection listing, not revenue less expenses. There is no income statement in either build |
 | 23 | REQ-RPT-07's "bilingual PDF" is delivered as a **print stylesheet rendered by the browser**, not by a PDF writer in the codebase | Arabic shaping — four contextual forms per letter, obligatory ligatures, then bidirectional reordering against Latin text and figures — must be done before a PDF content stream can position a glyph. Output that is nearly right looks like Arabic, prints, and gets signed. Browsers already contain a correct shaping engine; the repository does not need a second, worse one |
+| 24 | REQ-AC-04's account of the legacy fee save is **corrected and made worse**. It destroyed not only prior versions but every *sibling* schedule in the batch | The grid was loaded `where Batch=.. and Colleges=.. and Type=..` ([frmTuitionFees.vb:48](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Registration%20System/Forms/frmTuitionFees.vb#L48)) but saved with `Delete From TuitionFees Where Batch=N'..'` ([line 89](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Registration%20System/Forms/frmTuitionFees.vb#L89)) — college and admission type dropped from the predicate. Saving Medicine/General deleted Pharmacy's, Dentistry's and every other type's fees for that batch, on an autocommit connection with no transaction, reporting success |
+| 25 | REQ-AC-04 gains a **nullable nationality category** as an explicit any-nationality fallback, resolved after the specific one | An institution prices most programmes once and only some differently for expatriates. A non-null fourth enum value would force three identical schedules per programme to express that, and one of the three is eventually forgotten |
+| 26 | REQ-AC-03 states explicitly that an **academic year is not a fiscal year** | They straddle each other — a September intake sits in two fiscal years — and the legacy build had neither concept. Conflating them puts a term's revenue in the wrong set of accounts, and the two calendars are now separate models meeting only at a posting's document date |
 
 ---
 
@@ -161,7 +164,7 @@ The table below maps each legacy capability to its replacement. **The status col
 | **Medical Fitness Check** | `FrmMedical.vb`, `MedicalExamination` | Records exactly six fields: `UniversityID`, `DateofMedicalExamination`, `Hepatitis`, `Aids`, `BooldType`, `Employee`. There is **no vaccination status, no chronic conditions, no doctor sign-off, and no fitness verdict** | Medical records sub-module: the six legacy fields plus vaccination status, chronic conditions/allergies, medical officer notes, and a Fit/Unfit/Conditional clearance verdict | **Migrated + Extended** |
 | **Annual / Semester Registration** | `frmStudentRegisteration.vb`, `Registrations` | Writes a row to `Registrations` with tuition, registration fee, discount % and reason. **It does not post to the general ledger** — the posting block is commented out and annotated *"the debit/cridit will be inserted from financial system"*. The two systems are reconciled by hand | Registration workflow that posts a balanced, atomic double-entry transaction as part of the same database transaction that creates the registration | **Rebuilt** |
 | **Student Program Transfer** | `frmTransferStudent.vb` | Updates the student's program and rewrites registration rows | Transfer workflow that reverses the prior program's billing by linked reversal voucher and raises new billing entries | **Rebuilt** |
-| **Fee Structure Configuration** | `frmTuitionFees.vb`, `TuitionFees` | Keyed on `Batch × Colleges × Program × Type`. Saving performs `DELETE FROM TuitionFees WHERE Batch=…` then re-inserts every row — **no effective dates, no version history, no audit trail**. Prior fee schedules are destroyed | Effective-dated fee matrix by Program × Batch × Admission Type × Nationality × Currency, with full version history and an audit record per change | **Rebuilt** |
+| **Fee Structure Configuration** | `frmTuitionFees.vb`, `TuitionFees` | Keyed on `Batch × Colleges × Program × Type` — all four as **text**. The grid is loaded filtered on batch, college and type, but saving runs `DELETE FROM TuitionFees WHERE Batch=…` and re-inserts only the rows on screen, so **saving one faculty's fees destroys every other faculty's and every other admission type's for that batch**. No transaction, no effective dates, no version history; exactly two fee columns (`TuitionFees`, `RegFees`), both `Double`; the only audit is an `Employee` column overwritten on each save | Effective-dated, versioned fee matrix by Programme × Batch × Admission Category × Nationality Category × Currency. Published versions are immutable and non-overlapping by database constraint; revision creates a new version and the prior one keeps pricing the days it was in force | **Rebuilt** |
 | **Chart of Accounts** | `frmChartofAccounts.vb`, `Acc`, `Acc1` | Five denormalized **text name** columns (`Acc1`…`Acc5`) on one table — no account codes, no parent keys, no normal-balance flag. The tree is assembled by five nested `SELECT DISTINCT` cursors over five separate open connections. Account names appear in **both Arabic and English within the same database** | Normalized 5-level tree with surrogate keys, `parent_id`, account codes, bilingual titles, normal-balance enforcement and cost-centre association | **Rebuilt** |
 | **General Ledger** | `Transactions`, `Transactionees` | **Two divergent ledger tables** with **two different amount-column pairs** (`TotalIn`/`TotalOut` and `TotalValueIn`/`TotalValueOut`). Different forms write to different tables; account identity on each line is the five text names copied inline | A single `transaction_headers` / `transaction_lines` pair with foreign keys to accounts, a database-enforced balance constraint, and immutability after posting | **Rebuilt** |
 | **Voucher Numbering** | all posting forms | `SELECT ISNULL(MAX(MoveNo),0)+1` read inside the transaction — a lost-update race under concurrency. Fixed assets omits the `Year()` filter the other call sites apply, so its numbers collide with earlier years | Per-tenant, per-fiscal-year, per-document-type sequence allocator with a uniqueness constraint | **Rebuilt** |
@@ -244,9 +247,17 @@ graph LR
 - **REQ-AC-01: Faculty & Department Management** — Colleges/Faculties (Medicine, Pharmacy, Dentistry, Nursing, Medical Laboratories, Information Systems, Business — the faculties actually present in the legacy student lists).
 - **REQ-AC-02: Academic Programs & Degrees** — Degree level (Bachelor, Diploma, Master, Ph.D.), standard duration in semesters/years, and credit requirements.
 - **REQ-AC-03: Academic Years & Batch Cycles** — Academic Years (e.g. 2026/2027), Semesters (Fall, Spring, Summer), and Student Batches.
+  - An academic year is **not** a fiscal year and shall be modelled separately. They routinely straddle each other; the two calendars meet only at a posting's document date.
+  - Terms within an academic year shall not overlap, and shall fall inside their year. A date belonging to two terms has no answer to which term a student is registering for.
+  - A batch, programme, faculty, admission category or nationality that anything refers to shall be **deactivated, never deleted**. *(The legacy batch screen ran `Delete From AcademicYear Where Batch=N'..'` with no check for students admitted under it.)*
 - **REQ-AC-04: Comprehensive Fee Matrix Configuration**
   - Matrix defining `Program × Batch × Admission Type (General / Private / Foreign / Staff Child) × Nationality Category → {fee items} + Currency`.
-  - **Effective-dated and versioned.** Editing a fee schedule creates a new version; prior versions are retained and remain attached to registrations raised under them. *(The legacy system deleted and rewrote the whole batch — REQ-AC-04 exists specifically to prevent that.)*
+  - **Effective-dated and versioned.** Editing a fee schedule creates a new version; prior versions are retained and remain attached to registrations raised under them. *(The legacy system deleted and rewrote the whole batch, and in fact rather more than the batch — see §0.0 correction 24.)*
+  - A published schedule **shall be immutable**. Revision creates a new version; the prior version keeps its effective range and continues to price the days it was in force. Nothing may edit, delete or un-approve it, including a database session connecting as the schema owner.
+  - Two published versions for the same key **shall not** have overlapping effective ranges, enforced by database constraint rather than by convention. "What did this student owe on the day they registered" must have exactly one answer, permanently.
+  - Superseding is **adjacent**: the outgoing version closes the day before the incoming one opens. A gap would be a day on which no registration could be billed.
+  - The nationality category is **nullable**, and a null schedule is the fallback applying to any nationality. Resolution takes the most specific match first.
+  - A fee schedule shall be **approved by someone other than its preparer**, and whoever maintains the matrix shall not also approve individual discounts (REQ-SOD-01).
 - **REQ-AC-05: Nationalities & Admission Categories** — Master lists for national admission channels, expatriate quotas, and international fee structures.
 - **REQ-AC-06: Cost Centre Master** — See REQ-FIN-02.
 

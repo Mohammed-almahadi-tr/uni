@@ -425,7 +425,11 @@ ALTER TABLE fee_schedules
 --    already priced.
 --
 --    DRAFT versions are excluded from the constraint: several may be in
---    preparation at once, and they price nothing until approved.
+--    preparation at once, and they price nothing until approved. SUPERSEDED
+--    ones are NOT excluded. A superseded version still prices the days it was
+--    in force — that is the whole point of keeping it — so resolution reads
+--    published history by date, and the constraint has to guard that history
+--    rather than only the current version.
 --
 --    `COALESCE(effective_to, 'infinity')` gives an open-ended version an
 --    unbounded upper bound, which is what "still in force" means.
@@ -448,7 +452,7 @@ ALTER TABLE fee_schedules
     admission_category_id WITH =,
     nationality_category WITH =,
     daterange(effective_from, COALESCE(effective_to, 'infinity'::date), '[]') WITH &&
-  ) WHERE (status = 'APPROVED' AND nationality_category IS NOT NULL);
+  ) WHERE (status <> 'DRAFT' AND nationality_category IS NOT NULL);
 
 -- And the fallback row that applies to any nationality.
 ALTER TABLE fee_schedules
@@ -459,7 +463,7 @@ ALTER TABLE fee_schedules
     batch_id WITH =,
     admission_category_id WITH =,
     daterange(effective_from, COALESCE(effective_to, 'infinity'::date), '[]') WITH &&
-  ) WHERE (status = 'APPROVED' AND nationality_category IS NULL);
+  ) WHERE (status <> 'DRAFT' AND nationality_category IS NULL);
 
 
 -- ---------------------------------------------------------------------------
@@ -617,7 +621,10 @@ BEGIN
     RAISE EXCEPTION
       'cannot delete this % — % row(s) in % still refer to it. Deactivate it instead; deleting it would orphan records that are still being reported on',
       label, n, child_table
-      USING ERRCODE = 'foreign_key_violation';
+      -- Deliberately check_violation and not foreign_key_violation: the client
+      -- driver recognises the latter and replaces this message with its own
+      -- generic one, which tells the user nothing about what to do instead.
+      USING ERRCODE = 'check_violation';
   END IF;
 
   RETURN OLD;

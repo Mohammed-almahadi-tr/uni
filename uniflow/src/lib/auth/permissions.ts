@@ -43,6 +43,10 @@ export const PERMISSIONS = [
   // ---- Admissions and students -----------------------------------------
   { key: 'application.read', description: 'View admission applications' },
   { key: 'application.decide', description: 'Accept, waitlist or reject applications' },
+  { key: 'admission.capacity', description: 'Maintain seat quotas and eligibility rules' },
+  { key: 'application.offer', description: 'Issue and withdraw offers of a place' },
+  { key: 'admission.override', description: 'Issue an offer beyond the seat quota' },
+  { key: 'application.enrol', description: 'Turn an accepted offer into a student record' },
   { key: 'student.read', description: 'View student profiles' },
   { key: 'student.manage', description: 'Create and edit student profiles' },
   { key: 'student.status', description: 'Change student status (defer, withdraw, readmit)' },
@@ -149,6 +153,22 @@ export const SOD_CONFLICTS: readonly SodConflict[] = [
     b: 'voucher.approve',
     reason:
       'The two checker stages must be separate people, or the second review adds nothing.',
+  },
+  {
+    a: 'admission.capacity',
+    b: 'admission.override',
+    reason:
+      'Whoever sets how many seats a programme has must not also be the one who exceeds ' +
+      'that number. Together they make the quota advisory, which is what it was in the ' +
+      'legacy build — a report nobody consulted before a place was given away.',
+  },
+  {
+    a: 'application.offer',
+    b: 'admission.override',
+    reason:
+      'An override is a second signature on an offer that breaks the published capacity. ' +
+      'If the person issuing the offer can authorise their own exception, there is no ' +
+      'second signature.',
   },
   {
     a: 'feematrix.manage',
@@ -344,6 +364,7 @@ export const DEFAULT_ROLES: Record<
     nameAr: 'المسجل',
     permissions: [
       'academic.read', 'feematrix.read', 'application.read', 'application.decide',
+      'application.offer', 'application.enrol', 'admission.capacity',
       'student.read', 'student.manage', 'student.status', 'medical.read',
       'registration.read', 'registration.create', 'registration.cancel',
       'registration.transfer', 'hold.manage', 'discount.apply', 'charge.create',
@@ -394,7 +415,7 @@ export const DEFAULT_ROLES: Record<
     nameAr: 'العميد',
     permissions: [
       'academic.read', 'student.read', 'registration.read', 'application.read',
-      'report.student',
+      'admission.override', 'report.student',
     ],
   },
   'Procurement Officer': {

@@ -6,7 +6,7 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete · Track A complete (A1-A7).** Ledger invariants,
+**Status: Phase 0 complete · Track A complete (A1-A7) · Track B started (B1).** Ledger invariants,
 platform spine, auth/RBAC with segregation of duties, the bilingual RTL shell,
 a normalised chart of accounts, a four-state maker-checker workflow whose
 drafts are never deleted, and a working cashier desk: fee catalog, student
@@ -15,8 +15,9 @@ recognition, aging, a cheque clearing pipeline that posts at every transition,
 a fixed-asset register with an idempotent depreciation batch, budgetary control
 with a full procure-to-pay chain, and the financial statements that make all of
 it legible — trial balance, balance sheet, income statement, sub-ledger
-reconciliation, and their CSV, Excel and print exports. **500 tests across 17
-suites; typecheck, lint and production build clean.**
+reconciliation, and their CSV, Excel and print exports — plus the first of
+Track B: the academic structure and an effective-dated, versioned fee matrix.
+**531 tests across 18 suites; typecheck, lint and production build clean.**
 
 The finance engine is done. **There is no user interface yet** — one demo route
 proving the localisation layer works end to end, and nothing else. Tracks B
@@ -32,7 +33,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 500 tests
+npm test              # 531 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -300,6 +301,29 @@ unless a second person has approved a change request naming exactly those
 values. Redirecting a real supplier's payments needs no forged invoice, only an
 edit to one row.
 
+**B1 — Academic structure and the fee matrix.** The worst defect the legacy
+audit has found is four lines apart in one file. The fee grid was loaded
+`where Batch=.. and Colleges=.. and Type=..` and saved with
+`Delete From TuitionFees Where Batch=N'..'` — college and admission type
+dropped from the predicate. Pressing Save on the Medicine/General fee grid
+deleted the fee schedules of **every faculty and every admission type in that
+batch**, then re-inserted the dozen rows on screen. No transaction, so a
+failure partway left the batch priced at nothing. It reported success.
+
+A fee schedule here is versioned and effective-dated, and once approved it is
+immutable — refused to every path including the schema owner. Revision creates
+a new version; the old one keeps its date range and goes on pricing the days it
+was in force. An exclusion constraint refuses two published versions that both
+claim a date, so what a student owed on the day they registered has exactly one
+answer, permanently. Approving a version closes the previous one the day before
+the new one opens: adjacent, never overlapping, never leaving a gap.
+
+The rest of the structure — faculties, programmes, batches, academic years and
+terms — is keyed by id rather than by name, which is the same fix A1 applied to
+the chart of accounts. The legacy `Programs.ProgramName` was read back with
+`SELECT DISTINCT`, a batch list lived in a table called `AcademicYear`, and
+`Colleges` was never a table at all.
+
 **A7 — Financial statements.** The legacy trial balance and balance sheet did
 not read the same table: `frmTrialBalance` summed `Transactionees`,
 `frmBalanceSheetLevels` summed `Transactions`. The institution's two headline
@@ -408,9 +432,10 @@ operator screens — cashier desk, voucher grid, approvals queue, chart of
 accounts, budget, purchase orders, assets, and the statements this track just
 finished. Designs exist; the wiring does not.
 
-**Track B — student.** Academic structure and the effective-dated fee matrix,
-admissions with seat capacity, the student profile, the registration engine,
-the status lifecycle, and sponsors. Only `students/registry.ts` exists today.
+**Track B — student.** B1 is done. Next is admissions with seat capacity, the
+student profile, then **B4, the registration engine** — where a registration
+row and its balanced ledger entry are created in one transaction or neither is.
+That is the convergence milestone, and B1 built the thing it bills against.
 
 **Track C — public surface.** Theme engine and landing CMS, the public
 admissions portal, and student/guardian self-service.

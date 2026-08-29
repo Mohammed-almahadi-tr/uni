@@ -15,6 +15,7 @@ import { provisionTenant, syncPermissions } from '@/lib/auth/provisioning';
 import { installChartOfAccounts } from '@/lib/coa/template';
 import { installFeeCatalog } from '@/lib/fees/catalog';
 import { installAssetCategories } from '@/lib/assets/register';
+import { installAcademicDefaults } from '@/lib/academic/defaults';
 import type { Principal } from '@/lib/auth/rbac';
 import type { PermissionKey } from '@/lib/auth/permissions';
 
@@ -283,6 +284,13 @@ export interface University {
   feeItems: Record<string, string>;
   assetCategories: Record<string, string>;
   costCenterId: string;
+  /** Academic structure (Track B1). One faculty, two programmes, one batch. */
+  facultyId: string;
+  programmeIds: Record<string, string>;
+  batchId: string;
+  admissionCategories: Record<string, string>;
+  nationalities: Record<string, string>;
+  certificateTypes: Record<string, string>;
 }
 
 let uniCounter = 0;
@@ -309,6 +317,7 @@ export async function makeUniversity(
   await installChartOfAccounts(t.tenantId, t.adminUserId);
   await installFeeCatalog(t.tenantId, t.adminUserId);
   await installAssetCategories(t.tenantId, t.adminUserId);
+  await installAcademicDefaults(t.tenantId, t.adminUserId);
 
   const { fiscalYearId, periodIds } = await withSystem(
     (tx) =>
@@ -365,6 +374,84 @@ export async function makeUniversity(
     testSystemDb,
   );
 
+  const academic = await withSystem(
+    async (tx) => {
+      const faculty = await tx.faculty.create({
+        data: {
+          tenantId: t.tenantId,
+          code: 'MED',
+          nameAr: 'كلية الطب',
+          nameEn: 'Faculty of Medicine',
+          costCenterId,
+        },
+        select: { id: true },
+      });
+
+      const mbbs = await tx.programme.create({
+        data: {
+          tenantId: t.tenantId,
+          facultyId: faculty.id,
+          code: 'MBBS',
+          nameAr: 'بكالوريوس الطب والجراحة',
+          nameEn: 'Bachelor of Medicine and Surgery',
+          degreeLevel: 'BACHELOR',
+          durationYears: 5,
+          durationTerms: 10,
+        },
+        select: { id: true },
+      });
+
+      const nurs = await tx.programme.create({
+        data: {
+          tenantId: t.tenantId,
+          facultyId: faculty.id,
+          code: 'NURS',
+          nameAr: 'بكالوريوس التمريض',
+          nameEn: 'Bachelor of Nursing',
+          degreeLevel: 'BACHELOR',
+          durationYears: 4,
+          durationTerms: 8,
+        },
+        select: { id: true },
+      });
+
+      const batch = await tx.batch.create({
+        data: {
+          tenantId: t.tenantId,
+          code: String(year),
+          nameAr: `دفعة ${year}`,
+          nameEn: `Batch ${year}`,
+          admissionYear: year,
+        },
+        select: { id: true },
+      });
+
+      const cats = await tx.admissionCategory.findMany({
+        where: { tenantId: t.tenantId },
+        select: { id: true, code: true },
+      });
+      const nats = await tx.nationality.findMany({
+        where: { tenantId: t.tenantId },
+        select: { id: true, code: true },
+      });
+      const certs = await tx.certificateType.findMany({
+        where: { tenantId: t.tenantId },
+        select: { id: true, code: true },
+      });
+
+      return {
+        facultyId: faculty.id,
+        programmeIds: { MBBS: mbbs.id, NURS: nurs.id },
+        batchId: batch.id,
+        admissionCategories: Object.fromEntries(cats.map((c) => [c.code, c.id])),
+        nationalities: Object.fromEntries(nats.map((n) => [n.code, n.id])),
+        certificateTypes: Object.fromEntries(certs.map((c) => [c.code, c.id])),
+      };
+    },
+    {},
+    testSystemDb,
+  );
+
   return {
     tenantId: t.tenantId,
     adminUserId: t.adminUserId,
@@ -375,6 +462,7 @@ export async function makeUniversity(
     feeItems,
     assetCategories,
     costCenterId,
+    ...academic,
   };
 }
 

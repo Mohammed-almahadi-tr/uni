@@ -63,6 +63,10 @@ export const MFA_REQUIRED_PERMISSIONS: readonly PermissionKey[] = [
   // Disposing of an asset takes it off the books and can book a loss against
   // the difference. It is the paper half of equipment leaving the building.
   'asset.dispose',
+  // Overriding a seat quota gives someone a place the institution said it did
+  // not have. It is a discretionary grant of something scarce, which is
+  // exactly the shape of privilege a stolen session is used for.
+  'admission.override',
 ];
 
 const MFA_SET = new Set<string>(MFA_REQUIRED_PERMISSIONS);

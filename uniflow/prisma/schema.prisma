@@ -427,6 +427,13 @@ model Tenant {
   feeSchedules        FeeSchedule[]
   feeScheduleLines    FeeScheduleLine[]
 
+  certificateTypes   CertificateType[]
+  seatQuotas         SeatQuota[]
+  eligibilityRules   EligibilityRule[]
+  applications       Application[]
+  applicationChoices ApplicationChoice[]
+  admissionOffers    AdmissionOffer[]
+
   @@map("tenants")
 }
 
@@ -479,6 +486,11 @@ model User {
 
   feeSchedulesPrepared FeeSchedule[] @relation("FeeSchedulePreparer")
   feeSchedulesApproved FeeSchedule[] @relation("FeeScheduleApprover")
+
+  seatQuotasCreated    SeatQuota[]      @relation("SeatQuotaCreator")
+  applicationsDecided  Application[]    @relation("ApplicationDecider")
+  offersIssued         AdmissionOffer[] @relation("OfferIssuer")
+  offersOverridden     AdmissionOffer[] @relation("OfferOverrider")
 
   budgetsPrepared     Budget[]              @relation("BudgetPreparer")
   budgetsApproved     Budget[]              @relation("BudgetApprover")
@@ -1148,6 +1160,7 @@ model Student {
   charges           StudentCharge[]
   receipts          StudentReceipt[]
   plans             InstalmentPlan[]
+  application       Application?       @relation("ApplicationStudent")
 
   @@unique([tenantId, studentNo])
   @@index([tenantId, searchKey])
@@ -1277,6 +1290,7 @@ model StudentReceipt {
   dishonourPost    TransactionHeader?  @relation("ReceiptDishonourPosting", fields: [dishonourHeaderId], references: [id])
   cheque           Cheque?
   allocations      ReceiptAllocation[]
+  seatDepositFor   AdmissionOffer[]    @relation("OfferDepositReceipt")
 
   @@unique([tenantId, receiptNo])
   @@index([tenantId, studentId])
@@ -2386,6 +2400,11 @@ model Programme {
   feeSchedules FeeSchedule[]
   students     Student[]
 
+  seatQuotas        SeatQuota[]
+  eligibilityRules  EligibilityRule[]
+  applicationChoice ApplicationChoice[]
+  admissionOffers   AdmissionOffer[]
+
   @@unique([tenantId, code])
   @@index([tenantId, facultyId, isActive])
   @@map("programmes")
@@ -2452,6 +2471,8 @@ model Batch {
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   feeSchedules FeeSchedule[]
   students     Student[]
+  seatQuotas   SeatQuota[]
+  applications Application[]
 
   @@unique([tenantId, code])
   @@index([tenantId, admissionYear])
@@ -2473,6 +2494,8 @@ model AdmissionCategory {
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   feeSchedules FeeSchedule[]
   students     Student[]
+  seatQuotas   SeatQuota[]
+  applications Application[]
 
   @@unique([tenantId, code])
   @@map("admission_categories")
@@ -2487,8 +2510,9 @@ model Nationality {
   category NationalityCategory @default(FOREIGN)
   isActive Boolean             @default(true) @map("is_active")
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  students Student[]
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  students     Student[]
+  applications Application[]
 
   @@unique([tenantId, code])
   @@index([tenantId, category])
@@ -2572,4 +2596,305 @@ model FeeScheduleLine {
   @@unique([feeScheduleId, feeItemId])
   @@index([tenantId, feeItemId])
   @@map("fee_schedule_lines")
+}
+
+// ---------------------------------------------------------------------------
+// Admissions: capacity, eligibility, committee workflow (SRS Module 17, B2)
+//
+// The legacy seat-quota screen existed only in the Ribat/UOT build, held one
+// row per COLLEGE (no programme, no admission channel), and saved with
+// `Delete From StudentsVacants Where College=N'..'` followed by an insert
+// naming college AND batch — so setting one batch's quota deleted every other
+// batch's for that college. Capacity was never checked when a place was
+// offered: `ViewStudVacants` counted students who had *paid*, from receipt
+// vouchers, after the fact.
+// ---------------------------------------------------------------------------
+
+enum ApplicationState {
+  DRAFT
+  SUBMITTED
+  /// Screened against the programme rules; awaiting a committee.
+  UNDER_REVIEW
+  OFFERED
+  WAITLISTED
+  REJECTED
+  WITHDRAWN
+  /// Offer accepted and a student record created.
+  ENROLLED
+}
+
+/// A committee's verdict (REQ-ADM-CAP-03). Distinct from `ApplicationState`:
+/// the decision is what the committee said, the state is where the application
+/// has got to. A CONDITIONAL_ACCEPT that lapses ends REJECTED without anyone
+/// rewriting what the committee decided.
+enum AdmissionDecision {
+  ACCEPT
+  CONDITIONAL_ACCEPT
+  WAITLIST
+  REJECT
+}
+
+enum OfferState {
+  ISSUED
+  ACCEPTED
+  DECLINED
+  /// Deadline passed with no answer. Set by the lapse batch, never by hand.
+  LAPSED
+  /// Pulled by the institution before the deadline.
+  WITHDRAWN
+}
+
+enum EligibilityOutcome {
+  NOT_ASSESSED
+  PASS
+  /// Fails a rule but may still be considered — the committee is told which.
+  FAIL
+}
+
+/// The school-leaving qualification an applicant holds. A per-tenant table
+/// rather than an enum for the same reason admission categories are: an
+/// institution recognises whatever certificates its applicants actually bring,
+/// and adding one must not be a migration.
+model CertificateType {
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
+  code      String
+  nameAr    String  @map("name_ar")
+  nameEn    String  @map("name_en")
+  /// The mark the certificate is reported out of, so scores from different
+  /// systems can be compared. Sudanese secondary is out of 100 as a
+  /// percentage; some are out of 700 or 1600.
+  maxScore  Decimal @map("max_score") @db.Decimal(9, 3)
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rules        EligibilityRule[]
+  applications Application[]
+
+  @@unique([tenantId, code])
+  @@map("certificate_types")
+}
+
+/// Seats available for one programme × batch × admission category
+/// (REQ-ADM-CAP-01).
+///
+/// Three dimensions, where the legacy table had one and a half. The counters
+/// are NOT stored: `offered` and `confirmed` are counted from the offers
+/// themselves under a row lock on this record, so the number of seats taken
+/// cannot drift from the offers that took them. A stored counter is a second
+/// record of the same fact, and the whole legacy audit is a catalogue of what
+/// happens to those.
+model SeatQuota {
+  id                  String @id @default(uuid()) @db.Uuid
+  tenantId            String @map("tenant_id") @db.Uuid
+  programmeId         String @map("programme_id") @db.Uuid
+  batchId             String @map("batch_id") @db.Uuid
+  admissionCategoryId String @map("admission_category_id") @db.Uuid
+
+  seats Int
+  /// Seats held back from the general allocation — a ministry allocation, a
+  /// scholarship block. Offers may not consume them without an override.
+  reservedSeats Int @default(0) @map("reserved_seats")
+
+  /// When false, an offer beyond capacity is refused outright. When true it is
+  /// allowed with a recorded reason and a named approver.
+  allowOverride Boolean @default(true) @map("allow_override")
+  isActive      Boolean @default(true) @map("is_active")
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme         Programme         @relation(fields: [programmeId], references: [id])
+  batch             Batch             @relation(fields: [batchId], references: [id])
+  admissionCategory AdmissionCategory @relation(fields: [admissionCategoryId], references: [id])
+  createdBy         User              @relation("SeatQuotaCreator", fields: [createdById], references: [id])
+  offers            AdmissionOffer[]
+
+  @@unique([tenantId, programmeId, batchId, admissionCategoryId])
+  @@index([tenantId, batchId])
+  @@map("seat_quotas")
+}
+
+/// A screening rule for one programme (REQ-ADM-CAP-02).
+///
+/// Several rules may apply to one programme — one per certificate type it
+/// accepts. An applicant holding a certificate no rule mentions is reported as
+/// unassessable rather than silently passed.
+model EligibilityRule {
+  id                String @id @default(uuid()) @db.Uuid
+  tenantId          String @map("tenant_id") @db.Uuid
+  programmeId       String @map("programme_id") @db.Uuid
+  certificateTypeId String @map("certificate_type_id") @db.Uuid
+
+  /// Minimum overall percentage, normalised against the certificate's own
+  /// maximum so a 700-scale and a 100-scale certificate compare.
+  minPercentage Decimal @map("min_percentage") @db.Decimal(6, 3)
+  /// Subjects the applicant must have sat. Compared case- and
+  /// whitespace-insensitively against the subjects declared on the application.
+  requiredSubjects String[] @map("required_subjects")
+  minAge           Int?     @map("min_age")
+  maxAge           Int?     @map("max_age")
+  /// Restrict the rule to one nationality category, or null for all.
+  nationalityCategory NationalityCategory? @map("nationality_category")
+
+  isActive Boolean @default(true) @map("is_active")
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme       Programme       @relation(fields: [programmeId], references: [id])
+  certificateType CertificateType @relation(fields: [certificateTypeId], references: [id])
+
+  @@unique([tenantId, programmeId, certificateTypeId])
+  @@index([tenantId, programmeId])
+  @@map("eligibility_rules")
+}
+
+/// One person applying in one intake.
+///
+/// Deliberately not a `Student` row with status APPLICANT. A rejected applicant
+/// must not consume a student number or appear in student reporting, and the
+/// same person may apply in successive years. The Student record is created at
+/// the moment an offer is accepted, and not before.
+model Application {
+  id            String @id @default(uuid()) @db.Uuid
+  tenantId      String @map("tenant_id") @db.Uuid
+  applicationNo String @map("application_no")
+
+  batchId             String @map("batch_id") @db.Uuid
+  admissionCategoryId String @map("admission_category_id") @db.Uuid
+
+  fullNameAr String @map("full_name_ar")
+  fullNameEn String @map("full_name_en")
+  /// Alef/hamza/taa-marbuta-normalised, for duplicate detection. Written by
+  /// the application, never by hand.
+  searchKey  String @map("search_key")
+
+  nationalId    String?   @map("national_id")
+  passportNo    String?   @map("passport_no")
+  dateOfBirth   DateTime? @map("date_of_birth") @db.Date
+  nationalityId String?   @map("nationality_id") @db.Uuid
+  email         String?
+  phone         String?
+
+  certificateTypeId String?  @map("certificate_type_id") @db.Uuid
+  certificateScore  Decimal? @map("certificate_score") @db.Decimal(9, 3)
+  certificateYear   Int?     @map("certificate_year")
+  /// Subjects sat, as declared. Screened against the rule's requirements.
+  subjects          String[]
+
+  state ApplicationState @default(DRAFT)
+
+  /// The committee's verdict and its rationale (REQ-ADM-CAP-03).
+  decision       AdmissionDecision?
+  decisionNote   String?            @map("decision_note")
+  decidedById    String?            @map("decided_by_id") @db.Uuid
+  decidedAt      DateTime?          @map("decided_at") @db.Timestamptz(6)
+  /// Committee score, on whatever model the institution configures. Held here
+  /// rather than derived so a ranked list is reproducible after the fact.
+  committeeScore Decimal?           @map("committee_score") @db.Decimal(9, 3)
+
+  submittedAt DateTime? @map("submitted_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Set when an accepted offer produced a student record.
+  studentId   String?   @unique @map("student_id") @db.Uuid
+
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  batch             Batch               @relation(fields: [batchId], references: [id])
+  admissionCategory AdmissionCategory   @relation(fields: [admissionCategoryId], references: [id])
+  nationality       Nationality?        @relation(fields: [nationalityId], references: [id])
+  certificateType   CertificateType?    @relation(fields: [certificateTypeId], references: [id])
+  decidedBy         User?               @relation("ApplicationDecider", fields: [decidedById], references: [id])
+  student           Student?            @relation("ApplicationStudent", fields: [studentId], references: [id])
+  choices           ApplicationChoice[]
+  offers            AdmissionOffer[]
+
+  @@unique([tenantId, applicationNo])
+  @@index([tenantId, batchId, state])
+  @@index([tenantId, searchKey])
+  @@index([tenantId, nationalId])
+  @@map("applications")
+}
+
+/// A programme an applicant asked for, and where it came in their ranking.
+model ApplicationChoice {
+  id            String @id @default(uuid()) @db.Uuid
+  tenantId      String @map("tenant_id") @db.Uuid
+  applicationId String @map("application_id") @db.Uuid
+  programmeId   String @map("programme_id") @db.Uuid
+  /// 1 is the applicant's first choice.
+  rank          Int
+
+  /// Result of automatic screening against this programme's rules.
+  eligibility     EligibilityOutcome @default(NOT_ASSESSED)
+  /// Which rules failed, in a sentence per rule, so the committee sees the
+  /// reason rather than only the verdict.
+  eligibilityNotes String[]          @map("eligibility_notes")
+  assessedAt      DateTime?          @map("assessed_at") @db.Timestamptz(6)
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  programme   Programme   @relation(fields: [programmeId], references: [id])
+
+  @@unique([applicationId, rank])
+  @@unique([applicationId, programmeId])
+  @@index([tenantId, programmeId, eligibility])
+  @@map("application_choices")
+}
+
+/// A place offered, and what became of it (REQ-ADM-CAP-04).
+///
+/// A row per offer rather than columns on the application, so a lapsed offer
+/// and the waitlist promotion that followed it are both still readable. The
+/// question "who was offered this seat before it came to me" has an answer.
+model AdmissionOffer {
+  id            String @id @default(uuid()) @db.Uuid
+  tenantId      String @map("tenant_id") @db.Uuid
+  applicationId String @map("application_id") @db.Uuid
+  seatQuotaId   String @map("seat_quota_id") @db.Uuid
+  programmeId   String @map("programme_id") @db.Uuid
+
+  state OfferState @default(ISSUED)
+
+  issuedById String   @map("issued_by_id") @db.Uuid
+  issuedAt   DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
+  /// Last day the applicant may accept. After it the lapse batch closes the
+  /// offer and frees the seat.
+  acceptBy   DateTime @map("accept_by") @db.Date
+
+  /// A conditional offer states what must still be satisfied.
+  conditions String?
+
+  depositRequired Decimal?  @map("deposit_required") @db.Decimal(19, 4)
+  depositPaidAt   DateTime? @map("deposit_paid_at") @db.Timestamptz(6)
+  /// The receipt that paid the seat deposit, if one was taken.
+  depositReceiptId String?  @map("deposit_receipt_id") @db.Uuid
+
+  respondedAt DateTime? @map("responded_at") @db.Timestamptz(6)
+  closedAt    DateTime? @map("closed_at") @db.Timestamptz(6)
+  closeReason String?   @map("close_reason")
+
+  /// Set when this offer was issued beyond the quota. Both the reason and the
+  /// person are required — an override with neither is indistinguishable from
+  /// a capacity check that was never run.
+  overrodeCapacity Boolean @default(false) @map("overrode_capacity")
+  overrideReason   String? @map("override_reason")
+  overriddenById   String? @map("overridden_by_id") @db.Uuid
+
+  /// Set when this offer filled a seat freed by an earlier one lapsing.
+  promotedFromId String? @map("promoted_from_id") @db.Uuid
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  application   Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  seatQuota     SeatQuota       @relation(fields: [seatQuotaId], references: [id])
+  programme     Programme       @relation(fields: [programmeId], references: [id])
+  issuedBy      User            @relation("OfferIssuer", fields: [issuedById], references: [id])
+  overriddenBy  User?           @relation("OfferOverrider", fields: [overriddenById], references: [id])
+  promotedFrom  AdmissionOffer? @relation("OfferPromotion", fields: [promotedFromId], references: [id])
+  promotedTo    AdmissionOffer[] @relation("OfferPromotion")
+  depositReceipt StudentReceipt? @relation("OfferDepositReceipt", fields: [depositReceiptId], references: [id])
+
+  @@index([tenantId, seatQuotaId, state])
+  @@index([tenantId, state, acceptBy])
+  @@map("admission_offers")
 }

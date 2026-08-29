@@ -1,6 +1,6 @@
 # Implementation Plan: UniFlow Multi-Tenant University ERP & White-Label Web Platform
 
-**Version:** 2.6.0 · **Supersedes:** 1.0.0 - 2.5.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.6.0
+**Version:** 2.7.0 · **Supersedes:** 1.0.0 - 2.6.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.7.0
 
 Transformation of the legacy VB.NET / MS SQL desktop university system (Oasis E-University at Nile College; the Ribat University Application at Ribat and UOT) into a multi-tenant web application: student registration and lifecycle management, a double-entry university finance engine, and a white-label landing page per university client, built with **Next.js**, **shadcn UI** and **PostgreSQL**.
 
@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**500 tests pass across 17 suites; typecheck, lint and production build are all
+**531 tests pass across 18 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -43,6 +43,9 @@ procure-to-pay, and the financial statements — trial balance, balance sheet,
 income statement, sub-ledger reconciliation and their exports — together with
 the two Module 12 requirements the statements depend on, opening balances and
 the year-end close. See §0.2.
+
+**Track B has started.** B1 — academic structure and the effective-dated,
+versioned fee matrix — is complete; see §6.1.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -1019,7 +1022,7 @@ Even though Phases 7-8 are out of v1 scope, the Phase 0 schema must not preclude
 
 ## 6. Track B — Student
 
-**B1 · Academic Structure & Fee Matrix** — Faculties, programmes, degrees, batches, academic years and terms. The **effective-dated, versioned** fee matrix: editing creates a new version, prior versions are retained and stay attached to the registrations raised under them. *(The legacy screen ran `DELETE FROM TuitionFees WHERE Batch=…` before re-inserting, destroying every prior schedule.)*
+**B1 · Academic Structure & Fee Matrix** *(built — see §6.1)* — Faculties, programmes, degrees, batches, academic years and terms. The **effective-dated, versioned** fee matrix: editing creates a new version, prior versions are retained and stay attached to the registrations raised under them. *(The legacy screen ran `DELETE FROM TuitionFees WHERE Batch=…` before re-inserting, destroying every prior schedule.)*
 
 **B2 · Admissions, Capacity & Committee Workflow** — Seat quotas per programme × batch × channel with live counters and override logging. Automatic eligibility screening by certificate type and score. Committee scoring, ranking and decisions. Offers with acceptance deadlines, optional online seat deposits, automatic lapse and waitlist promotion. Duplicate-applicant detection on national ID, passport and normalised Arabic name plus date of birth. Bulk intake import with dry-run preview.
 
@@ -1032,6 +1035,129 @@ Even though Phases 7-8 are out of v1 scope, the Phase 0 schema must not preclude
 **B6 · Sponsors, Scholarships & Discount Governance** — Sponsor master with contract terms. Split funding apportioning charges across self-pay and sponsors at billing time, so a student's statement shows only what the student owes. Sponsor invoicing, settlement and aging; sponsor-default transfer back to the student. Scholarship schemes with budget caps and award approval. Discount exposure reporting by faculty, programme, batch, scheme and year.
 
 ---
+
+## 6.1 Track B progress
+
+### B1 — Academic Structure & Fee Matrix · complete
+
+The first half of Track B, and the half Track A has been waiting on: a fee
+schedule is what a registration bills against, so B4 cannot exist until this
+does.
+
+#### The save that destroyed other faculties' fees
+
+This is the single worst defect the legacy audit has found, and it is four
+lines apart in one file.
+
+The fee grid was **loaded** filtered on three columns:
+
+```vb
+"select Distinct Program,TuitionFees,RegFees From TuitionFees " & _
+"where Batch= N'" & combBatch.SelectedItem & "' and Colleges=N'" & _
+CombColleg.SelectedItem & "' and Type=N'" & CombType.SelectedItem & "'"
+```
+([frmTuitionFees.vb:48](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmTuitionFees.vb#L48))
+
+and **saved** by deleting on one:
+
+```vb
+cmd.CommandText = "Delete From TuitionFees Where Batch=N'" & combBatch.SelectedItem & "'"
+cmd.ExecuteNonQuery()
+cmd.CommandText = "insert into TuitionFees (Batch,Colleges,Program,TuitionFees,RegFees,Type,Employee) ..."
+For Each row As DataGridViewRow In GridFees.Rows ...
+```
+([frmTuitionFees.vb:89-104](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmTuitionFees.vb#L89-L104))
+
+The `DELETE` names the batch. The `SELECT` names the batch, the college **and**
+the admission type. So pressing Save on the Medicine / General fee grid deleted
+the fee schedules of **every faculty and every admission type in that batch**,
+then re-inserted only the dozen rows on screen. Pharmacy's fees, Dentistry's
+fees, the Private and Foreign columns — gone, silently, with a
+`MsgBox("تم الحفظ")` reporting success.
+
+Four aggravating details:
+
+- **No transaction.** `cmd.ExecuteNonQuery()` on an autocommit connection: a
+  failure between the `DELETE` and the last `INSERT` left the batch priced at
+  nothing, with the deletion already committed.
+- **Exactly two fee columns.** `TuitionFees` and `RegFees`, both read through
+  `CDbl(...)`. Every other fee an institution charges had nowhere to go.
+- **No version history.** SRS v2.0.0 said this destroyed "every prior fee
+  schedule". It destroys every *sibling* schedule as well, which is worse and
+  is recorded as SRS correction 24.
+- **The only audit was an `Employee` column** overwritten on every save.
+
+The rest of the academic structure was the same disease the chart of accounts
+had before A1: identity was a name. `Programs.ProgramName` inserted by string
+concatenation and read back with `SELECT DISTINCT`
+([frmListPrograms.vb:20,83](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmListPrograms.vb#L20-L83));
+a batch list living in a table called `AcademicYear`, with the academic year
+itself existing nowhere
+([frmListBatches.vb:9,47](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmListBatches.vb#L9-L47));
+and `Colleges` never a table at all, just a string copied onto every row that
+mentioned it.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| Faculty → department → programme, keyed by **id** | Renaming a faculty disturbs nothing. Asserted by test: the rename happens mid-test and every reference survives it |
+| Degree level, duration in **years and terms** | Not derived from one another — a summer intake, an intensive diploma and a five-year medical degree all break the two-terms-a-year assumption, and a fee matrix prices per term |
+| Academic years and terms, non-overlapping | GiST exclusion constraint, the same mechanism as fiscal periods. **An academic year is deliberately not a fiscal year**: they straddle each other, and conflating them puts a September intake's revenue in the wrong set of accounts |
+| Batches, admission categories, nationalities | Categories and nationalities are tables, not enums — institutions invent categories, and an enum change is a migration. The four shipped categories are what the legacy `Type` column actually contained |
+| **Versioned, effective-dated fee schedules** (REQ-AC-04) | Keyed on programme × batch × admission category × nationality category, in one currency, over a date range |
+| An approved schedule is **immutable** | Trigger. Editing, deleting or un-approving one is refused to every path including the owner role. Asserted four ways in the suite |
+| **One answer per cohort per day** | Exclusion constraint over the effective range. Two published versions cannot both claim a date, so "what did this student owe when they registered" has exactly one answer, permanently |
+| Supersession is adjacent, never overlapping and never gapped | Approving v2 closes v1 the day *before* v2 opens. A day priced by nothing is a day a registration cannot be billed |
+| Two signatures | `feematrix.approve` added, with an SoD pair against `feematrix.manage` and a self-approval refusal on top — the matrix stops one role holding both, the runtime check stops one person holding two roles |
+| Structure is deactivated, never deleted | Refused by trigger once anything refers to the row. `frmListBatches` deleted a batch with no check for students admitted under it |
+| `resolveFeeSchedule` / `feeScheduleForStudent` | The handover to B4. The fee matrix owns what a student's fees are; registration will own what to do with the answer |
+
+#### Resolution order, and why the fallback is nullable
+
+`nationality_category` is nullable, and null is the row that applies to any
+nationality. Resolution tries the student's own category first and falls back to
+it. An institution prices most programmes once and only some of them
+differently for expatriates; making the category a fourth non-null enum value
+would force three identical schedules per programme to say so, and one of the
+three would eventually be forgotten.
+
+#### Two bugs found by the suite
+
+Both were mine, both were caught by tests written to assert the property rather
+than the implementation.
+
+1. **The trigger's message was being thrown away.** `assert_no_dependants`
+   raised `ERRCODE = 'foreign_key_violation'`, which the Prisma driver
+   recognises and replaces with its own generic "Foreign key constraint
+   violated" — discarding the sentence telling the user to deactivate the row
+   instead. Changed to `check_violation`, which passes through intact.
+
+2. **Superseding a version made it unresolvable for its own dates.** The
+   overlap constraint and the resolver both filtered on `status = 'APPROVED'`,
+   so the moment v2 was approved, v1 stopped answering for the months it had
+   actually been in force — which is the exact property the whole track exists
+   to provide. Both now cover `status <> 'DRAFT'`: a published version prices
+   its range forever, and only a draft prices nothing.
+
+#### Verification
+
+31 tests. The load-bearing one is `prices one cohort without touching another`:
+two faculties priced under one batch, one of them revised, and the other still
+resolving to its original figures and version afterwards — the legacy save's
+failure, written down as an assertion.
+
+Alongside it, `supersedes without destroying` checks that a student registering
+in March still resolves to the March schedule after a July revision, and that
+every day either side of the boundary resolves to exactly one version.
+
+**Deferred to B3:** making the four academic dimensions mandatory on a student.
+They are nullable now because A3 created students before Track B existed and a
+cashier must still be able to take money from them. `feeScheduleForStudent`
+refuses to price a student missing any of them, with a message naming which.
+
+---
+
 
 ## 7. Track C — Public Surface
 
