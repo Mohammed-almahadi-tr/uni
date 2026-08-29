@@ -6,14 +6,15 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete · Track A1-A5 complete.** Ledger invariants,
+**Status: Phase 0 complete · Track A1-A6 complete.** Ledger invariants,
 platform spine, auth/RBAC with segregation of duties, the bilingual RTL shell,
 a normalised chart of accounts, a four-state maker-checker workflow whose
 drafts are never deleted, and a working cashier desk: fee catalog, student
 sub-ledger, multi-channel receipts, credit balances, deferred-revenue
 recognition, aging, a cheque clearing pipeline that posts at every transition,
-and a fixed-asset register with an idempotent depreciation batch. **395 tests
-across 14 suites; typecheck, lint and production build clean.**
+a fixed-asset register with an idempotent depreciation batch, and budgetary
+control with a full procure-to-pay chain. **450 tests across 16 suites;
+typecheck, lint and production build clean.**
 
 Tracks A (finance), B (student) and C (public surface) run in parallel from
 here.
@@ -27,7 +28,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 395 tests
+npm test              # 450 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -213,8 +214,16 @@ tests/assets.test.ts       43  schedule arithmetic, proration, residue,
                                the idempotent batch, disposal gain and loss,
                                custody history, the job runner, and the
                                register/ledger reconciliation
+tests/budget.test.ts       17  versioning and supersession, phasing and its
+                               residue, the three overrun policies, cumulative
+                               control, and the variance report
+tests/procurement.test.ts  38  dual-authorised bank details, encumbrance
+                               against the budget, the three-way match and its
+                               hold, duplicate-invoice refusal, payment
+                               approval, AP aging, and the vendor
+                               sub-ledger/control-account reconciliation
                            ───
-                           395
+                           450
 ```
 
 ---
@@ -252,6 +261,40 @@ the balancing rules live in [`src/lib/ledger/lines.ts`](src/lib/ledger/lines.ts)
 shared by the voucher grid and the posting engine as one implementation rather
 than two specifications — a grid that says "balanced" against a server that
 says "out by 0.01" leaves the maker stuck with no way to see why.
+
+**A6 — Budget, encumbrance and procure-to-pay.** The legacy budget keyed a
+line on four *text* account names over a free-form date range, with no
+uniqueness, no version and no approval — and nothing anywhere consulted it
+before money was committed. It was a report you looked at after you had
+overspent. Procurement did not exist at all: no vendor, no order, no receipt,
+no invoice, no payable. `frmMakePayBill` debited an expense straight against
+cash at payment time, so goods received in March and paid for in June were
+reported in June, and in between nothing recorded that the institution owed
+anything.
+
+Budgets are now **versions** — exactly one approved at a time, immutable once
+approved, revised by a new version — with lines keyed by account id and a
+per-line overrun policy of block, warn or advisory. Availability is
+$\text{allocated} - \text{encumbered} - \text{actual}$, and it is checked at
+purchase-order approval rather than reported afterwards.
+
+The accrual chain is three steps rather than one:
+
+```
+receipt   DR Expense / Asset          CR Goods Received Not Invoiced
+invoice   DR Goods Received Not Inv.  CR Vendor AP
+payment   DR Vendor AP                CR Cash / Bank
+```
+
+so an expense keeps the date it was incurred and the payable appears on the day
+the bill does. An **encumbrance is deliberately not a ledger posting** — an
+approved order has acquired no asset and incurred no liability, and putting it
+in the trial balance would mean writing a rule to take it out again.
+
+Vendor bank details cannot be changed by an update at all: a trigger refuses
+unless a second person has approved a change request naming exactly those
+values. Redirecting a real supplier's payments needs no forged invoice, only an
+edit to one row.
 
 **A5 — Fixed assets, depreciation, and the job runner.** The legacy system had
 **no asset entity**: an "asset" was a row in the chart of accounts carrying a
@@ -319,12 +362,13 @@ equals its control accounts **to the cent**.
 
 ## Next
 
-Track A continues at **A6 — budget, encumbrance and procurement/AP**, the
-largest remaining finance module and the one that makes REQ-BDG-02/03 coherent:
-a purchase order creates a commitment against a budget line, a goods receipt
-turns it into an accrual, and payment clears it. The job runner it needs is now
-in place. Track B (student) and Track C (public surface) can run in parallel —
-see the roadmap in
+Track A finishes at **A7 — financial statements and reports**: trial balance
+with opening / movement / closing sourced from `account_period_balances`,
+balance sheet L1-L4, income statement with comparatives and cost-centre
+filtering, receivables aging from the instalment due date, and the sub-ledger
+reconciliation report that makes control-account divergence visible on a page
+rather than only in a test. Track B (student) and Track C (public surface) can
+run in parallel — see the roadmap in
 [`../implementation_plan.md`](../implementation_plan.md). They converge at the
 **registration-posts-to-GL** milestone, which is the integration the legacy
 system never made.

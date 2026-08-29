@@ -68,6 +68,14 @@ const JAN = new Date(Date.UTC(2026, 0, 15));
 const JAN20 = new Date(Date.UTC(2026, 0, 20));
 const FEB = new Date(Date.UTC(2026, 1, 10));
 
+/**
+ * A note on `asSystem` in this file: it connects as the owner role and so
+ * bypasses RLS. Voucher references are unique per *tenant*, which means every
+ * university in the suite has its own VIV-2026-000001 — so a lookup by
+ * reference alone silently matches another test's voucher. Every raw lookup
+ * below carries the tenant for that reason.
+ */
+
 interface Actors {
   buyer: Principal;
   approver: Principal;
@@ -579,7 +587,7 @@ describe('goods receipt', () => {
     // when the cheque was written, which could be a quarter later.
     const lines = await asSystem((tx) =>
       tx.transactionLine.findMany({
-        where: { header: { voucherRef: grn.voucherRef } },
+        where: { header: { tenantId: u.tenantId, voucherRef: grn.voucherRef } },
         select: {
           debitAmount: true,
           creditAmount: true,
@@ -814,7 +822,7 @@ describe('vendor invoices and the three-way match', () => {
 
     const lines = await asSystem((tx) =>
       tx.transactionLine.findMany({
-        where: { header: { voucherRef: invoice.voucherRef! } },
+        where: { header: { tenantId: u.tenantId, voucherRef: invoice.voucherRef! } },
         select: {
           debitAmount: true,
           creditAmount: true,
@@ -1018,7 +1026,7 @@ describe('vendor invoices and the three-way match', () => {
     // what has arrived and not been billed.
     const lines = await asSystem((tx) =>
       tx.transactionLine.findMany({
-        where: { header: { voucherRef: invoice.voucherRef! } },
+        where: { header: { tenantId: u.tenantId, voucherRef: invoice.voucherRef! } },
         select: {
           debitAmount: true,
           creditAmount: true,
@@ -1096,7 +1104,7 @@ describe('payment', () => {
 
     const lines = await asSystem((tx) =>
       tx.transactionLine.findMany({
-        where: { header: { voucherRef: paid.voucherRef } },
+        where: { header: { tenantId: u.tenantId, voucherRef: paid.voucherRef } },
         select: {
           debitAmount: true,
           creditAmount: true,
@@ -1221,6 +1229,29 @@ describe('payment', () => {
     const proposal = await paymentProposal(apClerk, { dueBy: new Date(Date.UTC(2026, 2, 1)) });
     expect(proposal.map((p) => p.invoiceId)).toContain(invoice.id);
     expect(proposal[0].outstanding).toBe('5000.0000');
+  });
+
+  it('shows one vendor what was billed and what was paid, in date order', async () => {
+    const { u, apClerk, apApprover, reporter, vendor, invoice } = await billed();
+
+    const pv = await draftPayment(apClerk, {
+      vendorId: vendor.id,
+      paymentDate: FEB,
+      channel: 'BANK_TRANSFER',
+      bankAccountId: u.accounts['11121'],
+      allocations: [{ invoiceId: invoice.id, amount: '2000' }],
+    });
+    await submitPayment(apClerk, pv.id);
+    await approvePayment(apApprover, pv.id);
+
+    const statement = await vendorStatement(reporter, vendor.id);
+    expect(statement.rows.map((r) => r.kind)).toEqual(['INVOICE', 'PAYMENT']);
+    expect(statement.rows[0].charged).toBe('5000.0000');
+    expect(statement.rows[1].paid).toBe('2000.0000');
+    // A part-paid invoice leaves the balance, which is the number the legacy
+    // system had no way to produce: it had no vendor and no payable, so
+    // "how much do we owe this supplier" had no answer at all.
+    expect(statement.outstanding).toBe('3000.0000');
   });
 
   it('ages by due date rather than by invoice date', async () => {

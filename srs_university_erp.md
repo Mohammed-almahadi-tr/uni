@@ -1,14 +1,14 @@
 # Software Requirements Specification (SRS)
 ## Multi-Tenant University ERP & White-Label Web Platform
 **Project Name:** UniFlow Enterprise ERP (Next-Gen Transformation of Oasis E-University)
-**Document Version:** 2.4.0
-**Supersedes:** v1.0.0 - v2.3.0
+**Document Version:** 2.5.0
+**Supersedes:** v1.0.0 - v2.4.0
 **Target Audience:** University Management, Technical Architects, Development Team, Product Owners, Quality Assurance
 **Standard Compliance:** IEEE Std 830-1998 / ISO/IEC/IEEE 29148
 
 ---
 
-## 0.0 Corrections made while building (v2.1.0 - v2.4.0)
+## 0.0 Corrections made while building (v2.1.0 - v2.5.0)
 
 Version 2.0.0 was written before any of it was built. Building Phase 0 and
 Track A1-A3 showed several of its statements to be wrong, or weaker than what
@@ -31,6 +31,11 @@ diverge from the system.
 | 12 | REQ-AST-01 restated: the legacy system has **no asset entity**. An asset was a row in the chart of accounts with a `DeprPerc` column | v2.0.0 described the legacy fixed-asset module as though a register existed. It did not, so every field in REQ-AST-01 is new work rather than migrated |
 | 13 | New §4.5: **durable batch runs**. Every period-end job records when it ran, by whom, what it posted, and why it failed | Idempotency alone makes a batch safe; it does not make it accountable. "Was depreciation run for March" has to be answerable without reading the ledger |
 | 14 | REQ-AST-02 gains the residue rule: the final period absorbs rounding so the schedule sums to exactly cost − salvage | Otherwise an asset that should be fully written down keeps a balance of a few piastres forever, and nothing ever clears it |
+| 15 | REQ-BDG-01 restated: the legacy budget is keyed on four **text account names** over free-form date ranges, with no uniqueness, no version and no approval | v2.0.0 called Module 8 "Migrated + Extended". The table migrates; nothing about how it is keyed, versioned or enforced does |
+| 16 | §4.6 added: **an encumbrance is not a ledger posting**. It reduces available budget and never touches `transaction_headers` | An approved purchase order has acquired no asset and incurred no liability. Posting it would put amounts in the trial balance that no accounting standard recognises |
+| 17 | REQ-PRC-02 gains the **three-step accrual chain** (receipt → invoice → payment) explicitly | The legacy `frmMakePayBill` collapsed all three into one document at payment time, so an expense incurred in March and paid in June was reported in June |
+| 18 | REQ-PRC-01 gains **dual authorisation enforced in the database**, not only in the SoD matrix | Invoice-redirection fraud needs no forged invoice — only an edit to one row — so the bank columns are refused to an ordinary UPDATE outright |
+| 19 | Module 16's note that the Ribat `frmRequestGetBill` is a procurement precursor is **withdrawn** | `RequestBill` is a request for a student fee bill and sits on the receipts side. There is no procurement precursor in either build |
 
 ---
 
@@ -388,11 +393,17 @@ graph LR
 
 ### Module 8: Institutional Budgeting & Financial Control
 - **REQ-BDG-01: Annual Fiscal Budget Preparation**
-  - Budgets by Fiscal Year × Level 4/5 Account × Cost Centre, with monthly/quarterly distributions.
-  - Budget versions (Original, Revised) with an approval workflow; posted budgets are immutable and revised by a new version.
+  - Budgets by Fiscal Year × Level 5 Account × Cost Centre, with monthly distributions, referenced **by account id** rather than by name.
+  - *(The legacy `AccBudget` keyed a line on four text account names — `Acc1`..`Acc4` — over a free-form date range unconnected to the fiscal calendar, with no uniqueness constraint. Two rows for the same account silently doubled the allocation, and renaming an account in the chart orphaned its budget with nothing able to detect it.)*
+  - Budget versions (Original, Revised) with an approval workflow; **exactly one version is APPROVED at a time**, and an approved version is immutable — it is the authority every availability check has already been measured against, so editing it in place would silently restate decisions already taken.
+  - Budgeting a heading account is refused: spending lands on the detail accounts beneath it, and a budget has to be comparable with what it controls.
 - **REQ-BDG-02: Real-Time Budgetary Control**
   - Available budget $= \text{Allocated} - \text{Encumbered} - \text{Actual}$.
-  - Requisitions and payment vouchers check availability. Per-account policy determines whether an overrun warns or hard-stops.
+  - Allocated is measured either against the whole year or cumulatively to the document's own period, per budget version. The second stops a department spending the year in January.
+  - Purchase-order approval checks availability **line by line**, not on the document total: lines hit different accounts and cost centres, and an order that fits in aggregate can still exhaust one department's allocation.
+  - Per-**line** policy determines whether an overrun is advisory, warns, or hard-stops. Per line rather than per system, because a hard stop on stationery and a hard stop on emergency roof repairs are not the same decision.
+  - An account no approved budget covers does not block; it is reported as unbudgeted. A budget covering only some accounts is the normal state in year one, and refusing everything it omits would make the control unusable exactly while it is being adopted.
+  - *(Nothing in the legacy system consulted `AccBudget` at any point. `frmBudget` printed budget beside actual in a Crystal report — something you looked at after you had overspent.)*
   - Budget transfers between lines follow an approval workflow and are logged.
 - **REQ-BDG-03: Budget vs. Actual Variance Reporting**
   - Comparison of Budgeted, Encumbered, Actual, Available, Variance and Utilisation %.
@@ -553,10 +564,14 @@ stateDiagram-v2
 
 ### Module 16: Procurement & Accounts Payable with Encumbrance *(new in v2.0.0)*
 
-*This module exists to give REQ-BDG-02 and REQ-BDG-03 a source of encumbrance data. The legacy Ribat build's `frmRequestGetBill` is a rudimentary precursor.*
+*This module exists to give REQ-BDG-02 and REQ-BDG-03 a source of encumbrance data.*
+
+*Every requirement below is **new work**. Neither legacy build has a vendor, a purchase order, a goods receipt, an invoice or a payable: `frmMakePayBill` posts a grid of expense lines straight against cash at payment time, with the payee typed into a free-text `Source` column. (v2.0.0 named the Ribat build's `frmRequestGetBill` as a rudimentary precursor. It is not one — `RequestBill` is a request for a **student** fee bill, on the receipts side.)*
 
 - **REQ-PRC-01: Vendor Master**
-  - Vendor details, tax registration, bank details, payment terms, category, and AP sub-ledger account. Bank-detail changes require dual authorisation (REQ-SOD-01).
+  - Vendor details, tax registration, bank details, payment terms, category, and AP sub-ledger account.
+  - **Bank details cannot be changed by an ordinary update at all.** They change only when a separate change request is approved by a second person, enforced by database trigger rather than by application code, and the approver may not be the requester. Redirecting a real vendor's payments to an attacker's account is the highest-value fraud in accounts payable and it requires no forged invoice — only an edit to one row.
+  - A vendor is created *without* bank details, so there is no moment at which one person has decided where the money goes.
 - **REQ-PRC-02: Procure-to-Pay Cycle**
 
 ```mermaid
@@ -571,12 +586,22 @@ graph LR
 
 - **REQ-PRC-03: Encumbrance Accounting**
   - Approving a PO reserves the committed amount against the budget line as an encumbrance. It reduces available budget without touching actual expenditure.
-  - Receipt converts the encumbrance to an accrued liability; invoicing and payment clear it.
+  - **An encumbrance is not a general-ledger posting** — see §4.6.
+  - Receipt releases the encumbrance by the value *received* and raises the accrual: a partial delivery releases a partial commitment, and the remainder stays reserved because the institution is still on the hook for it.
+  - Released never exceeds reserved, and a release is never taken back. Both enforced by constraint, because an order that gave back more authority than it took would make the budget grow by being spent.
+  - Every reservation, release and closure is recorded in an append-only log. `released_amount` is otherwise a number with no explanation.
   - Unliquidated encumbrances at year-end either lapse or carry forward per tenant policy.
 - **REQ-PRC-04: Three-Way Match**
-  - Invoice quantities and prices are matched against the PO and the receipt within configurable tolerances. Out-of-tolerance invoices are held for exception approval.
+  - Invoice quantities and prices are matched against the PO and the receipt within configurable tolerances — quantity against the order, quantity against receipts, and price against the order.
+  - The three documents must come from three different people (REQ-SOD-01). A match between documents written by the same hand proves nothing.
+  - Out-of-tolerance invoices are **held**, not rejected: most failures are a price change somebody authorised verbally and nobody wrote down. A held invoice **does not post** — the payable does not exist until a second person has taken responsibility for the difference, and their name and reason are recorded against it.
+  - A vendor's own invoice number is unique per vendor. Paying the same bill twice is the largest single recurring loss in accounts payable, and it is nearly always a duplicate entry rather than a fraud.
+  - Invoices with no purchase order (utilities, subscriptions) recognise their expense directly rather than clearing an accrual that was never raised.
 - **REQ-PRC-05: AP Aging & Payment Run**
-  - Vendor aging by due date, and a payment proposal run selecting due invoices for batch payment voucher creation.
+  - Vendor aging by **due date**, not invoice date: an invoice on 60-day terms raised sixty-one days ago is one day late, not two months late.
+  - A payment proposal run selects due invoices; a person decides. An automatic run that also pays is a single point at which one compromised account empties a bank balance.
+  - A payment voucher settles **named invoices**, never a vendor balance. Paying "the vendor" and letting the system choose is how a disputed invoice gets quietly settled.
+  - Preparation and approval are different people, and approval is what posts — a voucher approved but unposted would be a decision to pay with no payment. Allocations are re-validated at approval, because another payment may have settled the same invoice since the draft.
 
 ---
 
@@ -756,6 +781,19 @@ These are constraints, not application conventions. Each exists because the lega
 | A cheque matches the receipt that took it | Trigger comparing amount, payer and channel. Otherwise the ledger holds one figure in cheques-receivable and the portfolio holds another |
 | Cheque history is append-only | Trigger on `cheque_events` |
 | A receipt is cancelled or dishonoured, never both | `CHECK`. They are two different accounts of where the money went and only one can be true |
+| Exactly one budget version is in force per fiscal year | Partial `UNIQUE` index on approved versions |
+| An approved budget is never edited | Trigger. It is the authority every availability check has been measured against |
+| One budget line per account × cost centre | `UNIQUE ... NULLS NOT DISTINCT`, so "no cost centre" is not a licence to enter it twice |
+| Encumbrance released never exceeds reserved, and is never reduced | `CHECK` + trigger. Otherwise a budget grows by being spent |
+| Encumbrance history is append-only | Trigger on `encumbrance_movements` |
+| Vendor bank details change only through an approved request | Trigger on `vendors`, which looks for a matching APPROVED change row |
+| A bank-detail change is not approved by its requester | Trigger on `vendor_bank_changes` |
+| An approved purchase order's lines are fixed | Trigger. Only received and invoiced quantities may move |
+| Nothing is received or invoiced beyond what was ordered | `CHECK` on the cumulative quantities |
+| A posted goods receipt is never edited or deleted | Trigger. Correction is by reversal, as with any posting |
+| A held invoice has a reason and has not posted | `CHECK` pairing state with `posted_header_id` |
+| A vendor's invoice number is unique per vendor | `UNIQUE (tenant, vendor, vendor_invoice_no)` |
+| A paid payment voucher is final | Trigger |
 | An asset's cost and depreciation basis are fixed once capitalised | Trigger. Every charge already taken depends on them; correction is by disposal and re-capitalisation |
 | A posted depreciation charge is never deleted or moved | Trigger on `depreciation_entries`. A disposal cancels the *unposted* remainder only |
 | Asset custody history is append-only | Trigger on `asset_movements` |
@@ -804,6 +842,31 @@ Every such batch runs through a shared runner and leaves a durable record:
 *(The legacy depreciation batch had none of this. A second click posted the
 whole run again, against voucher numbers taken from an unfiltered
 `MAX(MoveNo)`, and nothing anywhere recorded that a run had happened.)*
+
+### 4.6 Commitments Are Not Postings
+
+An **encumbrance** — the amount an approved purchase order commits against a
+budget line — lives in its own ledger and never touches
+`transaction_headers`.
+
+The reasoning is worth stating because the opposite is a common design. An
+approved purchase order has acquired no asset and incurred no liability;
+nothing has happened that double-entry bookkeeping describes. Posting it
+would put amounts in the trial balance that no accounting standard
+recognises, and every financial statement would then need a rule for taking
+them out again — a rule that will eventually be applied inconsistently.
+
+A commitment reduces **available budget** and nothing else:
+
+$$\text{Available} = \text{Allocated} - \text{Encumbered} - \text{Actual}$$
+
+Public-sector systems that maintain a parallel *budgetary* ledger alongside
+the financial one are doing something defensible. That is a second ledger
+with its own rules, not a set of extra rows in the first one, and it is not
+what this system has.
+
+The expense enters the general ledger at **receipt**, which is when it is
+incurred — not at payment, which is when it is settled.
 
 ---
 
@@ -875,8 +938,9 @@ Specified at summary level so the decision to defer them is explicit and revisit
 | **Ancillary billing** | Hostel allocation, transport route subscription, library fines — all flowing into student AR | Revenue currently tracked outside the system, if at all |
 | **Reporting & BI** | Cash flow statement, statement of changes in equity, comparative periods; enrolment funnel analytics; collection forecasting; at-risk student early warning; regulator statistical returns | Statutory statements beyond the three the SRS covers, plus the management reporting that justifies the platform |
 | **Platform** | SaaS subscription billing and seat/feature metering; SSO (Google / Microsoft / SAML); public API and webhooks; alumni certificate verification portal | The platform is sold as a product but currently has no mechanism to bill for itself |
-| **Deeper finance** | Multi-currency period-end revaluation beyond REQ-FIN-03; declining-balance and units-of-production depreciation; asset componentisation; QR-based physical asset count | Needed as tenants grow beyond a single currency and a simple asset register |
+| **Deeper finance** | Multi-currency period-end revaluation beyond REQ-FIN-03; units-of-production depreciation; asset componentisation; QR-based physical asset count | Needed as tenants grow beyond a single currency and a simple asset register |
+| **Deeper procurement** | Budget transfers between lines; vendor prepayments and retention; contract and framework agreements | The version mechanism in REQ-BDG-01 already covers revision, so a transfer is a convenience on top of it rather than a missing capability |
 
 ---
 
-*(End of SRS Document — Version 2.0.0)*
+*(End of SRS Document — Version 2.5.0)*

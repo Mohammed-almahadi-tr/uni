@@ -1,6 +1,6 @@
 # Implementation Plan: UniFlow Multi-Tenant University ERP & White-Label Web Platform
 
-**Version:** 2.4.0 · **Supersedes:** 1.0.0 - 2.3.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.4.0
+**Version:** 2.5.0 · **Supersedes:** 1.0.0 - 2.4.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.5.0
 
 Transformation of the legacy VB.NET / MS SQL desktop university system (Oasis E-University at Nile College; the Ribat University Application at Ribat and UOT) into a multi-tenant web application: student registration and lifecycle management, a double-entry university finance engine, and a white-label landing page per university client, built with **Next.js**, **shadcn UI** and **PostgreSQL**.
 
@@ -33,12 +33,13 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**395 tests pass across 14 suites; typecheck, lint and production build are all
+**450 tests pass across 16 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
-**Track A1-A5 are also complete**: chart of accounts, journal vouchers and
+**Track A1-A6 are also complete**: chart of accounts, journal vouchers and
 maker-checker, fee catalog / student AR / cashiering, the cheque clearing
-pipeline, and fixed assets with the durable job runner — see §0.2.
+pipeline, fixed assets with the durable job runner, and budget /
+encumbrance / procure-to-pay — see §0.2.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -252,8 +253,8 @@ Worth watching for elsewhere: the only symptom is a `DeprecationWarning` from
 | Deferred | Reason |
 | :--- | :--- |
 | Payment-gateway provider adapters (REQ-CSH-05) | The interface is meaningless without a webhook route and a settlement-reconciliation job. `GATEWAY` receipts post to the bank account today and carry their provider reference |
-| Automatic late fees (REQ-CSH-02) | Needs the durable job runner, which A5 (depreciation) and A6 (dunning) also need. The `LATE_FEE` catalog item and the overdue query are in place; only the schedule that raises it is missing |
-| Refund disbursement (REQ-FEE-03) | Follows the payment-voucher workflow, which is A6. The withdrawal refund *policy* is a Track B lifecycle concern |
+| Automatic late fees (REQ-CSH-02) | The durable job runner it needed now exists (A5). The `LATE_FEE` catalog item and the overdue query are in place; only the schedule that raises it is missing |
+| Refund disbursement (REQ-FEE-03) | The payment-voucher workflow it follows now exists (A6); a refund is a payment voucher against a student rather than a vendor. The withdrawal refund *policy* is a Track B lifecycle concern |
 
 ---
 
@@ -404,6 +405,209 @@ fixed number of round trips rather than a fan-out — the better shape anyway.
 **Deferred:** componentisation, revaluation and QR-based physical count, all
 listed under "recommended, not scheduled" in SRS §7. The register carries a
 `barcode` field so a count app has something to scan when that lands.
+
+---
+
+### A6 — Budget, Encumbrance & Procurement/AP · complete
+
+Two modules that only make sense together, and the reason REQ-BDG-02 and
+REQ-BDG-03 existed with no source of data behind them.
+
+#### What the legacy budget actually was
+
+A budget line was one row:
+
+```vb
+cmd.CommandText = "Insert Into AccBudget (PeriodFrom,PeriodTo,Acc1,Acc2,Acc3,Acc4," & _
+                  "Amount,UserName) Values (@PeriodFrom,@PeriodTo,@Acc1,@Acc2,@Acc3,@Acc4," & _
+                  "@Amount,@UserName)"
+cmd.Parameters.AddWithValue("@PeriodFrom", Me.DTPFrom.Value.ToShortDateString & " 10:10:10")
+```
+([frmBudget.vb:120-165](Nile College E-University System/Oasis - E-University/Financial System/Forms/frmBudget.vb#L120-L165))
+
+Four *text* account names, a free-form date range with no relationship to the
+fiscal calendar, and a literal `" 10:10:10"` stamped onto the boundary so the
+row would sort inside the report's `"00:00:01".."23:59:59"` window. No
+uniqueness, so two rows for the same account silently doubled the allocation.
+No version and no approval: revision meant `Set Valid=0` and inserting
+another, and "what did the board approve in October" was unanswerable.
+Renaming an account in the chart orphaned its budget, silently, because the
+join was on the name.
+
+And it was advisory in the strongest possible sense: **nothing anywhere
+consulted it.** `frmBudget`'s report button ran `dbo.GetAccBudget` beside
+`dbo.GetAccAmount` and printed the two columns. It was a report you looked at
+*after* you had overspent.
+
+#### What the legacy procurement was
+
+Nothing. There is no vendor table, no purchase order, no goods receipt, no
+invoice and no payable anywhere in either build — grepping both trees for
+vendor, supplier, purchase, requisition, encumbrance, مورد, توريد and مشتريات
+returns no source file. (SRS v2.0.0 named the Ribat build's `frmRequestGetBill`
+as a rudimentary precursor. It is not: `RequestBill` is a request for a
+**student** fee bill and sits on the receipts side. Corrected in SRS §0.0.) `frmMakePayBill` posts a grid of expense lines against
+cash in a single document at payment time, with the payee's name typed into a
+free-text `Source` column and the voucher number taken from
+`Max(MoveNo)` ([frmMakePayBill.vb:337](Nile College E-University System/Oasis - E-University/Financial System/Forms/frmMakePayBill.vb#L337)).
+
+The consequence is an accounting one rather than a convenience one: goods
+received in March and paid for in June were reported as a June expense, and
+between those two dates there was no record anywhere that the institution owed
+anything. A quarterly income statement was wrong by everything delivered and
+not yet paid for.
+
+#### Budget
+
+| Delivered | Notes |
+| :--- | :--- |
+| Budget **versions** with approval (REQ-BDG-01) | Version 1 is the original; a revision is version 2 and version 1 stays readable beside it. Exactly one APPROVED version per fiscal year, enforced by a partial unique index |
+| Lines by account **id** × cost centre | Unique with `NULLS NOT DISTINCT`, so "no cost centre" is not a licence to enter the same allocation twice |
+| Monthly phasing, always written | Variance reporting wants to know what was *planned* for March even when availability is checked against the year. Unphased lines spread through `allocate()`, so the distribution sums to the allocation exactly |
+| Two control bases | `ANNUAL`, and `CUMULATIVE_TO_PERIOD` for institutions that phase — under which a department cannot spend December's money in January |
+| Per-line overrun policy (REQ-BDG-02) | `BLOCK`, `WARN`, `ADVISORY`. Per line, because a hard stop on stationery and a hard stop on emergency roof repairs are not the same decision, and a system that cannot express the difference gets its control switched off wholesale |
+| Variance report (REQ-BDG-03) | Allocated · Encumbered · Actual · Available · Variance · Utilisation % |
+| Approved budgets are immutable | Trigger. Editing one silently restates every availability check already made against it |
+
+An account **no approved budget covers does not block**. A budget covering only
+some accounts is the normal state in year one, and refusing everything it does
+not mention would make the control unusable exactly when it is being adopted.
+It is reported as `budgeted: false` instead.
+
+#### Encumbrance (REQ-PRC-03)
+
+The design decision worth recording: **an encumbrance is not a general-ledger
+posting.** An approved purchase order has acquired no asset and incurred no
+liability. Committing it to the ledger would put amounts in the trial balance
+that no accounting standard recognises, and every statement would then need a
+rule for taking them out again. It reduces *available budget* and nothing else,
+and lives in its own table with an append-only movement log. (Public-sector
+systems that keep a parallel budgetary ledger are doing something defensible;
+it is just not something that mixes with a single ledger carrying a
+balanced-posting invariant.)
+
+Reserved at PO approval, released as goods arrive — the value *received*, so a
+partial delivery releases a partial commitment and the rest stays reserved
+because the institution is still on the hook for it. Closed out as `CANCEL`,
+`LAPSE` or `CARRY_FORWARD`, which are three separate actions because "we
+changed our mind", "the year ended" and "it is still coming" are three
+different answers to an auditor asking where 400,000 of spending authority
+went.
+
+#### Procure-to-pay
+
+Requisition → PO → GRN → invoice → three-way match → payment voucher, with the
+accrual chain split into the three steps the legacy system collapsed into one:
+
+```
+receipt   DR Expense / Asset          CR Goods Received Not Invoiced
+invoice   DR Goods Received Not Inv.  CR Vendor AP
+payment   DR Vendor AP                CR Cash / Bank
+```
+
+so the expense keeps the date it was incurred, the payable appears on the day
+the bill does, and at every point in between the institution can state what it
+owes. A new account role, `GRNI_ACCRUAL` (template code 21231), holds the
+middle.
+
+| Delivered | Notes |
+| :--- | :--- |
+| Vendor master (REQ-PRC-01) | Bank details are **dual-authorised**, enforced by trigger — see below |
+| Requisitions | No accounting effect at all, which is why they are a separate document: the financial controls start at the order, and the requisition is the record of the decision that led to one |
+| Purchase orders | Approval checks the budget **line by line**, not on the order total — lines hit different accounts and an order that fits in aggregate can still exhaust one department's allocation |
+| Goods receipts | Idempotency key **required**, not optional. The stores officer is on a phone at a loading bay, and a second tap would otherwise accrue the delivery twice and release the encumbrance twice with it |
+| Three-way match (REQ-PRC-04) | Quantity against the order, quantity against receipts, price against the order, within a per-line tolerance of 2% or 10, whichever is larger |
+| Exception approval | A failed match **holds** the invoice rather than rejecting it, because most failures are a price change somebody authorised verbally and nobody wrote down. A held invoice does not post — the payable does not exist until a second person has taken responsibility for the difference, and their name is on it |
+| Duplicate-invoice guard | `UNIQUE (tenant, vendor, vendor_invoice_no)`. Paying the same bill twice is the largest single recurring loss in accounts payable, and it is nearly always a duplicate entry rather than a fraud |
+| Non-PO invoices | A utility bill has no order and no delivery note, so it recognises its expense directly rather than clearing an accrual that never existed |
+| Payment vouchers (REQ-PRC-05) | Two people; approval is what posts, because a voucher approved but unposted would be a decision to pay with no payment. Allocations are **re-validated at approval** — another payment may have settled the same invoice since the draft, and an approver signing an amount that no longer matches what is owed is exactly what a second signature is for |
+| AP aging and payment proposal | Aged by **due date**, not invoice date: an invoice on 60-day terms raised sixty-one days ago is one day late, not two months late. The proposal selects; a person decides |
+| Year-end encumbrance settlement | Lapse or carry forward, per tenant policy, stated at the call site rather than assumed |
+| 55 tests | Across two suites |
+
+#### The bank-detail control
+
+Redirecting a real vendor's payments to an attacker's account is the
+highest-value fraud in accounts payable, and it needs no forged invoice and no
+accomplice — only an edit to one row, after which every legitimate invoice
+pays the attacker. So the bank columns **cannot be changed by an UPDATE at
+all**: a trigger refuses unless an APPROVED `vendor_bank_changes` row exists
+proposing exactly those values, and separately refuses an approval by the
+requester. `vendor.manage` and `vendor.approve` are a new SoD pair, both
+demand a second factor, and `vendor.manage` already conflicted with
+`payment.create`.
+
+Vendors are also created *without* bank details, so there is no moment at which
+one person has decided where the money goes.
+
+#### Four new permissions, six new SoD pairs
+
+`payment.approve`, `vendor.approve`, `apinvoice.record`, `apinvoice.approve`.
+
+`payment.create` **lost** its MFA requirement and `payment.approve` gained one:
+drafting a payment moves nothing, and demanding a second factor for an action
+with no consequence trains people to reach for their phone without reading the
+screen.
+
+The new conflicts keep the three sides of the match in different hands —
+ordering, confirming delivery, and billing — because a match between documents
+written by the same hand proves nothing. A ninth default role, **Stores
+Officer**, holds `grn.create` and nothing else for that reason.
+
+#### The central check
+
+**The vendor sub-ledger equals the Vendor AP control account**, to the cent,
+after a scripted run: three orders across two vendors, one delivered short and
+closed, one fully delivered and paid, one delivered and left unpaid, plus a
+non-PO utility bill part-paid by cheque. Zero variance. Impossible against the
+legacy design for the same reason the student one was — there was neither a
+vendor sub-ledger nor a payable, so there were not two numbers to compare.
+
+A second check on the clearing account: **the GRNI balance equals what has
+arrived and not been billed.** A clearing account exists so that a discrepancy
+is visible rather than absorbed, and the test asserts that it is.
+
+And a third, on the encumbrance ledger: `released_amount` equals the sum of its
+own RELEASE movements. A number maintained by increments and an append-only log
+of those increments should agree; when they do not, one of the two write paths
+has a bug.
+
+#### Two defects found in my own work
+
+**A CHECK constraint that erased the evidence it existed to protect.**
+`chk_po_approval_complete` required `approved_by_id IS NULL` in the CANCELLED
+state — right for an order abandoned as a draft, wrong for one cancelled after
+approval, which is the case that matters because that is the order holding an
+encumbrance. Satisfying it would have meant erasing the record of who
+committed the money. Corrected in a follow-up migration rather than by
+rewriting the applied one.
+
+**A test that read another tenant's voucher.** `asSystem` connects as the owner
+role and bypasses RLS. Voucher references are unique *per tenant*, so every
+university in the suite has its own `VIV-2026-000001`, and a lookup by
+reference alone silently matched a different test's voucher. It surfaced as a
+non-PO invoice appearing to debit the accrual account; the code was right and
+the assertion was reading somebody else's ledger. Every raw lookup in that file
+now carries the tenant, with a note saying why.
+
+#### The Prisma boundary, corrected
+
+A5 recorded the rule as "two sibling relations are fine, three are not". That
+was too narrow. This track hit the same `pg` deprecation warning from a query
+with only *two* top-level relations — because their nested loads brought the
+total to five. Bisecting located it exactly.
+
+The rule as it actually is: **a query may carry at most two relation loads in
+total, counting nested ones.** Prisma 7's query interpreter runs them
+concurrently on the transaction's single connection; `pg` answers with a
+deprecation warning today and will refuse outright at pg 9. Three queries were
+flattened — a fixed number of round trips instead of a fan-out, which is the
+better shape regardless.
+
+**Deferred:** budget transfers between lines (REQ-BDG-02's third bullet — the
+version mechanism covers revision, and a transfer is a convenience on top of
+it), and vendor prepayments and retention. Both are listed under "recommended,
+not scheduled".
 
 ---
 
@@ -635,7 +839,7 @@ Even though Phases 7-8 are out of v1 scope, the Phase 0 schema must not preclude
 
 **A5 · Fixed Assets & Depreciation** — Registry with the GL account triple per category. A persisted depreciation schedule generated at capitalisation, with first- and final-period proration. The period-end batch is keyed on (tenant, period), rejects closed periods, and is a reporting no-op on repeat invocation. Disposal and write-off with gain/loss on NBV.
 
-**A6 · Budget, Encumbrance & Procurement/AP** — Budget versions with approval; available = allocated − encumbered − actual. Vendor master with dual-authorised bank details. Requisition → PO → GRN → invoice → three-way match → payment voucher. PO approval creates the encumbrance; receipt converts it to accrual; payment clears it. AP aging and payment proposal runs. Year-end encumbrance lapse or carry-forward.
+**A6 · Budget, Encumbrance & Procurement/AP** *(built — see §0.2)* — Budget versions with approval; available = allocated − encumbered − actual, checked at order approval rather than reported afterwards. Vendor master whose bank details a single person cannot change. Requisition → PO → GRN → invoice → three-way match → payment voucher. PO approval creates the encumbrance; receipt releases it and raises the accrual; the invoice moves the accrual to a payable; payment clears it. AP aging by due date and payment proposal runs. Year-end encumbrance lapse or carry-forward.
 
 **A7 · Financial Statements & Reports** — Trial Balance (opening / movement / closing, sourced from `account_period_balances`), Balance Sheet L1-L4, Income Statement with comparatives and cost-centre filtering, Student Statement of Account, Receivables Aging from **instalment due date**, and the Sub-Ledger Reconciliation report that makes control-account divergence visible. Excel, CSV and bilingual PDF export.
 
@@ -787,8 +991,8 @@ Deferred by decision, listed so the choice stays visible and revisitable. Full d
 - **Ancillary billing** — hostel, transport and library fines flowing into student AR.
 - **Reporting & BI** — cash flow statement, statement of changes in equity; enrolment funnel; collection forecasting; at-risk early warning; regulator statistical returns.
 - **Platform** — SaaS subscription billing and seat/feature metering; SSO; public API and webhooks; alumni verification portal.
-- **Deeper finance** — period-end FX revaluation beyond REQ-FIN-03; declining-balance and units-of-production depreciation; asset componentisation; QR-based physical count.
+- **Deeper finance** — period-end FX revaluation beyond REQ-FIN-03; units-of-production depreciation; asset componentisation; QR-based physical count; budget transfers between lines; vendor prepayments and retention.
 
 ---
 
-*(End of Implementation Plan — Version 2.0.0)*
+*(End of Implementation Plan — Version 2.5.0)*
