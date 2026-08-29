@@ -6,7 +6,7 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete · Track A complete (A1-A7) · Track B started (B1).** Ledger invariants,
+**Status: Phase 0 complete · Track A complete (A1-A7) · Track B under way (B1-B2).** Ledger invariants,
 platform spine, auth/RBAC with segregation of duties, the bilingual RTL shell,
 a normalised chart of accounts, a four-state maker-checker workflow whose
 drafts are never deleted, and a working cashier desk: fee catalog, student
@@ -16,8 +16,9 @@ a fixed-asset register with an idempotent depreciation batch, budgetary control
 with a full procure-to-pay chain, and the financial statements that make all of
 it legible — trial balance, balance sheet, income statement, sub-ledger
 reconciliation, and their CSV, Excel and print exports — plus the first of
-Track B: the academic structure and an effective-dated, versioned fee matrix.
-**531 tests across 18 suites; typecheck, lint and production build clean.**
+Track B: the academic structure, an effective-dated versioned fee matrix, and
+admissions with real seat capacity. **588 tests across 19 suites; typecheck,
+lint and production build clean.**
 
 The finance engine is done. **There is no user interface yet** — one demo route
 proving the localisation layer works end to end, and nothing else. Tracks B
@@ -33,7 +34,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 531 tests
+npm test              # 588 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -301,6 +302,41 @@ unless a second person has approved a change request naming exactly those
 values. Redirecting a real supplier's payments needs no forged invoice, only an
 edit to one row.
 
+**B2 — Admissions, capacity and the committee.** The legacy seat-quota screen
+saved with `Delete From StudentsVacants Where College=N'..'` and then inserted a
+row naming the college *and* the batch — so setting one batch's quota deleted
+every other batch's for that college. The same bug as the fee matrix, in a
+second screen, which makes it a habit rather than an accident.
+
+The deeper problem was that nothing consulted the quota when a place was given.
+The report rebuilt two SQL views at runtime with `ALTER VIEW` and counted
+students who had **paid**, from receipt vouchers. Seats taken meant money
+received, so over-admission surfaced when the cash arrived. (Two side effects of
+that `ALTER VIEW`: the client needed DDL rights on the live database, and two
+people running the report at once overwrote each other's view — the second
+user's academic year decided what the first one saw.)
+
+Capacity is now checked **when a place is offered**, under a row lock on the
+quota, and the counters are counted from the offers rather than stored. An
+unanswered offer holds its seat, because treating it as free is how a programme
+discovers it is over-subscribed on deadline day. Exceeding the quota needs a
+separate MFA-gated permission, a stated reason and a second person — all three
+enforced by constraint.
+
+Around that: eligibility screening that normalises a score against its own
+certificate scale before comparing (38 out of the IB's 45 is 84.4%, not 38),
+committee scoring and ranked lists, offers with deadlines and a lapse batch,
+waitlist promotion that records which seat it came from, duplicate detection
+across both applications and enrolled students, and a bulk intake import that
+previews before it writes.
+
+One control emerged from the build. The database said an application in state
+OFFERED must carry a committee decision; the offer code did not require one, and
+eighteen tests failed on the contradiction. The constraint was right — so
+allocating a seat now demands a recorded verdict with its rationale. Deciding
+and admitting are separate acts, and collapsing them is how the old system
+over-admitted.
+
 **B1 — Academic structure and the fee matrix.** The worst defect the legacy
 audit has found is four lines apart in one file. The fee grid was loaded
 `where Batch=.. and Colleges=.. and Type=..` and saved with
@@ -432,10 +468,12 @@ operator screens — cashier desk, voucher grid, approvals queue, chart of
 accounts, budget, purchase orders, assets, and the statements this track just
 finished. Designs exist; the wiring does not.
 
-**Track B — student.** B1 is done. Next is admissions with seat capacity, the
-student profile, then **B4, the registration engine** — where a registration
-row and its balanced ledger entry are created in one transaction or neither is.
-That is the convergence milestone, and B1 built the thing it bills against.
+**Track B — student.** B1 and B2 are done: a cohort can be priced, and a place
+can be offered without over-admitting. Next is **B3, the student profile**, then
+**B4, the registration engine** — where a registration row and its balanced
+ledger entry are created in one transaction or neither is. That is the
+convergence milestone with Track A, and B1 built the fee schedule it bills
+against while B2 built the path a student arrives by.
 
 **Track C — public surface.** Theme engine and landing CMS, the public
 admissions portal, and student/guardian self-service.

@@ -148,6 +148,7 @@ async function applicant(
   });
 }
 
+
 // ---------------------------------------------------------------------------
 // Seat quotas
 // ---------------------------------------------------------------------------
@@ -224,6 +225,7 @@ describe('seat quotas', () => {
     for (const n of [1, 2]) {
       const app = await applicant(registrar, u, { nationalId: `Q-${n}` });
       await submitApplication(registrar, app.id);
+      await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
       await issueOffer(registrar, {
         applicationId: app.id,
         programmeId: u.programmeIds.MBBS,
@@ -304,6 +306,7 @@ describe('capacity enforcement', () => {
 
     const first = await applicant(registrar, u, { nationalId: 'C-1' });
     await submitApplication(registrar, first.id);
+    await decideApplication(registrar, first.id, 'ACCEPT', 'Meets the published entry requirements.');
     await issueOffer(registrar, {
       applicationId: first.id,
       programmeId: u.programmeIds.MBBS,
@@ -312,6 +315,7 @@ describe('capacity enforcement', () => {
 
     const second = await applicant(registrar, u, { nationalId: 'C-2' });
     await submitApplication(registrar, second.id);
+    await decideApplication(registrar, second.id, 'ACCEPT', 'Meets the published entry requirements.');
 
     await expect(
       issueOffer(registrar, {
@@ -333,6 +337,7 @@ describe('capacity enforcement', () => {
 
     const app = await applicant(registrar, u, { nationalId: 'H-1' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -362,6 +367,7 @@ describe('capacity enforcement', () => {
 
     const first = await applicant(registrar, u, { nationalId: 'R-1' });
     await submitApplication(registrar, first.id);
+    await decideApplication(registrar, first.id, 'ACCEPT', 'Meets the published entry requirements.');
     await issueOffer(registrar, {
       applicationId: first.id,
       programmeId: u.programmeIds.MBBS,
@@ -370,6 +376,7 @@ describe('capacity enforcement', () => {
 
     const second = await applicant(registrar, u, { nationalId: 'R-2' });
     await submitApplication(registrar, second.id);
+    await decideApplication(registrar, second.id, 'ACCEPT', 'Meets the published entry requirements.');
     await expect(
       issueOffer(registrar, {
         applicationId: second.id,
@@ -392,6 +399,7 @@ describe('capacity enforcement', () => {
 
     const first = await applicant(registrar, u, { nationalId: 'O-1' });
     await submitApplication(registrar, first.id);
+    await decideApplication(registrar, first.id, 'ACCEPT', 'Meets the published entry requirements.');
     await issueOffer(registrar, {
       applicationId: first.id,
       programmeId: u.programmeIds.MBBS,
@@ -400,6 +408,7 @@ describe('capacity enforcement', () => {
 
     const second = await applicant(registrar, u, { nationalId: 'O-2' });
     await submitApplication(registrar, second.id);
+    await decideApplication(registrar, second.id, 'ACCEPT', 'Meets the published entry requirements.');
 
     // The registrar cannot authorise their own exception.
     await expect(
@@ -446,6 +455,7 @@ describe('capacity enforcement', () => {
     });
     const app = await applicant(registrar, u, { nationalId: 'ORX-1' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
 
     await expect(
       issueOffer(overrider, {
@@ -488,6 +498,7 @@ describe('capacity enforcement', () => {
 
     const first = await applicant(registrar, u, { nationalId: 'NO-1' });
     await submitApplication(registrar, first.id);
+    await decideApplication(registrar, first.id, 'ACCEPT', 'Meets the published entry requirements.');
     await issueOffer(registrar, {
       applicationId: first.id,
       programmeId: u.programmeIds.MBBS,
@@ -496,6 +507,7 @@ describe('capacity enforcement', () => {
 
     const second = await applicant(registrar, u, { nationalId: 'NO-2' });
     await submitApplication(registrar, second.id);
+    await decideApplication(registrar, second.id, 'ACCEPT', 'Meets the published entry requirements.');
     await expect(
       issueOffer(overrider, {
         applicationId: second.id,
@@ -510,6 +522,7 @@ describe('capacity enforcement', () => {
     const { uni: u, registrar } = await fresh();
     const app = await applicant(registrar, u, { nationalId: 'NQ-1' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
 
     await expect(
       issueOffer(registrar, {
@@ -533,6 +546,7 @@ describe('capacity enforcement', () => {
       choices: [u.programmeIds.MBBS],
     });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
 
     await expect(
       issueOffer(registrar, {
@@ -559,6 +573,7 @@ describe('capacity enforcement', () => {
       choices: [u.programmeIds.MBBS, u.programmeIds.NURS],
     });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -799,6 +814,7 @@ describe('duplicate detection', () => {
 
     const app = await applicant(registrar, u, { nationalId: '20015555' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     const offer = await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -1002,6 +1018,7 @@ describe('offers, lapse and waitlist', () => {
 
     const app = await applicant(registrar, u, { nationalId: 'LP-1' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     const offer = await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -1035,7 +1052,10 @@ describe('offers, lapse and waitlist', () => {
 
     const holder = await applicant(registrar, u, { nationalId: 'PR-1', score: '70' });
     const waiting = await applicant(registrar, u, { nationalId: 'PR-2', score: '88' });
-    for (const app of [holder, waiting]) await submitApplication(registrar, app.id);
+    for (const app of [holder, waiting]) {
+      await submitApplication(registrar, app.id);
+      await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
+    }
 
     const first = await issueOffer(registrar, {
       applicationId: holder.id,
@@ -1071,7 +1091,10 @@ describe('offers, lapse and waitlist', () => {
     const { uni: u, registrar } = await withQuota(2);
     const holder = await applicant(registrar, u, { nationalId: 'PH-1' });
     const waiting = await applicant(registrar, u, { nationalId: 'PH-2' });
-    for (const app of [holder, waiting]) await submitApplication(registrar, app.id);
+    for (const app of [holder, waiting]) {
+      await submitApplication(registrar, app.id);
+      await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
+    }
 
     const live = await issueOffer(registrar, {
       applicationId: holder.id,
@@ -1095,6 +1118,7 @@ describe('offers, lapse and waitlist', () => {
 
     const first = await applicant(registrar, u, { nationalId: 'DC-1' });
     await submitApplication(registrar, first.id);
+    await decideApplication(registrar, first.id, 'ACCEPT', 'Meets the published entry requirements.');
     const offer = await issueOffer(registrar, {
       applicationId: first.id,
       programmeId: u.programmeIds.MBBS,
@@ -1104,6 +1128,7 @@ describe('offers, lapse and waitlist', () => {
 
     const second = await applicant(registrar, u, { nationalId: 'DC-2' });
     await submitApplication(registrar, second.id);
+    await decideApplication(registrar, second.id, 'ACCEPT', 'Meets the published entry requirements.');
     const replacement = await issueOffer(registrar, {
       applicationId: second.id,
       programmeId: u.programmeIds.MBBS,
@@ -1120,6 +1145,7 @@ describe('offers, lapse and waitlist', () => {
     const { uni: u, registrar } = await withQuota(1);
     const app = await applicant(registrar, u, { nationalId: 'RO-1' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     const offer = await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -1142,6 +1168,7 @@ describe('offers, lapse and waitlist', () => {
     const { uni: u, registrar } = await withQuota(1);
     const app = await applicant(registrar, u, { nationalId: 'DP-1' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     const offer = await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -1158,6 +1185,7 @@ describe('offers, lapse and waitlist', () => {
     const { uni: u, registrar } = await withQuota(1);
     const app = await applicant(registrar, u, { nationalId: 'DP-2' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     const offer = await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -1196,6 +1224,7 @@ describe('enrolment', () => {
       nationality: 'SD',
     });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     const offer = await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -1261,6 +1290,7 @@ describe('enrolment', () => {
     });
     const app = await applicant(registrar, u, { nationalId: 'EN-2' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     const offer = await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -1282,6 +1312,7 @@ describe('enrolment', () => {
     });
     const app = await applicant(registrar, u, { nationalId: 'EN-3' });
     await submitApplication(registrar, app.id);
+    await decideApplication(registrar, app.id, 'ACCEPT', 'Meets the published entry requirements.');
     const offer = await issueOffer(registrar, {
       applicationId: app.id,
       programmeId: u.programmeIds.MBBS,
@@ -1310,7 +1341,10 @@ describe('enrolment', () => {
 // ---------------------------------------------------------------------------
 
 describe('bulk intake import', () => {
-  function roster(u: University): IntakeRow[] {
+  // No tenant ids anywhere: a roster names programmes, categories, certificates
+  // and nationalities by CODE, which is what makes a file from a ministry or a
+  // registrar's spreadsheet usable without anyone looking up a uuid.
+  function roster(): IntakeRow[] {
     return [
       {
         fullNameAr: 'سارة عبد الله',
@@ -1341,7 +1375,7 @@ describe('bulk intake import', () => {
 
   it('previews without writing anything', async () => {
     const { uni: u, registrar } = await fresh();
-    const preview = await previewIntake(registrar, u.batchId, roster(u));
+    const preview = await previewIntake(registrar, u.batchId, roster());
 
     expect(preview.totalRows).toBe(2);
     expect(preview.importable).toBe(2);
@@ -1356,7 +1390,7 @@ describe('bulk intake import', () => {
   it('reports every bad row rather than silently dropping it', async () => {
     const { uni: u, registrar } = await fresh();
     const rows: IntakeRow[] = [
-      ...roster(u),
+      ...roster(),
       { fullNameEn: 'No Arabic Name', admissionCategoryCode: 'GENERAL', programmeCodes: 'MBBS' },
       {
         fullNameAr: 'اسم',
@@ -1404,7 +1438,7 @@ describe('bulk intake import', () => {
 
   it('catches the same national ID twice within one file', async () => {
     const { uni: u, registrar } = await fresh();
-    const rows = roster(u);
+    const rows = roster();
     rows[1].nationalId = rows[0].nationalId;
 
     const preview = await previewIntake(registrar, u.batchId, rows);
@@ -1413,7 +1447,7 @@ describe('bulk intake import', () => {
 
   it('commits every valid row in one transaction', async () => {
     const { uni: u, registrar } = await fresh();
-    const result = await commitIntake(registrar, u.batchId, roster(u));
+    const result = await commitIntake(registrar, u.batchId, roster());
 
     expect(result.imported).toBe(2);
     expect(result.applicationNos).toHaveLength(2);
@@ -1434,9 +1468,9 @@ describe('bulk intake import', () => {
 
   it('skips rows that duplicate an existing applicant', async () => {
     const { uni: u, registrar } = await fresh();
-    await commitIntake(registrar, u.batchId, roster(u));
+    await commitIntake(registrar, u.batchId, roster());
 
-    const again = await commitIntake(registrar, u.batchId, roster(u));
+    const again = await commitIntake(registrar, u.batchId, roster());
     expect(again.imported).toBe(0);
     expect(again.skipped).toBe(2);
   });

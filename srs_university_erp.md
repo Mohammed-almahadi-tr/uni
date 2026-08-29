@@ -1,14 +1,14 @@
 # Software Requirements Specification (SRS)
 ## Multi-Tenant University ERP & White-Label Web Platform
 **Project Name:** UniFlow Enterprise ERP (Next-Gen Transformation of Oasis E-University)
-**Document Version:** 2.7.0
-**Supersedes:** v1.0.0 - v2.6.0
+**Document Version:** 2.8.0
+**Supersedes:** v1.0.0 - v2.7.0
 **Target Audience:** University Management, Technical Architects, Development Team, Product Owners, Quality Assurance
 **Standard Compliance:** IEEE Std 830-1998 / ISO/IEC/IEEE 29148
 
 ---
 
-## 0.0 Corrections made while building (v2.1.0 - v2.7.0)
+## 0.0 Corrections made while building (v2.1.0 - v2.8.0)
 
 Version 2.0.0 was written before any of it was built. Building Phase 0 and
 Track A1-A3 showed several of its statements to be wrong, or weaker than what
@@ -43,6 +43,10 @@ diverge from the system.
 | 24 | REQ-AC-04's account of the legacy fee save is **corrected and made worse**. It destroyed not only prior versions but every *sibling* schedule in the batch | The grid was loaded `where Batch=.. and Colleges=.. and Type=..` ([frmTuitionFees.vb:48](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Registration%20System/Forms/frmTuitionFees.vb#L48)) but saved with `Delete From TuitionFees Where Batch=N'..'` ([line 89](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Registration%20System/Forms/frmTuitionFees.vb#L89)) — college and admission type dropped from the predicate. Saving Medicine/General deleted Pharmacy's, Dentistry's and every other type's fees for that batch, on an autocommit connection with no transaction, reporting success |
 | 25 | REQ-AC-04 gains a **nullable nationality category** as an explicit any-nationality fallback, resolved after the specific one | An institution prices most programmes once and only some differently for expatriates. A non-null fourth enum value would force three identical schedules per programme to express that, and one of the three is eventually forgotten |
 | 26 | REQ-AC-03 states explicitly that an **academic year is not a fiscal year** | They straddle each other — a September intake sits in two fiscal years — and the legacy build had neither concept. Conflating them puts a term's revenue in the wrong set of accounts, and the two calendars are now separate models meeting only at a posting's document date |
+| 27 | §2.1's note that legacy seat capacity was "maintained manually" is **corrected**: it was also destroyed on every save, exactly as the fee matrix was | `frmStudentsVacants` saved with `Delete From StudentsVacants Where College=N'..'` then an insert naming college AND batch ([lines 94-101](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Form/frmStudentsVacants.vb#L94-L101)), so setting one batch's quota deleted every other batch's for that college. Two `ExecuteNonQuery` calls, no transaction. The same defect as `frmTuitionFees`, which makes it a pattern rather than an accident |
+| 28 | REQ-ADM-CAP-01's "live counters" are **derived, never stored**, and capacity is checked when a place is offered rather than reported afterwards | The legacy figure came from `ALTER VIEW … COUNT(DISTINCT StudID) … WHERE Transtype = N'سند قبض'` rebuilt at runtime ([lines 141-160](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Form/frmStudentsVacants.vb#L141-L160)) — seats taken meant money received, so over-admission surfaced when the cash arrived. That `ALTER VIEW` also required the client to hold DDL rights on the live database and was not reentrant: two concurrent users overwrote each other's view definition, and the second one's academic year decided what the first saw |
+| 29 | REQ-ADM-CAP-04 gains an explicit ordering: **an offer follows a recorded committee decision** | Found while building. The database required an application in state OFFERED to carry a decision, while the offer path did not demand one. The constraint was right: allocating a seat is acting on a recorded verdict, not deciding and awarding in one motion — which is how the legacy build over-admitted |
+| 30 | REQ-ADM-CAP-02 requires certificate scores to be **normalised against the certificate's own maximum** before any rule is applied | A rule is stated as a percentage and certificates are reported out of 100, 45 or 4. Comparing raw numbers refuses an IB candidate scoring 84.4% against an 80% minimum, and the error looks correct on screen |
 
 ---
 
@@ -181,7 +185,7 @@ The table below maps each legacy capability to its replacement. **The status col
 | **Multi-Currency** | *(absent)* | No currency column exists anywhere in the legacy schema | Functional currency per tenant, transaction currency per line, rate tables, and period-end revaluation | **New** |
 | **Financial Statements** | `frmBalanceSheetLevels.vb`, `frmTrialBalance.vb`, `frmRptIncome.vb`, `frmStatement.vb`, `frmUncollectedFees.vb` | Crystal Reports over ad-hoc `SUM(TotalValueIn)-SUM(TotalValueOut)` scans, grouped by four *text* account names. The trial balance reads `Transactionees` and the balance sheet reads `Transactions` — the two statements are built from different ledger tables. The trial balance aliases one net expression to **both** its debit and credit columns, so it always appears to balance. No opening column, because there is no fiscal period model. `frmRptIncome` is a student fee-collection listing, **not** an income statement — there is none | Reporting engine over maintained period-balance aggregates, all statements reading one shared figure source: Trial Balance (opening/movement/closing, levels 1-5), Balance Sheet L1-L4 at any cutoff, Income Statement with comparatives and cost-centre filter, Student Ledger, Aging, and the Sub-Ledger Reconciliation the legacy design made uncomputable | **Rebuilt** |
 | **Amount in Words** | `SpellNumber`, `EgyCurr.CurText` | An English number speller, patched with `.Replace("Dollar","Pound")` and `.Replace("and No Cent","")`. **Arabic تفقيط does not work** | A correct Arabic and English monetary speller with per-tenant currency naming | **Rebuilt** |
-| **Seat Quotas** | `StudentsVacants` *(Ribat/UOT only)* | Seat capacity per college × batch, maintained manually | Quota model per program × batch × admission channel, enforced at offer time | **Migrated** |
+| **Seat Quotas** | `StudentsVacants` *(Ribat/UOT only)* | One row per **college** in a column named `Amount` — no programme, no admission channel. Saving deleted every other batch's quota for that college (see §0.0 correction 27). Nothing consulted it when a place was given: the "seats taken" figure counted students who had **paid**, from receipt vouchers, via two SQL views the client rebuilt at runtime with `ALTER VIEW` | Quota per programme × batch × admission category, counters derived from the offers themselves, capacity checked under a row lock **at the moment a place is offered**, and overrides that carry a reason and a second person | **Rebuilt** |
 | **Receipt Book Serials** | `BillSNo`, `frmVouchersSerialsNo` *(Ribat/UOT only)* | Pre-printed receipt-book serial ranges allocated per cashier, with an overlap check on issue | Retained as a recommended (unscheduled) module — see §7 | **Deferred** |
 | **Petty Cash Custody** | `frmCustody.vb` *(Ribat/UOT only)* | Imprest accounts under an `العهد` parent, with per-holder balances | Retained as a recommended (unscheduled) module — see §7 | **Deferred** |
 | **Discount Exposure Reporting** | `viewDiscount`, `UnivDiscountSummary` *(Ribat/UOT only)* | A SQL view joining `Transactions` to `CollegeFees` to derive the discount given per student | Scholarship and discount governance with approval workflow and exposure reporting — REQ-SPN-04 | **Migrated + Extended** |
@@ -644,12 +648,22 @@ graph LR
 - **REQ-ADM-CAP-01: Seat Quotas**
   - Capacity per Programme × Batch × Admission Channel (General, Private, Foreign, Staff Child, Scholarship).
   - Live counters of allocated, confirmed and available seats. Offers beyond capacity are blocked or require an override with a logged reason. *(Rebuilds the legacy `StudentsVacants` table, present only in the Ribat/UOT build.)*
+  - Counters shall be **derived from the offers**, not stored and adjusted. A stored counter is a second record of the same fact and drifts from it silently.
+  - An **unanswered offer holds its seat**. Available capacity subtracts issued offers as well as accepted ones.
+  - Capacity shall be evaluated **under a lock on the quota** at the moment an offer is issued, so two officers allocating the last seat concurrently cannot both succeed.
+  - An override shall record both the reason and the person who authorised it, enforced by database constraint; the authorising permission is segregated from both maintaining the quota and issuing the offer.
 - **REQ-ADM-CAP-02: Eligibility Rules**
   - Per-programme minimum score by certificate type, required subjects, and age or nationality constraints. Applications are screened automatically and flagged where a rule fails.
+  - Each certificate type carries the mark it is reported out of, and a score **shall be normalised to a percentage against it** before any rule is applied.
+  - Screening **advises and does not block**. A failing applicant remains offerable on a recorded rationale; a programme with no published rule for a certificate is reported as unassessed rather than as a pass.
 - **REQ-ADM-CAP-03: Committee Review, Scoring & Ranking**
   - Configurable scoring model; a ranked list per programme; committee decisions of Accept, Conditional Accept, Waitlist or Reject, each with a recorded rationale.
 - **REQ-ADM-CAP-04: Offers, Deposits & Waitlists**
   - Offer letters generated as bilingual PDFs with an acceptance deadline, optional seat deposit payable online, automatic lapse on deadline, and automatic waitlist promotion when a seat frees.
+  - An offer **shall follow a recorded committee decision** of Accept or Conditional Accept (see §0.0 correction 29). Deciding and allocating are separate acts.
+  - An applicant holds **at most one live offer**, enforced by index. Two live offers is two seats consumed by one person.
+  - Lapse shall be applied by a **batch that marks and timestamps** the offer, not evaluated at read time; a seat must not be free in one report and taken in another.
+  - A closed offer shall not be reopened — by then the seat may have been promoted to somebody else — and a recorded deposit payment shall name the receipt that paid it.
 - **REQ-ADM-CAP-05: Duplicate Applicant Detection**
   - Candidate matching on national ID, passport number, and normalised Arabic name plus date of birth, surfaced to the reviewer before an offer is made.
 - **REQ-ADM-CAP-06: Bulk Intake Import**

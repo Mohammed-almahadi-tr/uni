@@ -1,6 +1,6 @@
 # Implementation Plan: UniFlow Multi-Tenant University ERP & White-Label Web Platform
 
-**Version:** 2.7.0 · **Supersedes:** 1.0.0 - 2.6.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.7.0
+**Version:** 2.8.0 · **Supersedes:** 1.0.0 - 2.7.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.8.0
 
 Transformation of the legacy VB.NET / MS SQL desktop university system (Oasis E-University at Nile College; the Ribat University Application at Ribat and UOT) into a multi-tenant web application: student registration and lifecycle management, a double-entry university finance engine, and a white-label landing page per university client, built with **Next.js**, **shadcn UI** and **PostgreSQL**.
 
@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**531 tests pass across 18 suites; typecheck, lint and production build are all
+**588 tests pass across 19 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -44,8 +44,9 @@ income statement, sub-ledger reconciliation and their exports — together with
 the two Module 12 requirements the statements depend on, opening balances and
 the year-end close. See §0.2.
 
-**Track B has started.** B1 — academic structure and the effective-dated,
-versioned fee matrix — is complete; see §6.1.
+**Track B is under way.** B1 — academic structure and the effective-dated,
+versioned fee matrix — and B2 — admissions capacity, eligibility screening and
+the committee workflow — are both complete; see §6.1.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -1024,7 +1025,7 @@ Even though Phases 7-8 are out of v1 scope, the Phase 0 schema must not preclude
 
 **B1 · Academic Structure & Fee Matrix** *(built — see §6.1)* — Faculties, programmes, degrees, batches, academic years and terms. The **effective-dated, versioned** fee matrix: editing creates a new version, prior versions are retained and stay attached to the registrations raised under them. *(The legacy screen ran `DELETE FROM TuitionFees WHERE Batch=…` before re-inserting, destroying every prior schedule.)*
 
-**B2 · Admissions, Capacity & Committee Workflow** — Seat quotas per programme × batch × channel with live counters and override logging. Automatic eligibility screening by certificate type and score. Committee scoring, ranking and decisions. Offers with acceptance deadlines, optional online seat deposits, automatic lapse and waitlist promotion. Duplicate-applicant detection on national ID, passport and normalised Arabic name plus date of birth. Bulk intake import with dry-run preview.
+**B2 · Admissions, Capacity & Committee Workflow** *(built — see §6.1)* — Seat quotas per programme × batch × channel with live counters and override logging. Automatic eligibility screening by certificate type and score. Committee scoring, ranking and decisions. Offers with acceptance deadlines, optional online seat deposits, automatic lapse and waitlist promotion. Duplicate-applicant detection on national ID, passport and normalised Arabic name plus date of birth. Bulk intake import with dry-run preview.
 
 **B3 · Student Profile, Documents & Medical** — Multi-step wizard capturing discrete 4-part Arabic and English names, dual-calendar dates, guardian details, secondary school record, photo capture and document uploads. Per-programme document checklists with verification state and expiry. Medical record: the five legacy fields plus vaccination status, chronic conditions, officer notes and a fitness verdict. Directory search with **Arabic normalisation** — alef, taa marbuta, yaa and tatweel folded — over a trigram index.
 
@@ -1158,6 +1159,128 @@ refuses to price a student missing any of them, with a message naming which.
 
 ---
 
+
+### B2 — Admissions, Capacity & Committee Workflow · complete
+
+#### The same defect, in a second screen
+
+`frmStudentsVacants`, present only in the Ribat/UOT build, saved a seat quota
+like this:
+
+```vb
+Dim cmdDel As New SqlCommand("Delete From StudentsVacants Where College=N'" & _
+                             Me.CombColleges.SelectedItem & "'", cnn)
+Dim cmd As New SqlCommand("Insert Into StudentsVacants (College,Batch,Amount) " & _
+                          "Values (N'" & Me.CombColleges.SelectedItem & "',N'" & _
+                          Me.CombBatch.SelectedItem & "'," & Me.txtAmount.Text.Trim & ")", cnn)
+cmdDel.ExecuteNonQuery()
+cmd.ExecuteNonQuery()
+```
+([frmStudentsVacants.vb:94-101](Nile College System - Ribat Univ/Rebat University Application/Form/frmStudentsVacants.vb#L94-L101))
+
+The `DELETE` names the college. The `INSERT` names the college **and** the
+batch. Setting the 2026 quota for Medicine therefore deleted Medicine's quota
+for every other batch — the identical shape to the fee-matrix save found in B1,
+which makes it a habit in that codebase rather than an accident. Two
+`ExecuteNonQuery` calls on an autocommit connection, so a failure between them
+left the college with no quota at all.
+
+#### The deeper finding: capacity was a report, not a control
+
+Nothing consulted the quota when a place was given. The screen's report rebuilt
+two SQL views **at runtime**:
+
+```vb
+Dim cmd1 As New SqlCommand("ALTER VIEW [dbo].[viewCollegRegTotal]" & _
+    " AS SELECT College, COUNT(DISTINCT StudID) AS Total FROM Transactions" & _
+    " WHERE Transtype = N'سند قبض' AND (AcdYear = N'" & Me.CombAcdYear.SelectedItem & "')" & …
+```
+([frmStudentsVacants.vb:141-160](Nile College System - Ribat Univ/Rebat University Application/Form/frmStudentsVacants.vb#L141-L160))
+
+Three things follow from those lines, all verifiable:
+
+1. **Seats taken meant money received.** The count is over receipt vouchers
+   (`Transtype = N'سند قبض'`) with a non-zero fee sum. An institution could
+   over-admit freely and discover it when the cash arrived — there was no
+   moment at which a place was allocated for capacity to be checked against.
+2. **The application required DDL rights on the live database.** `ALTER VIEW`
+   at runtime, from the client.
+3. **The report was not reentrant.** Two people running it at once overwrote
+   each other's view definition, so the second user's academic year decided
+   what the first user saw. No error, just the wrong year's figures.
+
+The quota itself was keyed on **college** alone — no programme, no admission
+channel — in a column named `Amount`, and the academic-year dropdown was
+populated by `select Distinct AcdYear From Transactions Where Descr=N'تسجيل
+للعام الدراسي'`: an Arabic description string matched against ledger rows.
+
+There was no application entity at all. A person became known to the system
+when a cashier took money from them, which is why payment *was* admission, and
+why there was nowhere to record that somebody applied and was refused.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| Quotas per **programme × batch × admission category** (REQ-ADM-CAP-01) | Three dimensions where the legacy table had one and a half. Setting one leaves the others alone, which is the assertion that names the legacy bug |
+| Counters **counted, never stored** | `offered`, `confirmed`, `held`, `released` are derived from the offers each time. A stored counter is a second record of the same fact, and this project's legacy audit is a catalogue of what happens to those |
+| Capacity checked **under a row lock**, at the moment a place is offered | `SELECT … FOR UPDATE` on the quota. Without it two officers issuing the last seat both read "one available" and both succeed — the lost-update race Phase 0 removed from voucher numbering, with a person's place instead of a document number |
+| An **unanswered offer holds its seat** | `available` subtracts issued offers, not only accepted ones. Treating an unanswered offer as free is how a programme discovers it is over-subscribed on deadline day |
+| Overrides carry a reason **and** a second person | `admission.override` is a separate permission, MFA-gated, with SoD pairs against both `admission.capacity` and `application.offer`. A CHECK constraint refuses an override row with no reason or no approver — recording that capacity was exceeded without recording who allowed it is indistinguishable from never having checked |
+| Eligibility rules per programme × certificate type (REQ-ADM-CAP-02) | Minimum percentage, required subjects, age range, nationality restriction |
+| Scores **normalised against the certificate's own scale** | A rule is a percentage; certificates are reported out of 100, 45 or 4. Comparing a raw 38 against a minimum of 80 refuses an IB candidate at 84.4% |
+| Screening **reports, never blocks** | A failing applicant can still be offered a place with a recorded rationale. A system that discarded them would hide exactly the case a committee exists for — the applicant one mark short |
+| Committee scoring, ranked lists, four decisions with mandatory rationale (REQ-ADM-CAP-03) | The rationale is enforced by CHECK, not only in code. A REJECT with no reason is the one an applicant comes back to ask about |
+| Offers, deadlines, lapse, waitlist promotion (REQ-ADM-CAP-04) | A lapse is a **batch** that marks and timestamps, not a condition evaluated at read time — otherwise a seat is free in one report and taken in another depending on who asked |
+| Duplicate detection across applications **and students** (REQ-ADM-CAP-05) | National ID and passport at HIGH confidence; Arabic-normalised name plus date of birth at MEDIUM. Surfaced to the reviewer, never auto-refused |
+| Bulk intake import with dry-run preview (REQ-ADM-CAP-06) | Validates by **code**, not id, so a ministry roster needs no uuid lookups. One transaction for the whole file |
+
+#### Two controls that emerged from the build
+
+**An offer follows a committee decision.** The database constraint said an
+application in state OFFERED must carry a decision; `issueOffer` did not require
+one, and eighteen tests failed on the contradiction. The constraint was right,
+so the code changed: allocating a seat now demands a recorded verdict of ACCEPT
+or CONDITIONAL_ACCEPT with its rationale. It is the admissions equivalent of
+maker-checker, and REQ-ADM-CAP-03 → -04 reads that way. Waitlist promotion goes
+through the same door — it re-decides the applicant first, so the record says
+why a place appeared in August.
+
+**Deciding is not admitting.** A committee ACCEPT leaves the application
+UNDER_REVIEW until a seat is actually allocated to it. Collapsing the two is
+precisely how the legacy build over-admitted: nothing separated "we want this
+person" from "we have somewhere to put them".
+
+#### The import validates the thing most likely to be wrong
+
+A roster's commonest error is a score entered against the wrong certificate's
+scale — 620 in a column the file says is IB, which runs to 45. The preview
+refuses it by name rather than putting the applicant through screening at a
+meaningless percentage. Dates are parsed strictly for the same reason:
+`new Date('2007-02-31')` silently becomes 3 March, which turns a typo in a date
+of birth into a plausible wrong answer instead of an error somebody can fix.
+
+#### Verification
+
+57 tests. The two that matter most:
+
+- `refuses an offer beyond the quota` and `counts an unanswered offer as a seat
+  taken` — together, the property the legacy build never had.
+- `updating one quota leaves the others untouched` — the legacy bug written down
+  as an assertion, the same shape as B1's `prices one cohort without touching
+  another`.
+
+Four constraints are exercised by writing directly as the **owner role**, which
+bypasses RLS entirely: reopening a closed offer, moving a quota to another
+programme, an override with no approver, and a paid deposit with no receipt
+behind it. All four are refused by the database, not by application code.
+
+**Deferred:** bilingual offer-letter PDFs (the print path exists from A7; the
+letter template is a Track C document), and online seat-deposit payment, which
+needs the public portal C2. The deposit itself is wired — an offer names the
+cashier's receipt that paid it, and a CHECK refuses a paid deposit without one.
+
+---
 
 ## 7. Track C — Public Surface
 
