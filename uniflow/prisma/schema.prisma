@@ -168,6 +168,72 @@ enum StudentStatus {
   ALUMNUS
 }
 
+/// SRS REQ-ST-01. The legacy `StdForm.Gender` column held 0 or 1, decided by
+/// `If RadMail.Checked` — a radio button misspelt "Mail", with no third state
+/// and no way to tell "not recorded" from "female".
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+}
+
+/// Which calendar the date was read off the document in.
+///
+/// The stored date is always Gregorian; this records what the registrar was
+/// looking at. A birth date transcribed from a Hijri passport and converted
+/// once will render back through Umm al-Qura within a day of the original,
+/// and that is expected — but only if we know it started as Hijri.
+enum CalendarSystem {
+  GREGORIAN
+  HIJRI
+}
+
+enum BloodGroup {
+  A_POS
+  A_NEG
+  B_POS
+  B_NEG
+  AB_POS
+  AB_NEG
+  O_POS
+  O_NEG
+}
+
+/// A screening result, with "not tested" as a value rather than as an absence.
+///
+/// The legacy medical form passed `CombAids.Text` straight into the insert.
+/// When nothing was selected that is the empty string, so a student never
+/// screened for HIV and a student screened negative were stored identically
+/// and printed identically.
+enum ScreeningResult {
+  NOT_TESTED
+  NEGATIVE
+  POSITIVE
+}
+
+/// SRS REQ-ST-02. The legacy system recorded results and no verdict at all —
+/// whether the student was fit to enrol was a decision somebody made verbally
+/// and nothing wrote down.
+enum FitnessVerdict {
+  FIT
+  CONDITIONAL
+  UNFIT
+}
+
+/// SRS REQ-ST-05. A document is unverified until somebody other than the
+/// person who uploaded it says otherwise.
+enum DocumentState {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
 /// SRS REQ-BDG-01. A budget is a *version*, not a set of rows that get edited.
 /// The legacy `AccBudget` had neither versions nor an approval: a row was
 /// inserted, and revision meant soft-deleting it and inserting another.
@@ -434,6 +500,12 @@ model Tenant {
   applicationChoices ApplicationChoice[]
   admissionOffers    AdmissionOffer[]
 
+  studentProfiles     StudentProfile[]
+  documentTypes       DocumentType[]
+  documentRequirements ProgrammeDocumentRequirement[]
+  studentDocuments    StudentDocument[]
+  medicalRecords      MedicalRecord[]
+
   @@map("tenants")
 }
 
@@ -491,6 +563,11 @@ model User {
   applicationsDecided  Application[]    @relation("ApplicationDecider")
   offersIssued         AdmissionOffer[] @relation("OfferIssuer")
   offersOverridden     AdmissionOffer[] @relation("OfferOverrider")
+
+  profilesEdited       StudentProfile[]  @relation("ProfileEditor")
+  documentsUploaded    StudentDocument[] @relation("DocumentUploader")
+  documentsVerified    StudentDocument[] @relation("DocumentVerifier")
+  medicalRecorded      MedicalRecord[]   @relation("MedicalRecorder")
 
   budgetsPrepared     Budget[]              @relation("BudgetPreparer")
   budgetsApproved     Budget[]              @relation("BudgetApprover")
@@ -1132,6 +1209,27 @@ model Student {
   studentNo  String  @map("student_no")
   fullNameAr String  @map("full_name_ar")
   fullNameEn String  @map("full_name_en")
+
+  /// The four Arabic and four English name parts (REQ-ST-01).
+  ///
+  /// All four or none, per language, by CHECK — half a name is worse than no
+  /// name, because it invites exactly the concatenation the legacy code did:
+  /// `x = x1 + " " + x2 + " " + x3 + " " + x4`, run in four different screens
+  /// against columns that were sometimes NULL.
+  ///
+  /// When the parts are present, `fullNameAr` must equal them joined by single
+  /// spaces — enforced by trigger, so the displayed name and the parts can
+  /// never disagree. The full name stays the canonical display value because
+  /// receipts, certificates and the sub-ledger all quote it, and a student
+  /// admitted before Track B has no parts to compose one from.
+  nameAr1 String? @map("name_ar_1")
+  nameAr2 String? @map("name_ar_2")
+  nameAr3 String? @map("name_ar_3")
+  nameAr4 String? @map("name_ar_4")
+  nameEn1 String? @map("name_en_1")
+  nameEn2 String? @map("name_en_2")
+  nameEn3 String? @map("name_en_3")
+  nameEn4 String? @map("name_en_4")
   /// Alef/hamza/taa-marbuta-normalised name, for search (REQ-ST-03). Written
   /// by the application, never by hand.
   searchKey  String  @map("search_key")
@@ -1161,9 +1259,17 @@ model Student {
   receipts          StudentReceipt[]
   plans             InstalmentPlan[]
   application       Application?       @relation("ApplicationStudent")
+  profile           StudentProfile?
+  documents         StudentDocument[]
+  medicalRecords    MedicalRecord[]
 
   @@unique([tenantId, studentNo])
   @@index([tenantId, searchKey])
+  /// Trigram index behind the directory search (REQ-ST-03, REQ-NFR-01). The
+  /// btree index above serves a prefix; a registrar typing a middle name is a
+  /// `LIKE '%…%'`, which a btree cannot answer and which was a sequential scan
+  /// until this existed.
+  @@index([searchKey(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([tenantId, status])
   @@index([tenantId, programmeId, batchId])
   @@map("students")
@@ -2404,6 +2510,7 @@ model Programme {
   eligibilityRules  EligibilityRule[]
   applicationChoice ApplicationChoice[]
   admissionOffers   AdmissionOffer[]
+  documentRequirements ProgrammeDocumentRequirement[]
 
   @@unique([tenantId, code])
   @@index([tenantId, facultyId, isActive])
@@ -2671,6 +2778,7 @@ model CertificateType {
   tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   rules        EligibilityRule[]
   applications Application[]
+  profiles     StudentProfile[]
 
   @@unique([tenantId, code])
   @@map("certificate_types")
@@ -2897,4 +3005,239 @@ model AdmissionOffer {
   @@index([tenantId, seatQuotaId, state])
   @@index([tenantId, state, acceptBy])
   @@map("admission_offers")
+}
+
+// ---------------------------------------------------------------------------
+// B3 — Student profile, documents and medical records (SRS Module 3)
+// ---------------------------------------------------------------------------
+
+/// Everything about a student that finance does not need on every query.
+///
+/// Split from `students` deliberately. That table is read on the cashier's
+/// hot path — a receipt looks up a student by number and needs a name and a
+/// status, not a guardian's occupation. Keeping forty profile columns out of
+/// it also keeps the row narrow enough to stay in cache.
+///
+/// The legacy system spread this across four tables with no keys between
+/// them: `StdForm` (the admission form), `StdData` (a second, hand-typed copy
+/// used only by the search dialog), `StudentsProfilees` (accepted students)
+/// and `StudentsProfilesIndecent` (rejected ones). The same four Arabic names
+/// were keyed twice by two different clerks on two different screens, and
+/// `StdSchool` existed in only one of them.
+model StudentProfile {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @unique @map("student_id") @db.Uuid
+
+  // ---- Demographics ------------------------------------------------------
+  gender        Gender?
+  dateOfBirth   DateTime?       @map("date_of_birth") @db.Date
+  /// Which calendar the birth date was transcribed from. Gregorian is stored
+  /// either way; see the CalendarSystem doc comment.
+  birthCalendar CalendarSystem? @map("birth_calendar")
+  placeOfBirth  String?         @map("place_of_birth")
+  religion      String?
+  maritalStatus MaritalStatus?  @map("marital_status")
+
+  passportNo     String?   @map("passport_no")
+  passportExpiry DateTime? @map("passport_expiry") @db.Date
+
+  // ---- Contact -----------------------------------------------------------
+  email    String?
+  phone    String?
+  whatsapp String?
+  address  String?
+
+  // ---- Guardian (REQ-ST-01) ---------------------------------------------
+  /// Held here rather than as a separate party because the legacy data has one
+  /// guardian per student and no evidence of a second. A sponsor — an entity
+  /// that pays — is a different thing entirely and arrives in B6.
+  guardianName         String? @map("guardian_name")
+  guardianRelationship String? @map("guardian_relationship")
+  guardianOccupation   String? @map("guardian_occupation")
+  guardianPhone        String? @map("guardian_phone")
+  guardianAddress      String? @map("guardian_address")
+  emergencyName        String? @map("emergency_name")
+  emergencyPhone       String? @map("emergency_phone")
+
+  // ---- Secondary school record ------------------------------------------
+  schoolName        String?  @map("school_name")
+  certificateTypeId String?  @map("certificate_type_id") @db.Uuid
+  /// Seat or index number on the certificate, as printed.
+  certificateSeatNo String?  @map("certificate_seat_no")
+  certificateYear   Int?     @map("certificate_year")
+  /// Raw mark, on the certificate's own scale. The percentage is derived
+  /// against `certificate_types.max_score` — never stored, for the same reason
+  /// admissions screening normalises rather than comparing raw numbers.
+  certificateScore  Decimal? @map("certificate_score") @db.Decimal(9, 3)
+
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  certificateType CertificateType? @relation(fields: [certificateTypeId], references: [id])
+  updatedBy       User?            @relation("ProfileEditor", fields: [updatedById], references: [id])
+
+  @@index([tenantId])
+  @@map("student_profiles")
+}
+
+/// The kinds of document an institution collects. Per tenant, because the
+/// list is a registry-office policy, not a property of the software.
+model DocumentType {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  code     String
+  nameAr   String @map("name_ar")
+  nameEn   String @map("name_en")
+
+  /// True for documents that go out of date — passport, residence permit.
+  /// An uploaded document of such a type must carry an expiry, enforced by
+  /// trigger: a residence permit with no expiry is a permit nobody will ever
+  /// chase.
+  requiresExpiry Boolean @default(false) @map("requires_expiry")
+
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  tenant       Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requirements ProgrammeDocumentRequirement[]
+  documents    StudentDocument[]
+
+  @@unique([tenantId, code])
+  @@map("document_types")
+}
+
+/// Which documents a given programme requires (REQ-ST-05).
+///
+/// Medicine wants a medical certificate that Business does not; a foreign
+/// student needs a residence permit. Expressed per programme so the checklist
+/// a registrar sees is the checklist that programme actually needs.
+model ProgrammeDocumentRequirement {
+  id             String @id @default(uuid()) @db.Uuid
+  tenantId       String @map("tenant_id") @db.Uuid
+  programmeId    String @map("programme_id") @db.Uuid
+  documentTypeId String @map("document_type_id") @db.Uuid
+
+  /// A non-mandatory entry still appears on the checklist — it is requested,
+  /// not required. Dropping it from the list entirely is how a document stops
+  /// being collected without anybody deciding to stop collecting it.
+  isMandatory Boolean @default(true) @map("is_mandatory")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme    Programme    @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  documentType DocumentType @relation(fields: [documentTypeId], references: [id])
+
+  @@unique([tenantId, programmeId, documentTypeId])
+  @@map("programme_document_requirements")
+}
+
+/// One uploaded file against one student.
+///
+/// Metadata only; the bytes live in object storage under `storageKey`, the
+/// same arrangement as voucher attachments. `sha256` is recorded at upload so
+/// a later audit can prove the file served today is the file that was
+/// verified.
+///
+/// **Documents supersede, they do not get replaced in place.** Re-uploading a
+/// passport marks the old row superseded and inserts a new one; the partial
+/// unique index allows exactly one live document per type per student. The
+/// legacy student screen did the opposite — `Delete From StudentsProfilees
+/// Where StudentIndex=…` followed by an insert, outside any transaction — and
+/// that is the third screen in this codebase found doing it.
+model StudentDocument {
+  id             String @id @default(uuid()) @db.Uuid
+  tenantId       String @map("tenant_id") @db.Uuid
+  studentId      String @map("student_id") @db.Uuid
+  documentTypeId String @map("document_type_id") @db.Uuid
+
+  fileName    String @map("file_name")
+  contentType String @map("content_type")
+  byteSize    Int    @map("byte_size")
+  storageKey  String @unique @map("storage_key")
+  sha256      String @db.Char(64)
+
+  issuedOn  DateTime? @map("issued_on") @db.Date
+  expiresOn DateTime? @map("expires_on") @db.Date
+
+  state             DocumentState @default(PENDING)
+  /// Never the uploader. A CHECK enforces it: a certificate uploaded and
+  /// verified by one person has not been verified by anybody.
+  verifiedById      String?       @map("verified_by_id") @db.Uuid
+  verifiedAt        DateTime?     @map("verified_at") @db.Timestamptz(6)
+  /// Mandatory on REJECTED, by CHECK. A rejection with no reason is one the
+  /// student cannot act on.
+  rejectionReason   String?       @map("rejection_reason")
+
+  supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
+
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  uploadedAt   DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  documentType DocumentType @relation(fields: [documentTypeId], references: [id])
+  uploadedBy   User         @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  verifiedBy   User?        @relation("DocumentVerifier", fields: [verifiedById], references: [id])
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, state, expiresOn])
+  @@map("student_documents")
+}
+
+/// A medical examination and its verdict (SRS REQ-ST-02).
+///
+/// The legacy `MedicalExamination` table held six columns — `UniversityID`,
+/// `DateofMedicalExamination`, `Hepatitis`, `Aids`, `BooldType`, `Employee` —
+/// and the form inserted a new row on every save with no key and no notion of
+/// which row was current. `Employee` was the data-entry clerk, which is why
+/// there is no record anywhere of who actually examined anyone.
+///
+/// Superseded rather than edited, one live record per student. A re-examination
+/// is a new fact, not a correction of an old one, and the previous verdict is
+/// what a decision three months ago was based on.
+model MedicalRecord {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  examDate DateTime @map("exam_date") @db.Date
+
+  // ---- The legacy fields, typed ------------------------------------------
+  bloodGroup  BloodGroup?     @map("blood_group")
+  hepatitisB  ScreeningResult @default(NOT_TESTED) @map("hepatitis_b")
+  hiv         ScreeningResult @default(NOT_TESTED)
+
+  // ---- The extension (REQ-ST-02) -----------------------------------------
+  vaccinations       String[]
+  chronicConditions  String?  @map("chronic_conditions")
+  allergies          String?
+  officerNotes       String?  @map("officer_notes")
+
+  verdict FitnessVerdict
+  /// Mandatory unless the verdict is FIT, by CHECK. "Conditional" without the
+  /// condition, or "unfit" without the reason, is a verdict nobody can act on
+  /// or appeal.
+  verdictNote String? @map("verdict_note")
+  /// When a fitness clearance expires. Programmes with clinical placements
+  /// re-examine annually.
+  validUntil  DateTime? @map("valid_until") @db.Date
+
+  /// The clinician, as a name. Medical officers are rarely system users, and
+  /// recording the clerk in a column called `Employee` is how the legacy build
+  /// ended up with no examiner on file at all.
+  medicalOfficer String @map("medical_officer")
+  recordedById   String @map("recorded_by_id") @db.Uuid
+  recordedAt     DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
+
+  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  recordedBy User    @relation("MedicalRecorder", fields: [recordedById], references: [id])
+
+  @@index([tenantId, studentId, examDate])
+  @@map("medical_records")
 }

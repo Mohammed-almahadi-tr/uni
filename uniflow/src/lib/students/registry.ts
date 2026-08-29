@@ -4,6 +4,7 @@ import { withTenant } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { buildSearchKey, searchTerms } from '@/lib/i18n/arabic';
+import { composeName, type NameParts } from '@/lib/students/profile';
 import { toDateOnly } from '@/lib/ledger/period';
 
 /**
@@ -37,11 +38,63 @@ export class StudentError extends Error {
 
 export interface CreateStudentInput {
   studentNo: string;
-  fullNameAr: string;
-  fullNameEn: string;
+  /** Required unless `nameParts` is given, in which case it is derived. */
+  fullNameAr?: string;
+  fullNameEn?: string;
+  /**
+   * The discrete four-part names (B3, REQ-ST-01). When supplied, the displayed
+   * names are composed from them and the database checks the composition
+   * independently — see students/profile.ts.
+   */
+  nameParts?: NameParts;
   nationalId?: string | null;
   status?: StudentStatus;
   admittedOn?: Date | null;
+
+  /**
+   * The four dimensions the fee matrix is keyed on. Optional here because a
+   * cashier taking money from a walk-in has none of them to hand, and refusing
+   * the payment is worse than a student who cannot yet be billed a schedule.
+   * `feeScheduleForStudent` refuses to price a student missing any of them,
+   * naming which — and once set, a trigger refuses to let them be cleared.
+   */
+  programmeId?: string | null;
+  batchId?: string | null;
+  admissionCategoryId?: string | null;
+  nationalityId?: string | null;
+}
+
+/** Resolve the displayed names from whichever form the caller supplied. */
+function resolveNames(input: CreateStudentInput): {
+  fullNameAr: string;
+  fullNameEn: string;
+} {
+  if (input.nameParts) {
+    const p = input.nameParts;
+    for (const [label, parts] of [
+      ['Arabic', [p.ar1, p.ar2, p.ar3, p.ar4]],
+      ['English', [p.en1, p.en2, p.en3, p.en4]],
+    ] as const) {
+      if (parts.some((x) => !x?.trim())) {
+        throw new StudentError(
+          `A ${label} name needs all four parts. Sudanese names run to four and ` +
+            `certificates are issued in all of them.`,
+        );
+      }
+    }
+    return {
+      fullNameAr: composeName(p.ar1, p.ar2, p.ar3, p.ar4),
+      fullNameEn: composeName(p.en1, p.en2, p.en3, p.en4),
+    };
+  }
+
+  if (!input.fullNameAr?.trim() || !input.fullNameEn?.trim()) {
+    throw new StudentError(
+      'A student needs a name in both Arabic and English — certificates and receipts are ' +
+        'issued in both, and a missing one is discovered at graduation.',
+    );
+  }
+  return { fullNameAr: input.fullNameAr.trim(), fullNameEn: input.fullNameEn.trim() };
 }
 
 export async function createStudent(
@@ -52,12 +105,7 @@ export async function createStudent(
 
   const studentNo = input.studentNo.trim();
   if (!studentNo) throw new StudentError('A student needs a university number.');
-  if (!input.fullNameAr.trim() || !input.fullNameEn.trim()) {
-    throw new StudentError(
-      'A student needs a name in both Arabic and English — certificates and receipts are ' +
-        'issued in both, and a missing one is discovered at graduation.',
-    );
-  }
+  const { fullNameAr, fullNameEn } = resolveNames(input);
 
   return withTenant(principal.tenantId, async (tx) => {
     const nationalId = input.nationalId?.trim() || null;
@@ -74,16 +122,29 @@ export async function createStudent(
       }
     }
 
+    const p = input.nameParts;
     const student = await tx.student.create({
       data: {
         tenantId: principal.tenantId,
         studentNo,
-        fullNameAr: input.fullNameAr.trim(),
-        fullNameEn: input.fullNameEn.trim(),
-        searchKey: buildSearchKey(input.fullNameAr, input.fullNameEn, studentNo, nationalId),
+        fullNameAr,
+        fullNameEn,
+        ...(p
+          ? {
+              nameAr1: p.ar1.trim(), nameAr2: p.ar2.trim(),
+              nameAr3: p.ar3.trim(), nameAr4: p.ar4.trim(),
+              nameEn1: p.en1.trim(), nameEn2: p.en2.trim(),
+              nameEn3: p.en3.trim(), nameEn4: p.en4.trim(),
+            }
+          : {}),
+        searchKey: buildSearchKey(fullNameAr, fullNameEn, studentNo, nationalId),
         nationalId,
         status: input.status ?? 'ACTIVE',
         admittedOn: input.admittedOn ? toDateOnly(input.admittedOn) : null,
+        programmeId: input.programmeId ?? null,
+        batchId: input.batchId ?? null,
+        admissionCategoryId: input.admissionCategoryId ?? null,
+        nationalityId: input.nationalityId ?? null,
       },
       select: { id: true, studentNo: true },
     });
@@ -95,8 +156,8 @@ export async function createStudent(
       resourceId: student.id,
       after: {
         studentNo,
-        fullNameAr: input.fullNameAr.trim(),
-        fullNameEn: input.fullNameEn.trim(),
+        fullNameAr,
+        fullNameEn,
         status: input.status ?? 'ACTIVE',
       },
     });

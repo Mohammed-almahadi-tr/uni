@@ -1,6 +1,6 @@
 # Implementation Plan: UniFlow Multi-Tenant University ERP & White-Label Web Platform
 
-**Version:** 2.8.0 · **Supersedes:** 1.0.0 - 2.7.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.8.0
+**Version:** 2.9.0 · **Supersedes:** 1.0.0 - 2.8.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.9.0
 
 Transformation of the legacy VB.NET / MS SQL desktop university system (Oasis E-University at Nile College; the Ribat University Application at Ribat and UOT) into a multi-tenant web application: student registration and lifecycle management, a double-entry university finance engine, and a white-label landing page per university client, built with **Next.js**, **shadcn UI** and **PostgreSQL**.
 
@@ -45,8 +45,10 @@ the two Module 12 requirements the statements depend on, opening balances and
 the year-end close. See §0.2.
 
 **Track B is under way.** B1 — academic structure and the effective-dated,
-versioned fee matrix — and B2 — admissions capacity, eligibility screening and
-the committee workflow — are both complete; see §6.1.
+versioned fee matrix — B2 — admissions capacity, eligibility screening and the
+committee workflow — and B3 — the student profile, per-programme document
+checklists and medical records — are all complete; see §6.1. B4, the
+registration engine, is the convergence milestone with Track A and is next.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -1027,7 +1029,7 @@ Even though Phases 7-8 are out of v1 scope, the Phase 0 schema must not preclude
 
 **B2 · Admissions, Capacity & Committee Workflow** *(built — see §6.1)* — Seat quotas per programme × batch × channel with live counters and override logging. Automatic eligibility screening by certificate type and score. Committee scoring, ranking and decisions. Offers with acceptance deadlines, optional online seat deposits, automatic lapse and waitlist promotion. Duplicate-applicant detection on national ID, passport and normalised Arabic name plus date of birth. Bulk intake import with dry-run preview.
 
-**B3 · Student Profile, Documents & Medical** — Multi-step wizard capturing discrete 4-part Arabic and English names, dual-calendar dates, guardian details, secondary school record, photo capture and document uploads. Per-programme document checklists with verification state and expiry. Medical record: the five legacy fields plus vaccination status, chronic conditions, officer notes and a fitness verdict. Directory search with **Arabic normalisation** — alef, taa marbuta, yaa and tatweel folded — over a trigram index.
+**B3 · Student Profile, Documents & Medical** *(built — see §6.1)* — Multi-step wizard capturing discrete 4-part Arabic and English names, dual-calendar dates, guardian details, secondary school record, photo capture and document uploads. Per-programme document checklists with verification state and expiry. Medical record: the five legacy fields plus vaccination status, chronic conditions, officer notes and a fitness verdict. Directory search with **Arabic normalisation** — alef, taa marbuta, yaa and tatweel folded — over a trigram index.
 
 **B4 · Semester Registration Engine** *(critical path)* — Student lookup auto-filling programme and the effective fee schedule version. Per-item discount application with approval above threshold. **Atomic**: the registration row and its balanced GL posting are created in one database transaction through the Phase 0 posting engine, carrying an idempotency key and rejected if the period is closed. Registration card with QR verification.
 
@@ -1152,10 +1154,14 @@ Alongside it, `supersedes without destroying` checks that a student registering
 in March still resolves to the March schedule after a July revision, and that
 every day either side of the boundary resolves to exactly one version.
 
-**Deferred to B3:** making the four academic dimensions mandatory on a student.
-They are nullable now because A3 created students before Track B existed and a
-cashier must still be able to take money from them. `feeScheduleForStudent`
-refuses to price a student missing any of them, with a message naming which.
+**Deferred to B3, and settled there:** making the four academic dimensions
+mandatory on a student. They stay nullable because A3 created students before
+Track B existed and a cashier must still be able to take money from them, and
+because a NOT NULL would refuse the backfill that is the only thing able to
+make them mandatory eventually. `feeScheduleForStudent` refuses to price a
+student missing any of them, with a message naming which; B3 adds a trigger
+refusing to let one be **cleared** once set, and lists all four in the profile
+completeness check.
 
 ---
 
@@ -1281,6 +1287,223 @@ needs the public portal C2. The deposit itself is wired — an offer names the
 cashier's receipt that paid it, and a CHECK refuses a paid deposit without one.
 
 ---
+
+### B3 — Student Profile, Documents & Medical · complete
+
+#### One student, four tables, two keyboards
+
+The legacy build stored one student across four tables with no key joining any
+of them:
+
+| Table | Written by | Holds |
+| :--- | :--- | :--- |
+| `StdForm` | `FrmStudForm2.vb` | The admission form — four Arabic names, four English names, birth date, guardian, national number |
+| `StdData` | `FrmDataEntery.vb` | The same four Arabic names, typed again, plus `StdSchool`, which exists nowhere else |
+| `StudentsProfilees` | `frmStudentProfiles.vb` | Accepted students, name **concatenated** into one column |
+| `StudentsProfilesIndecent` | `frmStudentProfiles.vb` | Rejected students, plus `ReasonofIndecent` |
+
+The two data-entry screens are independent. `FrmStudForm2` writes the names to
+`StdForm`; `FrmDataEntery` writes the same names to `StdData`
+([FrmDataEntery.vb:55-70](Nile College E-University System/Oasis - E-University/Registration System/Forms/FrmDataEntery.vb#L55-L70)).
+Nothing reconciles them, and the student search dialog reads only the second —
+so a name corrected on the admission form stayed wrong everywhere it was
+looked up.
+
+`FrmForm.vb`, the older and richer version of the admission screen, is 649
+lines in which **the entire save is commented out** ([lines 336-400](Nile College E-University System/Oasis - E-University/Registration System/Forms/FrmForm.vb#L336-L400)).
+It collects religion, place of birth, marital status and guardian details and
+writes none of them.
+
+#### The registration date was manufactured
+
+```vb
+cmd.CommandText = "Select IsNull(Max(RegDate),0) from StdForm Where Coleg=N'" & _
+                   Me.CombColeg.Text & "'  "
+dat1 = CDate(cmd.ExecuteScalar)
+
+If (dat.Hour = 10 And dat.Minute = 30) Or dat.Hour = 12 Then
+    dat.AddMinutes(30)
+Else
+    dat = dat1.AddMinutes(10)
+End If
+```
+([FrmStudForm2.vb:368-377](Nile College E-University System/Oasis - E-University/Registration System/Forms/FrmStudForm2.vb#L368-L377))
+
+The date recorded against a student's admission is **the previous student's
+date plus ten minutes**, per faculty. Not when anything happened — a
+manufactured appointment queue.
+
+Three further defects sit inside those ten lines, all verifiable:
+
+1. `dat.AddMinutes(30)` **discards its result.** `Date` is a value type in VB
+   and `AddMinutes` returns a new one. That branch leaves `dat` at whatever the
+   module-level `Public dat As Date` last held, which on a fresh form is
+   `0001-01-01`.
+2. The condition reads `dat.Hour` **before** `dat` is assigned in this pass, so
+   it tests the previous record's value.
+3. `IsNull(Max(RegDate),0)` returns `1900-01-01` when the faculty has no rows
+   yet — and the branch is reached whenever `FileNo <> 1`, where `FileNo` is a
+   global `MAX+1` across all faculties. **The first student of every new
+   faculty after the first is dated 1900.**
+
+`FileNo` itself is `Select IsNull(Max(FileNo),0)` + 1 — the same lost-update
+race Phase 0 removed from voucher numbering. And `TypeofAdmission` is set by
+four `If` statements with no `Else`, so an admission type outside the four
+hard-coded Arabic strings adds no parameter at all and the save dies with
+`must declare the scalar variable "@TypeofAdmission"`.
+
+#### The medical form validated data it then threw away
+
+`FrmMedical.vb` refuses to save until all four Arabic name fields are filled
+in — "الرجاء ادخال الاسم الاول الطالب" and three more like it
+([lines 73-83](Nile College E-University System/Oasis - E-University/Registration System/Forms/FrmMedical.vb#L73-L83)).
+The insert that follows names six columns and **none of them is a name**:
+
+```vb
+cmd.CommandText = "Insert Into MedicalExamination (UniversityID,DateofMedicalExamination," & _
+                  "Hepatitis,Aids,BooldType,Employee) Values (…)"
+```
+([FrmMedical.vb:114](Nile College E-University System/Oasis - E-University/Registration System/Forms/FrmMedical.vb#L114))
+
+Alongside it:
+
+- **`@Aids` was never validated** — the check is commented out, together with
+  the rule that made HIV screening conditional on the nursing programme. An
+  unset combo box passes `""`, so *never screened* and *screened negative* were
+  stored identically and printed identically.
+- **No verdict and no examiner.** `Employee` is the data-entry clerk. Whether
+  the student was fit to enrol was decided verbally and written down nowhere.
+- **`FillStdData()` fires on `TextChanged`**, so typing an eight-character
+  student number opens eight connections and runs eight `SELECT *` queries,
+  seven of which match nothing and blank the name boxes as they go.
+- The profile screen's `FillMedicalExamination()` selects a column
+  `MedicalExamination` from the table `MedicalExamination` — a column no insert
+  in the codebase writes — and assigns the result to `CombType`, the **degree
+  type** combo, which is then saved to `StudentsProfilees.Type`. It was
+  commented out at its call site rather than fixed
+  ([frmStudentProfiles.vb:664](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentProfiles.vb#L664)).
+
+#### Three more findings in the profile screen
+
+**The deployed binary showed one faculty.** The profile list is filtered on a
+hard-coded college name, with three earlier faculties commented out above it:
+
+```vb
+Dim cmd As New SqlCommand("select … from StdForm where StdFiNaA Like N'%" & _
+  Me.txtStudNameSearch.Text.Trim & "%' and CH=0 and " & _
+  "Coleg='علوم الحاسوب وتقانة المعلومات'   Order By RegDate ASC", cnn)
+```
+([frmStudentProfiles.vb:35-38](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentProfiles.vb#L35-L38))
+
+Changing faculty meant editing source and recompiling.
+
+**The parent's occupation was stored in the telephone column.** `txtStdParJop`
+is loaded from `StdForm.JobofParent` (line 373) and saved into
+`StudentsProfilees.PhoneNo` (line 246), which the grid then displays under a
+telephone heading (line 88). The control is `Enabled = False`, so nobody could
+correct it.
+
+**Clicking "edit" on one row wrote back every row on screen.** The
+`CellContentClick` handler loops `For Each row As DataGridViewRow In
+Me.GridStudProfiles.Rows` and updates all of them, with `Where UnivID=" &
+row.Cells(0).Value` built by concatenation ([lines 593-603](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentProfiles.vb#L593-L603)).
+
+And the save is the **third** DELETE-then-insert in this codebase — after
+`frmTuitionFees` (B1) and `frmStudentsVacants` (B2):
+
+```vb
+cmd.CommandText = "Delete From StudentsProfilees Where StudentIndex=N'" & _
+                  (Me.TxtYear.Text) + (Me.txtStdIndex.Text.Trim) & "'"
+cmd.ExecuteNonQuery()
+cmd.CommandText = "Insert Into StudentsProfilees (…)"
+```
+([frmStudentProfiles.vb:233-236](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentProfiles.vb#L233-L236))
+
+`' Trans.Commit()` is commented out on the line below, so the two statements
+run on an autocommit connection: a failure between them leaves the student
+with no profile at all. On the rejection branch the `DELETE` keys on
+`txtStdIndex` alone while the `INSERT` keys on year + index, so the delete
+never matches and rejecting a student twice inserts twice.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| Discrete four-part Arabic and English names (REQ-ST-01) | All four or none per language, by CHECK. Where the parts exist, the displayed name must equal them joined — enforced by trigger, so the two can never disagree. One `composeName` function, where the legacy build had the same expression written inline in four screens |
+| One student, one profile | Demographics, dual-calendar birth date, contact, guardian and the secondary-school record, in named columns. A guardian's occupation cannot land in a telephone field because both are named and typed |
+| The profile is **seeded from the application** at enrolment | Birth date, passport, contact and certificate carry across from B2. The whole point of admissions and the registry sharing a database, and the direct answer to typing the same four names into two screens |
+| Hijri conversion happens **once, deliberately** | `birthDateFromHijri` converts at the point of transcription and `birthCalendar` records what the document said, so somebody comparing the profile against a Hijri passport knows why the rendered date may sit a day either side |
+| Directory search over a **GIN trigram index** (REQ-ST-03) | Every name part in both languages, plus the university number and national ID, normalised. Every term must match, so a second word narrows. Filters by programme, faculty, batch, category, nationality and status, with an honest total |
+| Profile completeness **names what is missing** | Including the four dimensions the fee matrix is keyed on, so registration fails at the first step rather than the last |
+| The four fee-matrix dimensions may be filled in but **never cleared** | Deferred from B1, settled here by trigger. They stay nullable because A3 created students before Track B existed; what must not happen is a student who has a programme losing it, because `resolveFeeSchedule` then silently stops finding the schedule that has been billing them all year |
+| Per-programme document checklists (REQ-ST-05) | Requirements are **additive**: declaring one leaves the others alone, and removing one is a separate call. The shape of code where the legacy defect lives, written the other way round |
+| Documents **supersede, never replace** | One live document per type per student, by partial unique index. A replaced passport scan is the evidence of what was checked last year |
+| **The verifier is never the uploader**, by CHECK | A certificate uploaded and marked verified by one person has been checked by nobody. Enforced per document rather than as an SoD pair, so a registry office of two can still function |
+| A renewable document must carry an expiry | By trigger, cross-table. A residence permit with no expiry never reaches the expiry report, which is how a university finds out in June that its foreign students are out of status |
+| Medical records: the legacy six fields, typed, plus vaccinations, chronic conditions, allergies, officer notes, a verdict and a validity date (REQ-ST-02) | `ScreeningResult` makes *not tested* a value. The clinician is named separately from the clerk who keyed the record |
+| Medical records are **append-only** | One current record per student; a re-examination supersedes rather than edits, and neither editing nor deleting is possible even for the database owner. The same rule the ledger applies to a posted voucher, for the same reason |
+| A `Medical Officer` role | The legacy medical screen was reachable by every authenticated user, because the system had no roles at all — a cashier could read a student's HIV result |
+
+#### Two decisions worth recording
+
+**A lapsed clearance is not an unfit verdict.** `fitnessStatus` returns
+`LAPSED` as a state of its own. Telling a student they are unfit when their
+certificate has merely run out is a different, and worse, conversation, and
+collapsing the two is the kind of thing that gets discovered in a complaint.
+
+**An expired document outranks a verified one on the checklist.** A passport
+verified in 2024 and expired in 2025 is not a satisfied requirement, however
+green it once was. `documentChecklist` takes an `asOf` date and the test
+asserts the same document reads VERIFIED in 2026 and EXPIRED in 2027.
+
+#### One defect found by the tests
+
+`rejectDocument` returned `Promise<void>` but threw its "a rejection needs a
+reason" guard **synchronously**, before returning a promise — so a caller
+writing `.catch()` rather than `await` would have missed it entirely and
+carried on as though the document had been rejected. Both `verifyDocument` and
+`rejectDocument` are now genuinely `async`.
+
+#### One design assumption corrected mid-build
+
+`findLikelyDuplicates` was written to match on the national ID. It cannot:
+`uq_student_national_id` is a partial unique index, so two students in one
+tenant cannot share one and looking is wasted work. It now matches on the
+**passport number**, which carries no uniqueness constraint and is how a
+foreign student ends up on file twice, and on the normalised name — which is
+the duplicate the legacy system actually produced, because it created a
+student record whenever a cashier took money from somebody the search dialog
+failed to find, and that dialog matched a prefix of the first name.
+
+#### Verification
+
+75 tests. The ones that carry the most weight:
+
+- `finds a student by their family name` and `finds a student by a middle
+  name` — the legacy `like N'<typed>%'` on `StdFirName` written down as its
+  negation.
+- `distinguishes not tested from negative` — the empty-string HIV result.
+- `an expired document is not satisfied, even though it was verified`.
+- `declaring one requirement leaves the others untouched` — the same assertion
+  as B1's `prices one cohort without touching another` and B2's `updating one
+  quota leaves the others untouched`, now for a third screen.
+
+Eleven constraints are exercised by writing directly as the **owner role**,
+which bypasses RLS: a full name that disagrees with its parts, two of four
+name parts, clearing a programme or a batch, a second live document of one
+type, swapping the bytes behind a document, editing a superseded document,
+deleting a checked one, a second current medical record, an unreasoned
+verdict, editing a recorded examination, and deleting one. All eleven are
+refused by the database rather than by application code.
+
+**Deferred:** webcam photo capture and the object-storage upload endpoint
+itself — the metadata, digest and supersession model are complete and the
+bytes land in the same store as voucher attachments (A2), but the browser
+capture surface is a Track C screen. Bilingual profile printing uses the A7
+print path; the profile card template is a Track C document.
+
+---
+
 
 ## 7. Track C — Public Surface
 

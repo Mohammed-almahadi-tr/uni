@@ -16,6 +16,7 @@ import { installChartOfAccounts } from '@/lib/coa/template';
 import { installFeeCatalog } from '@/lib/fees/catalog';
 import { installAssetCategories } from '@/lib/assets/register';
 import { installAcademicDefaults } from '@/lib/academic/defaults';
+import { installDocumentTypes } from '@/lib/students/defaults';
 import type { Principal } from '@/lib/auth/rbac';
 import type { PermissionKey } from '@/lib/auth/permissions';
 
@@ -291,6 +292,8 @@ export interface University {
   admissionCategories: Record<string, string>;
   nationalities: Record<string, string>;
   certificateTypes: Record<string, string>;
+  /** Document types (Track B3), keyed by code. MBBS requires three of them. */
+  documentTypes: Record<string, string>;
 }
 
 let uniCounter = 0;
@@ -318,6 +321,7 @@ export async function makeUniversity(
   await installFeeCatalog(t.tenantId, t.adminUserId);
   await installAssetCategories(t.tenantId, t.adminUserId);
   await installAcademicDefaults(t.tenantId, t.adminUserId);
+  await installDocumentTypes(t.tenantId, t.adminUserId);
 
   const { fiscalYearId, periodIds } = await withSystem(
     (tx) =>
@@ -438,6 +442,23 @@ export async function makeUniversity(
         where: { tenantId: t.tenantId },
         select: { id: true, code: true },
       });
+      const docTypes = await tx.documentType.findMany({
+        where: { tenantId: t.tenantId },
+        select: { id: true, code: true },
+      });
+      const docTypeByCode = Object.fromEntries(docTypes.map((d) => [d.code, d.id]));
+
+      // Medicine's checklist: photograph, national ID and secondary
+      // certificate are mandatory; a passport is requested but not required,
+      // since most of the intake is Sudanese.
+      await tx.programmeDocumentRequirement.createMany({
+        data: [
+          { tenantId: t.tenantId, programmeId: mbbs.id, documentTypeId: docTypeByCode.PHOTO, isMandatory: true },
+          { tenantId: t.tenantId, programmeId: mbbs.id, documentTypeId: docTypeByCode.NATIONAL_ID, isMandatory: true },
+          { tenantId: t.tenantId, programmeId: mbbs.id, documentTypeId: docTypeByCode.SECONDARY_CERT, isMandatory: true },
+          { tenantId: t.tenantId, programmeId: mbbs.id, documentTypeId: docTypeByCode.PASSPORT, isMandatory: false },
+        ],
+      });
 
       return {
         facultyId: faculty.id,
@@ -446,6 +467,7 @@ export async function makeUniversity(
         admissionCategories: Object.fromEntries(cats.map((c) => [c.code, c.id])),
         nationalities: Object.fromEntries(nats.map((n) => [n.code, n.id])),
         certificateTypes: Object.fromEntries(certs.map((c) => [c.code, c.id])),
+        documentTypes: docTypeByCode,
       };
     },
     {},

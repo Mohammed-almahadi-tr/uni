@@ -651,6 +651,13 @@ export async function enrolAcceptedOffer(
         batchId: true,
         admissionCategoryId: true,
         nationalityId: true,
+        passportNo: true,
+        dateOfBirth: true,
+        email: true,
+        phone: true,
+        certificateTypeId: true,
+        certificateScore: true,
+        certificateYear: true,
       },
     });
     if (app.state === 'ENROLLED') {
@@ -690,6 +697,27 @@ export async function enrolAcceptedOffer(
         nationalityId: app.nationalityId,
       },
       select: { id: true, studentNo: true },
+    });
+
+    // Seed the profile from what the applicant already told us (B3). The
+    // legacy system re-keyed this: `FrmStudForm2` wrote the applicant's names,
+    // birth date and contact details to `StdForm`, and then a second clerk
+    // typed the same names again into `StdData` on a different screen, with
+    // nothing reconciling the two. Carrying it across is the whole point of
+    // having admissions and the registry in one database.
+    await tx.studentProfile.create({
+      data: {
+        tenantId: principal.tenantId,
+        studentId: student.id,
+        dateOfBirth: app.dateOfBirth,
+        passportNo: app.passportNo,
+        email: app.email,
+        phone: app.phone,
+        certificateTypeId: app.certificateTypeId,
+        certificateScore: app.certificateScore,
+        certificateYear: app.certificateYear,
+        updatedById: principal.userId,
+      },
     });
 
     await tx.application.update({

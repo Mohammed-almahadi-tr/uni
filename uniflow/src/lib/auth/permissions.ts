@@ -50,6 +50,7 @@ export const PERMISSIONS = [
   { key: 'student.read', description: 'View student profiles' },
   { key: 'student.manage', description: 'Create and edit student profiles' },
   { key: 'student.status', description: 'Change student status (defer, withdraw, readmit)' },
+  { key: 'document.verify', description: 'Verify or reject an uploaded student document' },
   { key: 'medical.read', description: 'View student medical records' },
   { key: 'medical.manage', description: 'Record medical examinations and fitness' },
 
@@ -357,7 +358,7 @@ export const DEFAULT_ROLES: Record<
     permissions: [
       'user.read', 'user.manage', 'role.read', 'role.manage', 'audit.read',
       'academic.read', 'academic.manage', 'coa.read', 'period.read',
-      'report.financial', 'report.student',
+      'document.verify', 'report.financial', 'report.student',
     ],
   },
   Registrar: {
@@ -366,6 +367,7 @@ export const DEFAULT_ROLES: Record<
       'academic.read', 'feematrix.read', 'application.read', 'application.decide',
       'application.offer', 'application.enrol', 'admission.capacity',
       'student.read', 'student.manage', 'student.status', 'medical.read',
+      'document.verify',
       'registration.read', 'registration.create', 'registration.cancel',
       'registration.transfer', 'hold.manage', 'discount.apply', 'charge.create',
       'report.student',
@@ -429,5 +431,13 @@ export const DEFAULT_ROLES: Record<
   'Stores Officer': {
     nameAr: 'أمين المخازن',
     permissions: ['grn.create', 'voucher.read'],
+  },
+  // The legacy medical screen was open to every authenticated user, because
+  // there were no roles at all — a cashier could record a student's HIV
+  // result. These are the most sensitive rows in the database and this role
+  // exists so they are not readable by everybody who can look up a student.
+  'Medical Officer': {
+    nameAr: 'الطبيب',
+    permissions: ['student.read', 'medical.read', 'medical.manage'],
   },
 };

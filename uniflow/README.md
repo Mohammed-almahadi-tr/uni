@@ -6,7 +6,7 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete · Track A complete (A1-A7) · Track B under way (B1-B2).** Ledger invariants,
+**Status: Phase 0 complete · Track A complete (A1-A7) · Track B under way (B1-B3).** Ledger invariants,
 platform spine, auth/RBAC with segregation of duties, the bilingual RTL shell,
 a normalised chart of accounts, a four-state maker-checker workflow whose
 drafts are never deleted, and a working cashier desk: fee catalog, student
@@ -16,9 +16,10 @@ a fixed-asset register with an idempotent depreciation batch, budgetary control
 with a full procure-to-pay chain, and the financial statements that make all of
 it legible — trial balance, balance sheet, income statement, sub-ledger
 reconciliation, and their CSV, Excel and print exports — plus the first of
-Track B: the academic structure, an effective-dated versioned fee matrix, and
-admissions with real seat capacity. **588 tests across 19 suites; typecheck,
-lint and production build clean.**
+Track B: the academic structure, an effective-dated versioned fee matrix,
+admissions with real seat capacity, and the student profile with its document
+checklists and medical records. **663 tests across 20 suites; typecheck, lint
+and production build clean.**
 
 The finance engine is done. **There is no user interface yet** — one demo route
 proving the localisation layer works end to end, and nothing else. Tracks B
@@ -34,7 +35,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 588 tests
+npm test              # 663 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -336,6 +337,40 @@ eighteen tests failed on the contradiction. The constraint was right — so
 allocating a seat now demands a recorded verdict with its rationale. Deciding
 and admitting are separate acts, and collapsing them is how the old system
 over-admitted.
+
+**B3 — Profile, documents and medical.** One student lived in four tables with
+no key joining them, and the four Arabic names were typed **twice**, on two
+screens, by two clerks — `FrmStudForm2` into `StdForm`, `FrmDataEntery` into
+`StdData`. Nothing reconciled them, and the search dialog read only the second,
+so a name corrected on the admission form stayed wrong everywhere it was looked
+up. The richer admission screen, `FrmForm.vb`, is 649 lines with its entire
+save commented out.
+
+The admission date was manufactured rather than recorded: `dat =
+dat1.AddMinutes(10)`, ten minutes after the previous student in that faculty.
+The other branch calls `dat.AddMinutes(30)` and throws the result away — `Date`
+is a value type — and because `IsNull(Max(RegDate),0)` returns 1900-01-01, the
+first student of every new faculty is dated 1900.
+
+The medical form refused to save until all four Arabic name fields were filled
+in and then inserted six columns, none of them a name. An unset HIV combo box
+was stored as the empty string, so *never screened* and *screened negative*
+were the same value. `Employee` held the data-entry clerk, so no record names
+who examined anyone, and there was no verdict at all.
+
+The replacement stores four discrete name parts per language — all four or
+none, and the displayed name must equal them joined, both by database
+constraint. Search runs over a GIN trigram index across every name part in both
+languages, so a family name finds a student and أحمد finds احمد; the legacy
+query was `Where StdFirName like N'<typed>%'`, a prefix of the *first* name.
+Documents supersede rather than replace, one live per type per student, and the
+verifier can never be the uploader. Medical records are append-only with one
+current record each: a re-examination supersedes, and neither editing nor
+deleting is possible even for the database owner — the same rule the ledger
+applies to a posted voucher.
+
+The profile is also **seeded from the application** at enrolment, which is what
+having admissions and the registry in one database is for.
 
 **B1 — Academic structure and the fee matrix.** The worst defect the legacy
 audit has found is four lines apart in one file. The fee grid was loaded
