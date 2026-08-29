@@ -61,6 +61,9 @@ export interface RaiseChargesInput {
   docDate: Date;
   description?: string;
   termLabel?: string | null;
+  /** Set by the registration engine, so every charge it raises is traceable
+   *  back to the registration that caused it (B4). */
+  registrationId?: string | null;
   lines: ChargeLineInput[];
   sourceModule?: SourceModule;
   sourceRef?: string | null;
@@ -299,6 +302,7 @@ export async function raiseChargesInTx(
         tenantId,
         studentId: student.id,
         feeItemId: p.feeItemId,
+        registrationId: input.registrationId ?? null,
         termLabel: input.termLabel ?? null,
         docDate,
         dueDate: p.dueDate,
@@ -352,7 +356,7 @@ export async function raiseChargesInTx(
 }
 
 /**
- * Reverse a single billed charge.
+ * Reverse billed charges — one voucher, however many charges.
  *
  * Harder than it looks, because a charge in the wild has usually been partly
  * paid and partly recognised, and both have to be unwound correctly:
@@ -365,62 +369,85 @@ export async function raiseChargesInTx(
  *     student AR to student overpayments and is available against the next
  *     charge — it is not silently kept.
  *
- * The original charge is never edited beyond its reversal stamp. As with a
- * voucher, correction is by reversal.
+ * Several charges reverse into a *single* voucher because a registration is
+ * billed by a single voucher (REQ-REG-02) and cancelling it must produce one
+ * linked reversing entry, not one per fee item (REQ-REG-03). Pass
+ * `reversesHeaderId` to link them; the ledger then stamps the original as
+ * reversed and "is this live?" needs no join.
+ *
+ * The original charges are never edited beyond their reversal stamp. As with
+ * a voucher, correction is by reversal.
  */
-export async function reverseCharge(
+export async function reverseChargesInTx(
+  tx: Tx,
   principal: Principal,
-  chargeId: string,
+  chargeIds: string[],
   reason: string,
-  opts: { reversalDate?: Date } = {},
+  opts: {
+    reversalDate?: Date;
+    /** Link the reversal to the voucher that raised these charges. */
+    reversesHeaderId?: string | null;
+    /** Overrides the default "Reversal of …" narration. */
+    description?: string;
+  } = {},
 ): Promise<{ headerId: string; voucherRef: string; freedToCredit: string }> {
-  requirePermission(principal, 'charge.reverse');
+  const { tenantId } = principal;
 
   const trimmed = reason?.trim();
   if (!trimmed) {
     throw new ChargeError('Reversing a charge requires a stated reason.');
   }
+  if (chargeIds.length === 0) {
+    throw new ChargeError('Nothing to reverse.');
+  }
 
-  return withTenant(principal.tenantId, async (tx) => {
-    const { tenantId } = principal;
-
-    const charge = await tx.studentCharge.findUnique({
-      where: { id: chargeId },
-      select: {
-        id: true,
-        studentId: true,
-        grossAmount: true,
-        discountAmount: true,
-        netAmount: true,
-        settledAmount: true,
-        recognisedAmount: true,
-        isDeferred: true,
-        reversedAt: true,
-        docDate: true,
-        feeItem: {
-          select: {
-            code: true,
-            nameEn: true,
-            revenueAccountId: true,
-            unearnedAccountId: true,
-            costCenterId: true,
-            revenueAccount: { select: { requiresCostCenter: true } },
-          },
+  const charges = await tx.studentCharge.findMany({
+    where: { id: { in: chargeIds } },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      studentId: true,
+      grossAmount: true,
+      discountAmount: true,
+      netAmount: true,
+      settledAmount: true,
+      recognisedAmount: true,
+      isDeferred: true,
+      reversedAt: true,
+      docDate: true,
+      feeItem: {
+        select: {
+          code: true,
+          nameEn: true,
+          revenueAccountId: true,
+          unearnedAccountId: true,
+          costCenterId: true,
+          revenueAccount: { select: { requiresCostCenter: true } },
         },
-        student: { select: { studentNo: true } },
       },
-    });
-    if (!charge) throw new ChargeError('Charge not found in this tenant.');
-    if (charge.reversedAt) {
-      throw new ChargeError('That charge has already been reversed.');
+      student: { select: { studentNo: true } },
+    },
+  });
+
+  if (charges.length !== chargeIds.length) {
+    throw new ChargeError('Charge not found in this tenant.');
+  }
+  for (const c of charges) {
+    if (c.reversedAt) {
+      throw new ChargeError(`The ${c.feeItem.code} charge has already been reversed.`);
     }
+  }
 
-    const accounts = await requireAccounts(tx, tenantId, [
-      'STUDENT_AR_CONTROL',
-      'STUDENT_CREDIT_CONTROL',
-      'DEFAULT_DISCOUNT_EXPENSE',
-    ] as const);
+  const accounts = await requireAccounts(tx, tenantId, [
+    'STUDENT_AR_CONTROL',
+    'STUDENT_CREDIT_CONTROL',
+    'DEFAULT_DISCOUNT_EXPENSE',
+  ] as const);
 
+  const lines: PostingLine[] = [];
+  let freedTotal = ZERO;
+
+  for (const charge of charges) {
     // The line that originally credited revenue or unearned income has to be
     // unwound in the proportions that actually apply now, not the proportions
     // that applied when it was billed.
@@ -433,8 +460,6 @@ export async function reverseCharge(
           `item has no default. Set one before reversing charges against it.`,
       );
     }
-
-    const lines: PostingLine[] = [];
 
     if (!recognised.isZero()) {
       lines.push({
@@ -489,22 +514,33 @@ export async function reverseCharge(
         credit: freed,
         description: `Credit balance from reversed charge — ${charge.student.studentNo}`,
       });
+      freedTotal = freedTotal.plus(freed);
     }
+  }
 
-    const posted = await post(tx, tenantId, {
-      voucherType: 'REVERSAL',
-      docDate: opts.reversalDate ?? new Date(),
-      description: `Reversal of ${charge.feeItem.nameEn} — ${charge.student.studentNo}: ${trimmed}`,
-      sourceModule: 'REGISTRATION',
-      sourceRef: charge.studentId,
-      postedById: principal.userId,
-      lines,
-    });
+  const first = charges[0];
+  const label =
+    charges.length === 1
+      ? `${first.feeItem.nameEn} — ${first.student.studentNo}`
+      : `${charges.length} charges — ${first.student.studentNo}`;
 
+  const posted = await post(tx, tenantId, {
+    voucherType: 'REVERSAL',
+    docDate: opts.reversalDate ?? new Date(),
+    description: opts.description?.trim() || `Reversal of ${label}: ${trimmed}`,
+    sourceModule: 'REGISTRATION',
+    sourceRef: first.studentId,
+    postedById: principal.userId,
+    reversesId: opts.reversesHeaderId ?? null,
+    reversalReason: opts.reversesHeaderId ? trimmed : null,
+    lines,
+  });
+
+  for (const charge of charges) {
     // Release the allocations. The receipts keep their money; it is simply no
     // longer matched to anything, which is what makes it a credit balance.
     const allocations = await tx.receiptAllocation.findMany({
-      where: { chargeId },
+      where: { chargeId: charge.id },
       select: { id: true, receiptId: true, amount: true },
     });
     for (const a of allocations) {
@@ -517,10 +553,12 @@ export async function reverseCharge(
 
     // Unposted recognition slices simply stop existing; posted ones have been
     // dealt with above, in the ledger.
-    await tx.recognitionEntry.deleteMany({ where: { chargeId, recognisedAt: null } });
+    await tx.recognitionEntry.deleteMany({
+      where: { chargeId: charge.id, recognisedAt: null },
+    });
 
     await tx.studentCharge.update({
-      where: { id: chargeId },
+      where: { id: charge.id },
       data: {
         settledAmount: ZERO,
         reversedAt: new Date(),
@@ -533,20 +571,38 @@ export async function reverseCharge(
       actorId: principal.userId,
       action: 'REVERSE',
       resourceType: 'student.charge',
-      resourceId: chargeId,
+      resourceId: charge.id,
       before: {
         feeItem: charge.feeItem.code,
         netAmount: charge.netAmount.toFixed(4),
-        settledAmount: freed.toFixed(4),
-        recognisedAmount: recognised.toFixed(4),
+        settledAmount: charge.settledAmount.toFixed(4),
+        recognisedAmount: charge.recognisedAmount.toFixed(4),
       },
-      after: { voucherRef: posted.voucherRef, reason: trimmed, freedToCredit: freed.toFixed(4) },
+      after: {
+        voucherRef: posted.voucherRef,
+        reason: trimmed,
+        freedToCredit: charge.settledAmount.toFixed(4),
+      },
     });
+  }
 
-    return {
-      headerId: posted.headerId,
-      voucherRef: posted.voucherRef,
-      freedToCredit: freed.toFixed(4),
-    };
-  });
+  return {
+    headerId: posted.headerId,
+    voucherRef: posted.voucherRef,
+    freedToCredit: freedTotal.toFixed(4),
+  };
+}
+
+/** Reverse one billed charge. */
+export async function reverseCharge(
+  principal: Principal,
+  chargeId: string,
+  reason: string,
+  opts: { reversalDate?: Date } = {},
+): Promise<{ headerId: string; voucherRef: string; freedToCredit: string }> {
+  requirePermission(principal, 'charge.reverse');
+
+  return withTenant(principal.tenantId, (tx) =>
+    reverseChargesInTx(tx, principal, [chargeId], reason, opts),
+  );
 }

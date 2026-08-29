@@ -418,18 +418,24 @@ enum AuditAction {
 // ---------------------------------------------------------------------------
 
 model Tenant {
-  id                   String   @id @default(uuid()) @db.Uuid
-  slug                 String   @unique
-  nameEn               String   @map("name_en")
-  nameAr               String   @map("name_ar")
-  logoUrl              String?  @map("logo_url")
-  themeConfig          Json?    @map("theme_config")
+  id                           String   @id @default(uuid()) @db.Uuid
+  slug                         String   @unique
+  nameEn                       String   @map("name_en")
+  nameAr                       String   @map("name_ar")
+  logoUrl                      String?  @map("logo_url")
+  themeConfig                  Json?    @map("theme_config")
   /// The currency the books are kept in. Every balance check and every
   /// statement is expressed in this currency.
-  functionalCurrency   String   @default("SDG") @map("functional_currency") @db.Char(3)
-  fiscalYearStartMonth Int      @default(1) @map("fiscal_year_start_month") @db.SmallInt
-  isActive             Boolean  @default(true) @map("is_active")
-  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  functionalCurrency           String   @default("SDG") @map("functional_currency") @db.Char(3)
+  fiscalYearStartMonth         Int      @default(1) @map("fiscal_year_start_month") @db.SmallInt
+  /// Discounts at or below this percentage of a registration may be applied by
+  /// the registrar alone; anything above it parks the registration in
+  /// PENDING_APPROVAL until someone holding `discount.approve` signs it
+  /// (SRS REQ-SPN-04, REQ-REG-01). Configurable because the figure an
+  /// institution is comfortable with is a policy, not a constant.
+  discountApprovalThresholdPct Decimal  @default(10) @map("discount_approval_threshold_pct") @db.Decimal(7, 4)
+  isActive                     Boolean  @default(true) @map("is_active")
+  createdAt                    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   users           User[]
   roles           Role[]
@@ -500,11 +506,14 @@ model Tenant {
   applicationChoices ApplicationChoice[]
   admissionOffers    AdmissionOffer[]
 
-  studentProfiles     StudentProfile[]
-  documentTypes       DocumentType[]
+  studentProfiles      StudentProfile[]
+  documentTypes        DocumentType[]
   documentRequirements ProgrammeDocumentRequirement[]
-  studentDocuments    StudentDocument[]
-  medicalRecords      MedicalRecord[]
+  studentDocuments     StudentDocument[]
+  medicalRecords       MedicalRecord[]
+
+  registrations     SemesterRegistration[]
+  registrationLines RegistrationLine[]
 
   @@map("tenants")
 }
@@ -559,15 +568,19 @@ model User {
   feeSchedulesPrepared FeeSchedule[] @relation("FeeSchedulePreparer")
   feeSchedulesApproved FeeSchedule[] @relation("FeeScheduleApprover")
 
-  seatQuotasCreated    SeatQuota[]      @relation("SeatQuotaCreator")
-  applicationsDecided  Application[]    @relation("ApplicationDecider")
-  offersIssued         AdmissionOffer[] @relation("OfferIssuer")
-  offersOverridden     AdmissionOffer[] @relation("OfferOverrider")
+  seatQuotasCreated   SeatQuota[]      @relation("SeatQuotaCreator")
+  applicationsDecided Application[]    @relation("ApplicationDecider")
+  offersIssued        AdmissionOffer[] @relation("OfferIssuer")
+  offersOverridden    AdmissionOffer[] @relation("OfferOverrider")
 
-  profilesEdited       StudentProfile[]  @relation("ProfileEditor")
-  documentsUploaded    StudentDocument[] @relation("DocumentUploader")
-  documentsVerified    StudentDocument[] @relation("DocumentVerifier")
-  medicalRecorded      MedicalRecord[]   @relation("MedicalRecorder")
+  profilesEdited    StudentProfile[]  @relation("ProfileEditor")
+  documentsUploaded StudentDocument[] @relation("DocumentUploader")
+  documentsVerified StudentDocument[] @relation("DocumentVerifier")
+  medicalRecorded   MedicalRecord[]   @relation("MedicalRecorder")
+
+  registrationsCreated   SemesterRegistration[] @relation("RegistrationCreator")
+  registrationsApproved  SemesterRegistration[] @relation("RegistrationDiscountApprover")
+  registrationsCancelled SemesterRegistration[] @relation("RegistrationCanceller")
 
   budgetsPrepared     Budget[]              @relation("BudgetPreparer")
   budgetsApproved     Budget[]              @relation("BudgetApprover")
@@ -1009,16 +1022,18 @@ model TransactionHeader {
   lines        TransactionLine[]
   draft        VoucherDraft?
 
-  chargesRaised        StudentCharge[]     @relation("ChargePosting")
-  chargesReversed      StudentCharge[]     @relation("ChargeReversalPosting")
-  studentReceipt       StudentReceipt?     @relation("ReceiptPosting")
-  receiptCancellation  StudentReceipt?     @relation("ReceiptCancellationPosting")
-  recognitions         RecognitionEntry[]  @relation("RecognitionPosting")
-  chequeEvents         ChequeEvent[]       @relation("ChequeEventPosting")
-  receiptDishonours    StudentReceipt[]    @relation("ReceiptDishonourPosting")
-  assetCapitalisations FixedAsset[]        @relation("AssetCapitalisation")
-  assetDisposal        FixedAsset?         @relation("AssetDisposal")
-  depreciationEntries  DepreciationEntry[] @relation("DepreciationPosting")
+  chargesRaised         StudentCharge[]        @relation("ChargePosting")
+  chargesReversed       StudentCharge[]        @relation("ChargeReversalPosting")
+  studentReceipt        StudentReceipt?        @relation("ReceiptPosting")
+  receiptCancellation   StudentReceipt?        @relation("ReceiptCancellationPosting")
+  recognitions          RecognitionEntry[]     @relation("RecognitionPosting")
+  chequeEvents          ChequeEvent[]          @relation("ChequeEventPosting")
+  receiptDishonours     StudentReceipt[]       @relation("ReceiptDishonourPosting")
+  assetCapitalisations  FixedAsset[]           @relation("AssetCapitalisation")
+  assetDisposal         FixedAsset?            @relation("AssetDisposal")
+  depreciationEntries   DepreciationEntry[]    @relation("DepreciationPosting")
+  registrationsBilled   SemesterRegistration[] @relation("RegistrationPosting")
+  registrationsReversed SemesterRegistration[] @relation("RegistrationReversal")
 
   goodsReceipt        GoodsReceipt?   @relation("GoodsReceiptPosting")
   vendorInvoice       VendorInvoice?  @relation("InvoicePosting")
@@ -1184,12 +1199,13 @@ model FeeItem {
   sortOrder     Int           @default(0) @map("sort_order")
   isActive      Boolean       @default(true) @map("is_active")
 
-  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  revenueAccount  Account         @relation("FeeRevenueAccount", fields: [revenueAccountId], references: [id])
-  unearnedAccount Account?        @relation("FeeUnearnedAccount", fields: [unearnedAccountId], references: [id])
-  costCenter      CostCenter?     @relation(fields: [costCenterId], references: [id])
-  charges         StudentCharge[]
-  scheduleLines   FeeScheduleLine[]
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  revenueAccount    Account            @relation("FeeRevenueAccount", fields: [revenueAccountId], references: [id])
+  unearnedAccount   Account?           @relation("FeeUnearnedAccount", fields: [unearnedAccountId], references: [id])
+  costCenter        CostCenter?        @relation(fields: [costCenterId], references: [id])
+  charges           StudentCharge[]
+  scheduleLines     FeeScheduleLine[]
+  registrationLines RegistrationLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId, isActive, sortOrder])
@@ -1204,11 +1220,11 @@ model FeeItem {
 /// has never heard of. Track B extends this table rather than replacing it;
 /// the sub-ledger attaches by `id`.
 model Student {
-  id         String  @id @default(uuid()) @db.Uuid
-  tenantId   String  @map("tenant_id") @db.Uuid
-  studentNo  String  @map("student_no")
-  fullNameAr String  @map("full_name_ar")
-  fullNameEn String  @map("full_name_en")
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  studentNo  String @map("student_no")
+  fullNameAr String @map("full_name_ar")
+  fullNameEn String @map("full_name_en")
 
   /// The four Arabic and four English name parts (REQ-ST-01).
   ///
@@ -1222,14 +1238,14 @@ model Student {
   /// never disagree. The full name stays the canonical display value because
   /// receipts, certificates and the sub-ledger all quote it, and a student
   /// admitted before Track B has no parts to compose one from.
-  nameAr1 String? @map("name_ar_1")
-  nameAr2 String? @map("name_ar_2")
-  nameAr3 String? @map("name_ar_3")
-  nameAr4 String? @map("name_ar_4")
-  nameEn1 String? @map("name_en_1")
-  nameEn2 String? @map("name_en_2")
-  nameEn3 String? @map("name_en_3")
-  nameEn4 String? @map("name_en_4")
+  nameAr1    String? @map("name_ar_1")
+  nameAr2    String? @map("name_ar_2")
+  nameAr3    String? @map("name_ar_3")
+  nameAr4    String? @map("name_ar_4")
+  nameEn1    String? @map("name_en_1")
+  nameEn2    String? @map("name_en_2")
+  nameEn3    String? @map("name_en_3")
+  nameEn4    String? @map("name_en_4")
   /// Alef/hamza/taa-marbuta-normalised name, for search (REQ-ST-03). Written
   /// by the application, never by hand.
   searchKey  String  @map("search_key")
@@ -1250,18 +1266,19 @@ model Student {
   admissionCategoryId String? @map("admission_category_id") @db.Uuid
   nationalityId       String? @map("nationality_id") @db.Uuid
 
-  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  programme         Programme?         @relation(fields: [programmeId], references: [id])
-  batch             Batch?             @relation(fields: [batchId], references: [id])
-  admissionCategory AdmissionCategory? @relation(fields: [admissionCategoryId], references: [id])
-  nationality       Nationality?       @relation(fields: [nationalityId], references: [id])
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme         Programme?             @relation(fields: [programmeId], references: [id])
+  batch             Batch?                 @relation(fields: [batchId], references: [id])
+  admissionCategory AdmissionCategory?     @relation(fields: [admissionCategoryId], references: [id])
+  nationality       Nationality?           @relation(fields: [nationalityId], references: [id])
   charges           StudentCharge[]
   receipts          StudentReceipt[]
   plans             InstalmentPlan[]
-  application       Application?       @relation("ApplicationStudent")
+  application       Application?           @relation("ApplicationStudent")
   profile           StudentProfile?
   documents         StudentDocument[]
   medicalRecords    MedicalRecord[]
+  registrations     SemesterRegistration[]
 
   @@unique([tenantId, studentNo])
   @@index([tenantId, searchKey])
@@ -1286,6 +1303,11 @@ model StudentCharge {
   tenantId  String @map("tenant_id") @db.Uuid
   studentId String @map("student_id") @db.Uuid
   feeItemId String @map("fee_item_id") @db.Uuid
+
+  /// The registration that raised this charge, once Track B owns terms. Null
+  /// for everything billed outside one — a library fine, a returned-cheque
+  /// fee, an opening balance.
+  registrationId String? @map("registration_id") @db.Uuid
 
   /// Free text until Track B owns terms — "2026/1", "Spring 2026".
   termLabel String?   @map("term_label")
@@ -1318,17 +1340,20 @@ model StudentCharge {
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student      Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  feeItem      FeeItem             @relation(fields: [feeItemId], references: [id])
-  posting      TransactionHeader   @relation("ChargePosting", fields: [postedHeaderId], references: [id])
-  reversal     TransactionHeader?  @relation("ChargeReversalPosting", fields: [reversalHeaderId], references: [id])
-  createdBy    User                @relation("ChargeCreator", fields: [createdById], references: [id])
-  allocations  ReceiptAllocation[]
-  recognitions RecognitionEntry[]
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student          Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeItem          FeeItem               @relation(fields: [feeItemId], references: [id])
+  posting          TransactionHeader     @relation("ChargePosting", fields: [postedHeaderId], references: [id])
+  reversal         TransactionHeader?    @relation("ChargeReversalPosting", fields: [reversalHeaderId], references: [id])
+  createdBy        User                  @relation("ChargeCreator", fields: [createdById], references: [id])
+  allocations      ReceiptAllocation[]
+  recognitions     RecognitionEntry[]
+  registration     SemesterRegistration? @relation(fields: [registrationId], references: [id])
+  registrationLine RegistrationLine?     @relation("ChargeRegistrationLine")
 
   @@index([tenantId, studentId, reversedAt])
   @@index([tenantId, dueDate])
+  @@index([tenantId, registrationId])
   @@map("student_charges")
 }
 
@@ -2444,11 +2469,11 @@ enum FeeScheduleStatus {
 }
 
 model Faculty {
-  id       String @id @default(uuid()) @db.Uuid
-  tenantId String @map("tenant_id") @db.Uuid
-  code     String
-  nameAr   String @map("name_ar")
-  nameEn   String @map("name_en")
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  code         String
+  nameAr       String  @map("name_ar")
+  nameEn       String  @map("name_en")
   /// Where this faculty's costs and revenue land. The tuition account in the
   /// shipped chart requires a cost centre, and the faculty is the answer.
   costCenterId String? @map("cost_center_id") @db.Uuid
@@ -2491,14 +2516,14 @@ model Programme {
   nameAr       String  @map("name_ar")
   nameEn       String  @map("name_en")
 
-  degreeLevel DegreeLevel @map("degree_level")
+  degreeLevel     DegreeLevel @map("degree_level")
   /// Standard duration. Both are held because a fee matrix prices per term
   /// while an admission offer is written in years, and deriving one from the
   /// other assumes a term count that summer intakes break.
-  durationYears   Int     @map("duration_years")
-  durationTerms   Int     @map("duration_terms")
-  creditsRequired Int?    @map("credits_required")
-  isActive        Boolean @default(true) @map("is_active")
+  durationYears   Int         @map("duration_years")
+  durationTerms   Int         @map("duration_terms")
+  creditsRequired Int?        @map("credits_required")
+  isActive        Boolean     @default(true) @map("is_active")
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   faculty      Faculty       @relation(fields: [facultyId], references: [id])
@@ -2506,11 +2531,12 @@ model Programme {
   feeSchedules FeeSchedule[]
   students     Student[]
 
-  seatQuotas        SeatQuota[]
-  eligibilityRules  EligibilityRule[]
-  applicationChoice ApplicationChoice[]
-  admissionOffers   AdmissionOffer[]
+  seatQuotas           SeatQuota[]
+  eligibilityRules     EligibilityRule[]
+  applicationChoice    ApplicationChoice[]
+  admissionOffers      AdmissionOffer[]
   documentRequirements ProgrammeDocumentRequirement[]
+  registrations        SemesterRegistration[]
 
   @@unique([tenantId, code])
   @@index([tenantId, facultyId, isActive])
@@ -2533,8 +2559,9 @@ model AcademicYear {
   endDate   DateTime             @map("end_date") @db.Date
   status    AcademicPeriodStatus @default(PLANNED)
 
-  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  terms  AcademicTerm[]
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  terms         AcademicTerm[]
+  registrations SemesterRegistration[]
 
   @@unique([tenantId, code])
   @@index([tenantId, startDate])
@@ -2542,21 +2569,22 @@ model AcademicYear {
 }
 
 model AcademicTerm {
-  id             String   @id @default(uuid()) @db.Uuid
-  tenantId       String   @map("tenant_id") @db.Uuid
-  academicYearId String   @map("academic_year_id") @db.Uuid
-  seq            Int
-  kind           TermKind
-  nameAr         String   @map("name_ar")
-  nameEn         String   @map("name_en")
-  startDate      DateTime @map("start_date") @db.Date
-  endDate        DateTime @map("end_date") @db.Date
+  id                   String               @id @default(uuid()) @db.Uuid
+  tenantId             String               @map("tenant_id") @db.Uuid
+  academicYearId       String               @map("academic_year_id") @db.Uuid
+  seq                  Int
+  kind                 TermKind
+  nameAr               String               @map("name_ar")
+  nameEn               String               @map("name_en")
+  startDate            DateTime             @map("start_date") @db.Date
+  endDate              DateTime             @map("end_date") @db.Date
   /// Last day a student may register for this term without an override.
   registrationClosesOn DateTime?            @map("registration_closes_on") @db.Date
   status               AcademicPeriodStatus @default(PLANNED)
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  academicYear  AcademicYear           @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  registrations SemesterRegistration[]
 
   @@unique([academicYearId, seq])
   @@index([tenantId, startDate, endDate])
@@ -2575,11 +2603,12 @@ model Batch {
   admissionYear Int     @map("admission_year")
   isActive      Boolean @default(true) @map("is_active")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  feeSchedules FeeSchedule[]
-  students     Student[]
-  seatQuotas   SeatQuota[]
-  applications Application[]
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  feeSchedules  FeeSchedule[]
+  students      Student[]
+  seatQuotas    SeatQuota[]
+  applications  Application[]
+  registrations SemesterRegistration[]
 
   @@unique([tenantId, code])
   @@index([tenantId, admissionYear])
@@ -2598,11 +2627,12 @@ model AdmissionCategory {
   sortOrder Int     @default(0) @map("sort_order")
   isActive  Boolean @default(true) @map("is_active")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  feeSchedules FeeSchedule[]
-  students     Student[]
-  seatQuotas   SeatQuota[]
-  applications Application[]
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  feeSchedules  FeeSchedule[]
+  students      Student[]
+  seatQuotas    SeatQuota[]
+  applications  Application[]
+  registrations SemesterRegistration[]
 
   @@unique([tenantId, code])
   @@map("admission_categories")
@@ -2667,13 +2697,14 @@ model FeeSchedule {
   supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
   note         String?
 
-  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  programme         Programme         @relation(fields: [programmeId], references: [id])
-  batch             Batch             @relation(fields: [batchId], references: [id])
-  admissionCategory AdmissionCategory @relation(fields: [admissionCategoryId], references: [id])
-  preparedBy        User              @relation("FeeSchedulePreparer", fields: [preparedById], references: [id])
-  approvedBy        User?             @relation("FeeScheduleApprover", fields: [approvedById], references: [id])
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme         Programme              @relation(fields: [programmeId], references: [id])
+  batch             Batch                  @relation(fields: [batchId], references: [id])
+  admissionCategory AdmissionCategory      @relation(fields: [admissionCategoryId], references: [id])
+  preparedBy        User                   @relation("FeeSchedulePreparer", fields: [preparedById], references: [id])
+  approvedBy        User?                  @relation("FeeScheduleApprover", fields: [approvedById], references: [id])
   lines             FeeScheduleLine[]
+  registrations     SemesterRegistration[]
 
   @@unique([tenantId, programmeId, batchId, admissionCategoryId, nationalityCategory, versionNo])
   @@index([tenantId, programmeId, batchId, status])
@@ -2686,15 +2717,15 @@ model FeeScheduleLine {
   feeScheduleId String @map("fee_schedule_id") @db.Uuid
   feeItemId     String @map("fee_item_id") @db.Uuid
 
-  amount Decimal @db.Decimal(19, 4)
+  amount      Decimal        @db.Decimal(19, 4)
   /// A mandatory item is billed on every registration under this schedule. An
   /// optional one (hostel, transport) is billed only when the student takes it.
-  isMandatory Boolean @default(true) @map("is_mandatory")
+  isMandatory Boolean        @default(true) @map("is_mandatory")
   /// Overrides the fee item's own recurrence for this schedule only — a
   /// programme may charge a one-off where the catalogue says per-term.
-  recurrence FeeRecurrence?
-  sortOrder  Int            @default(0) @map("sort_order")
-  note       String?
+  recurrence  FeeRecurrence?
+  sortOrder   Int            @default(0) @map("sort_order")
+  note        String?
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   feeSchedule FeeSchedule @relation(fields: [feeScheduleId], references: [id], onDelete: Cascade)
@@ -2800,7 +2831,7 @@ model SeatQuota {
   batchId             String @map("batch_id") @db.Uuid
   admissionCategoryId String @map("admission_category_id") @db.Uuid
 
-  seats Int
+  seats         Int
   /// Seats held back from the general allocation — a ministry allocation, a
   /// scholarship block. Offers may not consume them without an override.
   reservedSeats Int @default(0) @map("reserved_seats")
@@ -2838,12 +2869,12 @@ model EligibilityRule {
 
   /// Minimum overall percentage, normalised against the certificate's own
   /// maximum so a 700-scale and a 100-scale certificate compare.
-  minPercentage Decimal @map("min_percentage") @db.Decimal(6, 3)
+  minPercentage       Decimal              @map("min_percentage") @db.Decimal(6, 3)
   /// Subjects the applicant must have sat. Compared case- and
   /// whitespace-insensitively against the subjects declared on the application.
-  requiredSubjects String[] @map("required_subjects")
-  minAge           Int?     @map("min_age")
-  maxAge           Int?     @map("max_age")
+  requiredSubjects    String[]             @map("required_subjects")
+  minAge              Int?                 @map("min_age")
+  maxAge              Int?                 @map("max_age")
   /// Restrict the rule to one nationality category, or null for all.
   nationalityCategory NationalityCategory? @map("nationality_category")
 
@@ -2934,11 +2965,11 @@ model ApplicationChoice {
   rank          Int
 
   /// Result of automatic screening against this programme's rules.
-  eligibility     EligibilityOutcome @default(NOT_ASSESSED)
+  eligibility      EligibilityOutcome @default(NOT_ASSESSED)
   /// Which rules failed, in a sentence per rule, so the committee sees the
   /// reason rather than only the verdict.
-  eligibilityNotes String[]          @map("eligibility_notes")
-  assessedAt      DateTime?          @map("assessed_at") @db.Timestamptz(6)
+  eligibilityNotes String[]           @map("eligibility_notes")
+  assessedAt       DateTime?          @map("assessed_at") @db.Timestamptz(6)
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -2973,10 +3004,10 @@ model AdmissionOffer {
   /// A conditional offer states what must still be satisfied.
   conditions String?
 
-  depositRequired Decimal?  @map("deposit_required") @db.Decimal(19, 4)
-  depositPaidAt   DateTime? @map("deposit_paid_at") @db.Timestamptz(6)
+  depositRequired  Decimal?  @map("deposit_required") @db.Decimal(19, 4)
+  depositPaidAt    DateTime? @map("deposit_paid_at") @db.Timestamptz(6)
   /// The receipt that paid the seat deposit, if one was taken.
-  depositReceiptId String?  @map("deposit_receipt_id") @db.Uuid
+  depositReceiptId String?   @map("deposit_receipt_id") @db.Uuid
 
   respondedAt DateTime? @map("responded_at") @db.Timestamptz(6)
   closedAt    DateTime? @map("closed_at") @db.Timestamptz(6)
@@ -2992,15 +3023,15 @@ model AdmissionOffer {
   /// Set when this offer filled a seat freed by an earlier one lapsing.
   promotedFromId String? @map("promoted_from_id") @db.Uuid
 
-  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  application   Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  seatQuota     SeatQuota       @relation(fields: [seatQuotaId], references: [id])
-  programme     Programme       @relation(fields: [programmeId], references: [id])
-  issuedBy      User            @relation("OfferIssuer", fields: [issuedById], references: [id])
-  overriddenBy  User?           @relation("OfferOverrider", fields: [overriddenById], references: [id])
-  promotedFrom  AdmissionOffer? @relation("OfferPromotion", fields: [promotedFromId], references: [id])
-  promotedTo    AdmissionOffer[] @relation("OfferPromotion")
-  depositReceipt StudentReceipt? @relation("OfferDepositReceipt", fields: [depositReceiptId], references: [id])
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  application    Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  seatQuota      SeatQuota        @relation(fields: [seatQuotaId], references: [id])
+  programme      Programme        @relation(fields: [programmeId], references: [id])
+  issuedBy       User             @relation("OfferIssuer", fields: [issuedById], references: [id])
+  overriddenBy   User?            @relation("OfferOverrider", fields: [overriddenById], references: [id])
+  promotedFrom   AdmissionOffer?  @relation("OfferPromotion", fields: [promotedFromId], references: [id])
+  promotedTo     AdmissionOffer[] @relation("OfferPromotion")
+  depositReceipt StudentReceipt?  @relation("OfferDepositReceipt", fields: [depositReceiptId], references: [id])
 
   @@index([tenantId, seatQuotaId, state])
   @@index([tenantId, state, acceptBy])
@@ -3162,14 +3193,14 @@ model StudentDocument {
   issuedOn  DateTime? @map("issued_on") @db.Date
   expiresOn DateTime? @map("expires_on") @db.Date
 
-  state             DocumentState @default(PENDING)
+  state           DocumentState @default(PENDING)
   /// Never the uploader. A CHECK enforces it: a certificate uploaded and
   /// verified by one person has not been verified by anybody.
-  verifiedById      String?       @map("verified_by_id") @db.Uuid
-  verifiedAt        DateTime?     @map("verified_at") @db.Timestamptz(6)
+  verifiedById    String?       @map("verified_by_id") @db.Uuid
+  verifiedAt      DateTime?     @map("verified_at") @db.Timestamptz(6)
   /// Mandatory on REJECTED, by CHECK. A rejection with no reason is one the
   /// student cannot act on.
-  rejectionReason   String?       @map("rejection_reason")
+  rejectionReason String?       @map("rejection_reason")
 
   supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
 
@@ -3206,30 +3237,30 @@ model MedicalRecord {
   examDate DateTime @map("exam_date") @db.Date
 
   // ---- The legacy fields, typed ------------------------------------------
-  bloodGroup  BloodGroup?     @map("blood_group")
-  hepatitisB  ScreeningResult @default(NOT_TESTED) @map("hepatitis_b")
-  hiv         ScreeningResult @default(NOT_TESTED)
+  bloodGroup BloodGroup?     @map("blood_group")
+  hepatitisB ScreeningResult @default(NOT_TESTED) @map("hepatitis_b")
+  hiv        ScreeningResult @default(NOT_TESTED)
 
   // ---- The extension (REQ-ST-02) -----------------------------------------
-  vaccinations       String[]
-  chronicConditions  String?  @map("chronic_conditions")
-  allergies          String?
-  officerNotes       String?  @map("officer_notes")
+  vaccinations      String[]
+  chronicConditions String?  @map("chronic_conditions")
+  allergies         String?
+  officerNotes      String?  @map("officer_notes")
 
-  verdict FitnessVerdict
+  verdict     FitnessVerdict
   /// Mandatory unless the verdict is FIT, by CHECK. "Conditional" without the
   /// condition, or "unfit" without the reason, is a verdict nobody can act on
   /// or appeal.
-  verdictNote String? @map("verdict_note")
+  verdictNote String?        @map("verdict_note")
   /// When a fitness clearance expires. Programmes with clinical placements
   /// re-examine annually.
-  validUntil  DateTime? @map("valid_until") @db.Date
+  validUntil  DateTime?      @map("valid_until") @db.Date
 
   /// The clinician, as a name. Medical officers are rarely system users, and
   /// recording the clerk in a column called `Employee` is how the legacy build
   /// ended up with no examiner on file at all.
-  medicalOfficer String @map("medical_officer")
-  recordedById   String @map("recorded_by_id") @db.Uuid
+  medicalOfficer String   @map("medical_officer")
+  recordedById   String   @map("recorded_by_id") @db.Uuid
   recordedAt     DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
 
   supersededAt DateTime? @map("superseded_at") @db.Timestamptz(6)
@@ -3240,4 +3271,179 @@ model MedicalRecord {
 
   @@index([tenantId, studentId, examDate])
   @@map("medical_records")
+}
+
+// ---------------------------------------------------------------------------
+// Semester registration (SRS Module 4, REQ-REG-01/02/03/05 — Track B4)
+//
+// The convergence point with Track A: the place where the academic act of
+// registering a student and the financial act of billing them become one
+// database transaction.
+//
+// The legacy system is precisely where they were not.
+// `frmStudentRegisteration.vb` opens a transaction, inserts one row into
+// `Registrations`, and then posts a ledger entry that does not agree with it:
+//
+//   · `Registrations.TuitionFees1` is written **net of discount**
+//     (`ttxtTuitionFeesafterdiscount`), while both the debit and the credit
+//     posted to `Transactionees` are `txtTuitionFees` — the **gross**. Every
+//     discounted student is billed in the ledger for more than the
+//     registration says they owe, and the discount reaches no account at all
+//     (lines 365 and 373, against 470-517).
+//   · The whole posting sits behind `If CheckBox1.Checked = False Then` — an
+//     unlabelled checkbox on the form that silently suppresses the ledger
+//     entry while still writing the registration.
+//   · `MoveNo` is allocated `Select IsNull(Max(MoveNo),0)+1 from Transactions`
+//     and then written into `Transactionees` — a different table (line 329
+//     against 470). The voucher number is drawn from a counter that does not
+//     count the rows it numbers.
+//   · The intended posting block immediately above it is commented out in its
+//     entirety, annotated "the debit/cridit will be inserted from financial
+//     system", with Trans.Commit() commented out along with it.
+//
+// Everything in these two models exists to make each of those impossible.
+// ---------------------------------------------------------------------------
+
+/// Where a registration stands.
+///
+/// PENDING_APPROVAL is a registration that has been priced and agreed but
+/// carries a discount above the tenant threshold, so nothing has been posted:
+/// SRS REQ-SPN-04 requires the approval *before* the registration can post,
+/// not after. A pending registration therefore holds its priced lines and no
+/// charges — see RegistrationLine.
+enum RegistrationStatus {
+  PENDING_APPROVAL
+  REGISTERED
+  CANCELLED
+}
+
+model SemesterRegistration {
+  id             String @id @default(uuid()) @db.Uuid
+  tenantId       String @map("tenant_id") @db.Uuid
+  registrationNo String @map("registration_no")
+
+  studentId String @map("student_id") @db.Uuid
+
+  /// The placement of the student **as it was on the day they registered**,
+  /// copied rather than joined. A programme transfer (B5) must not silently
+  /// rewrite what a past term was billed under, which is exactly what
+  /// `frmTransferStudent` did by updating the student row that the
+  /// registration read through.
+  programmeId         String @map("programme_id") @db.Uuid
+  batchId             String @map("batch_id") @db.Uuid
+  admissionCategoryId String @map("admission_category_id") @db.Uuid
+
+  academicYearId String @map("academic_year_id") @db.Uuid
+  academicTermId String @map("academic_term_id") @db.Uuid
+  /// Year of study, 1..programme duration. The legacy `Class` column, typed.
+  levelYear      Int    @map("level_year")
+
+  registrationDate DateTime @map("registration_date") @db.Date
+
+  /// The exact fee-schedule **version** billed. The whole reason B1 versions
+  /// the matrix: two years from now this answers "what did this student owe
+  /// when they registered" without reconstruction.
+  feeScheduleId        String @map("fee_schedule_id") @db.Uuid
+  feeScheduleVersionNo Int    @map("fee_schedule_version_no")
+
+  currency       String  @db.Char(3)
+  grossAmount    Decimal @map("gross_amount") @db.Decimal(19, 4)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(19, 4)
+  /// gross − discount, enforced by CHECK. The legacy row stored the net in a
+  /// column called `TuitionFees1` and posted the gross; holding all three and
+  /// checking the arithmetic in the database is how that stops being possible.
+  netAmount      Decimal @map("net_amount") @db.Decimal(19, 4)
+
+  /// Effective discount over the whole registration, for reporting. Derived
+  /// from the line amounts, never entered — a percentage typed on a form is
+  /// how `DiscPerc` and the amount actually billed came to disagree.
+  discountPct    Decimal @default(0) @map("discount_pct") @db.Decimal(7, 4)
+  discountReason String? @map("discount_reason")
+
+  discountApprovedById String?   @map("discount_approved_by_id") @db.Uuid
+  discountApprovedAt   DateTime? @map("discount_approved_at") @db.Timestamptz(6)
+
+  status RegistrationStatus @default(REGISTERED)
+
+  /// The single voucher that billed this registration. Unique: one
+  /// registration bills once. Null only while PENDING_APPROVAL — a trigger
+  /// refuses a REGISTERED row without one, which is the suppressing checkbox
+  /// written down as a constraint.
+  postedHeaderId   String? @unique @map("posted_header_id") @db.Uuid
+  /// The linked reversal raised on cancellation (REQ-REG-03).
+  reversalHeaderId String? @map("reversal_header_id") @db.Uuid
+
+  cancelledById      String?   @map("cancelled_by_id") @db.Uuid
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancellationReason String?   @map("cancellation_reason")
+
+  /// Opaque, unguessable token behind the QR code on the registration card
+  /// (REQ-REG-05). The public verification endpoint takes this and nothing
+  /// else, so a card never exposes a student id or a student number, and the
+  /// endpoint cannot be walked by incrementing a number.
+  verifyToken String @map("verify_token")
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student            Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  programme          Programme          @relation(fields: [programmeId], references: [id])
+  batch              Batch              @relation(fields: [batchId], references: [id])
+  admissionCategory  AdmissionCategory  @relation(fields: [admissionCategoryId], references: [id])
+  academicYear       AcademicYear       @relation(fields: [academicYearId], references: [id])
+  academicTerm       AcademicTerm       @relation(fields: [academicTermId], references: [id])
+  feeSchedule        FeeSchedule        @relation(fields: [feeScheduleId], references: [id])
+  posting            TransactionHeader? @relation("RegistrationPosting", fields: [postedHeaderId], references: [id])
+  reversal           TransactionHeader? @relation("RegistrationReversal", fields: [reversalHeaderId], references: [id])
+  createdBy          User               @relation("RegistrationCreator", fields: [createdById], references: [id])
+  discountApprovedBy User?              @relation("RegistrationDiscountApprover", fields: [discountApprovedById], references: [id])
+  cancelledBy        User?              @relation("RegistrationCanceller", fields: [cancelledById], references: [id])
+  lines              RegistrationLine[]
+  charges            StudentCharge[]
+
+  @@unique([tenantId, registrationNo])
+  @@unique([tenantId, verifyToken])
+  @@index([tenantId, studentId, registrationDate])
+  @@index([tenantId, academicTermId, status])
+  @@index([tenantId, programmeId, batchId, status])
+  @@map("semester_registrations")
+}
+
+/// One priced fee item on one registration.
+///
+/// Held separately from `StudentCharge` because a registration is priced and
+/// agreed before it is necessarily posted: a discount above threshold parks
+/// the registration in PENDING_APPROVAL with its lines intact and no ledger
+/// entry. When approval arrives, **these lines are what posts** — the fee
+/// matrix is not re-resolved, so the approver signs off the figures they were
+/// shown rather than whatever the matrix happens to say at the moment they
+/// click.
+model RegistrationLine {
+  id             String @id @default(uuid()) @db.Uuid
+  tenantId       String @map("tenant_id") @db.Uuid
+  registrationId String @map("registration_id") @db.Uuid
+  feeItemId      String @map("fee_item_id") @db.Uuid
+
+  grossAmount    Decimal @map("gross_amount") @db.Decimal(19, 4)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(19, 4)
+  netAmount      Decimal @map("net_amount") @db.Decimal(19, 4)
+
+  /// Copied from the schedule line, so the card and the audit trail can say
+  /// whether an item was compulsory under the version that was billed.
+  isMandatory Boolean @default(true) @map("is_mandatory")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  /// The sub-ledger charge this line became. Null until the registration
+  /// posts; unique, so one line can never bill twice.
+  chargeId String? @unique @map("charge_id") @db.Uuid
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  registration SemesterRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  feeItem      FeeItem              @relation(fields: [feeItemId], references: [id])
+  charge       StudentCharge?       @relation("ChargeRegistrationLine", fields: [chargeId], references: [id])
+
+  @@unique([registrationId, feeItemId])
+  @@index([tenantId, feeItemId])
+  @@map("registration_lines")
 }

@@ -294,6 +294,11 @@ export interface University {
   certificateTypes: Record<string, string>;
   /** Document types (Track B3), keyed by code. MBBS requires three of them. */
   documentTypes: Record<string, string>;
+  /** Academic calendar (Track B4). One year, two terms. */
+  academicYearId: string;
+  academicYearCode: string;
+  /** Keyed by term sequence: term 1 runs Jan-Apr, term 2 May-Aug. */
+  termIds: Record<number, string>;
 }
 
 let uniCounter = 0;
@@ -460,8 +465,62 @@ export async function makeUniversity(
         ],
       });
 
+      // The academic calendar (B4). Deliberately NOT the fiscal year: term 1
+      // starts inside the fixture's open periods (1-3) and runs on into
+      // periods it leaves FUTURE, which is what makes revenue recognition
+      // across a term testable. It stops at August so that suites which open
+      // their own academic year from September onwards do not overlap it —
+      // terms may only not overlap WITHIN a year, so two calendars in one
+      // tenant otherwise make `termOn` ambiguous.
+      const acadYear = await tx.academicYear.create({
+        data: {
+          tenantId: t.tenantId,
+          code: `AY-${year}`,
+          nameAr: `العام الدراسي ${year}`,
+          nameEn: `Academic Year ${year}`,
+          startDate: new Date(Date.UTC(year, 0, 1)),
+          endDate: new Date(Date.UTC(year, 7, 31)),
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      const term1 = await tx.academicTerm.create({
+        data: {
+          tenantId: t.tenantId,
+          academicYearId: acadYear.id,
+          seq: 1,
+          kind: 'FALL',
+          nameAr: 'الفصل الأول',
+          nameEn: `First Term ${year}`,
+          startDate: new Date(Date.UTC(year, 0, 1)),
+          endDate: new Date(Date.UTC(year, 3, 30)),
+          registrationClosesOn: new Date(Date.UTC(year, 1, 28)),
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      const term2 = await tx.academicTerm.create({
+        data: {
+          tenantId: t.tenantId,
+          academicYearId: acadYear.id,
+          seq: 2,
+          kind: 'SPRING',
+          nameAr: 'الفصل الثاني',
+          nameEn: `Second Term ${year}`,
+          startDate: new Date(Date.UTC(year, 4, 1)),
+          endDate: new Date(Date.UTC(year, 7, 31)),
+          status: 'PLANNED',
+        },
+        select: { id: true },
+      });
+
       return {
         facultyId: faculty.id,
+        academicYearId: acadYear.id,
+        academicYearCode: `AY-${year}`,
+        termIds: { 1: term1.id, 2: term2.id },
         programmeIds: { MBBS: mbbs.id, NURS: nurs.id },
         batchId: batch.id,
         admissionCategories: Object.fromEntries(cats.map((c) => [c.code, c.id])),

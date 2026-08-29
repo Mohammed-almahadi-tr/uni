@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**588 tests pass across 19 suites; typecheck, lint and production build are all
+**705 tests pass across 21 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -44,11 +44,18 @@ income statement, sub-ledger reconciliation and their exports — together with
 the two Module 12 requirements the statements depend on, opening balances and
 the year-end close. See §0.2.
 
-**Track B is under way.** B1 — academic structure and the effective-dated,
-versioned fee matrix — B2 — admissions capacity, eligibility screening and the
-committee workflow — and B3 — the student profile, per-programme document
-checklists and medical records — are all complete; see §6.1. B4, the
-registration engine, is the convergence milestone with Track A and is next.
+**Track B is under way, and the convergence milestone is reached.** B1 —
+academic structure and the effective-dated, versioned fee matrix — B2 —
+admissions capacity, eligibility screening and the committee workflow — B3 —
+the student profile, per-programme document checklists and medical records —
+and **B4, the semester registration engine**, are all complete; see §6.1.
+
+B4 closes milestone `m1`: a registration and its balanced double entry are now
+one database transaction. In the legacy build they were two systems reconciled
+by hand, and the posting block that would have joined them is commented out in
+the source with the note *"the debit/cridit will be inserted from financial
+system"*. B5 — status lifecycle, transfer and holds — is next, and inherits
+both the reversal path and the seam where a hold blocks a registration.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -1031,7 +1038,7 @@ Even though Phases 7-8 are out of v1 scope, the Phase 0 schema must not preclude
 
 **B3 · Student Profile, Documents & Medical** *(built — see §6.1)* — Multi-step wizard capturing discrete 4-part Arabic and English names, dual-calendar dates, guardian details, secondary school record, photo capture and document uploads. Per-programme document checklists with verification state and expiry. Medical record: the five legacy fields plus vaccination status, chronic conditions, officer notes and a fitness verdict. Directory search with **Arabic normalisation** — alef, taa marbuta, yaa and tatweel folded — over a trigram index.
 
-**B4 · Semester Registration Engine** *(critical path)* — Student lookup auto-filling programme and the effective fee schedule version. Per-item discount application with approval above threshold. **Atomic**: the registration row and its balanced GL posting are created in one database transaction through the Phase 0 posting engine, carrying an idempotency key and rejected if the period is closed. Registration card with QR verification.
+**B4 · Semester Registration Engine** *(built — see §6.1; convergence milestone `m1`)* — Student lookup auto-filling programme and the effective fee schedule version. Per-item discount application with approval above threshold. **Atomic**: the registration row and its balanced GL posting are created in one database transaction through the Phase 0 posting engine, carrying an idempotency key and rejected if the period is closed. Registration card with QR verification.
 
 **B5 · Status Lifecycle, Transfer & Holds** — The full status state machine with effective-dated history, each transition declaring its financial consequence. Programme transfer reversing the prior programme's billing by linked reversal and posting the new. Holds (financial, academic, disciplinary, documentary) that block registration, with placement and clearance authority.
 
@@ -1501,6 +1508,186 @@ itself — the metadata, digest and supersession model are complete and the
 bytes land in the same store as voucher attachments (A2), but the browser
 capture surface is a Track C screen. Bilingual profile printing uses the A7
 print path; the profile card template is a Track C document.
+
+---
+
+### B4 — Semester Registration Engine · complete · **convergence milestone m1 reached**
+
+The two halves of the posting path the legacy system never joined are now
+joined. A3 could take money from a student; B1 could say what a student owed;
+nothing until this connected the two. Registration and its balanced double
+entry are one database transaction.
+
+#### The screen this replaces, and its five defects
+
+`frmStudentRegisteration.vb` opens a transaction, inserts one row into
+`Registrations`, and posts a ledger entry that does not agree with it.
+
+**1. The registration and the ledger disagree by exactly the discount.**
+
+```vb
+cmd.Parameters.AddWithValue("@TuitionFees1", CDbl(Me.ttxtTuitionFeesafterdiscount.Text))
+```
+([frmStudentRegisteration.vb:365](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentRegisteration.vb#L365))
+
+```vb
+cmd.Parameters.AddWithValue("@TotalValueOut", CDbl(Me.txtTuitionFees.Text))
+```
+([frmStudentRegisteration.vb:477](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentRegisteration.vb#L477))
+
+The registration row records tuition **net of discount**. Both the debit and
+the credit posted to `Transactionees` are the **gross**. So for every
+discounted student the receivable in the ledger exceeds what the registration
+says is owed, by exactly the discount — and the discount itself reaches no
+account at all. There is no scholarship expense and no contra revenue. This is
+unrecoverable after the fact, and it is why `viewDiscount` and
+`UnivDiscountSummary` exist in the Ribat build: they are attempts to
+reconstruct a number that was never posted.
+
+**2. The posting is optional.** The entire block sits inside
+
+```vb
+If CheckBox1.Checked = False Then
+```
+([frmStudentRegisteration.vb:468](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentRegisteration.vb#L468))
+
+— an unlabelled checkbox. A registration with no accounting entry is one click
+away and looks identical to a correct one. Immediately above it the *intended*
+posting block is commented out in its entirety, annotated
+*"the debit/cridit will be inserted from financial system"*, with
+`'Trans.Commit()` commented out along with it
+([lines 382-463](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentRegisteration.vb#L382-L463)).
+That comment is the whole reason registration and finance were reconciled by
+hand, and why any divergence was silent.
+
+**3. The voucher number is drawn from the wrong table.**
+`Select IsNull(Max(MoveNo),0) from Transactions`
+([line 329](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentRegisteration.vb#L329)),
+written into `Transactionees`
+([line 470](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentRegisteration.vb#L470)).
+`MAX+1` is bad enough under concurrency; `MAX+1` over a table that does not
+contain the rows being numbered collides on the first registration of a year.
+
+**4. The duplicate check cannot work.**
+
+```vb
+'Dim cmd As New SqlCommand("Select Count(*) From StudentsRegistration Where  " & _
+'                          "AcademicYear=.. And StudentIndex=.. And Semester=..", cnn1)
+Dim cmd As New SqlCommand("Select Count(*) From Registrations Where " & _
+                          "AcademicYear=N'" & .. & "' And StudentIndex=N'" & .. & "' ", cnn1)
+```
+([frmStudentRegisteration.vb:173-176](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentRegisteration.vb#L173-L176))
+
+Two defects in six lines. The `And Semester=..` predicate is commented out, so
+a student **cannot register for the second semester of a year at all** — the
+system refuses it as a duplicate. And it runs on `cnn1`, a *second connection*,
+outside the transaction the insert then runs in, so under two registrars
+pressing Save together it catches nothing.
+
+**5. The instalment remainder is always zero.**
+
+```vb
+Me.ttxtTuitionFeesafterdiscount.Text = NetFeesValue.ToString("N2")
+y = Me.ttxtTuitionFeesafterdiscount.Text
+Me.TxtRem.Text = CInt(y) - CInt(Me.ttxtTuitionFeesafterdiscount.Text)
+```
+([frmStudentRegisteration.vb:845-847](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentRegisteration.vb#L845-L847))
+
+`y` is assigned that value on the line above, so the remainder is a number
+minus itself. `CInt` truncates money to whole pounds on the way past. The
+`ChkBoPrem` "instalments" checkbox therefore wrote a `Remain` of 0 on every
+registration it was ticked for.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| **Atomic registration + posting** (REQ-REG-02) | One `withTenant` transaction: the registration row, its priced lines, the sub-ledger charges and the balanced voucher, through the Phase 0 `post()`. Asserted by registering into a **FUTURE period** and confirming zero registration rows survive the refused posting |
+| Discount is an **expense**, not a smaller receivable | DR student AR `net`, DR scholarship expense `discount`, CR revenue/unearned `gross`. The test asserts receivable = 950,000 and credits = 1,250,000 on the same voucher — the legacy defect stated as an equality |
+| Posting is **not optional** | Deferred constraint trigger: at COMMIT, a `REGISTERED` registration without a `posted_header_id` is refused. The checkbox is not representable |
+| **One live registration per student per term** | Partial unique index on (tenant, student, term) where status ≠ CANCELLED. A hand-written insert bypassing the engine is refused; and the **second term of the same year is allowed**, which the legacy check forbade |
+| Registration numbers under an advisory lock | `REG-<year>-00001`, per tenant × academic year, allocated the way A2 allocates voucher numbers — never `MAX+1`, never from another table |
+| The **fee-schedule version** is recorded and frozen | A trigger refuses a registration whose schedule belongs to a different cohort, is still a draft, is a different version number, prices a different currency, or was not in force on the registration date. Revising the matrix in March does not reprice a January registration — asserted |
+| Per-item discounts, by amount or percentage | Refused on a non-discountable item, above the gross, on an item this registration does not bill, or with no stated reason. `DiscPerc` had none of these |
+| **Approval before posting** (REQ-SPN-04) | Above the tenant threshold the registration is `PENDING_APPROVAL` and **nothing** reaches the ledger — no voucher, no charge, no sub-ledger row. Approval posts it; the approver may not be the person who raised it, refused in the application and again by trigger |
+| Approval posts **what was approved** | The stored lines post, not a re-resolution of the matrix. The test revises the schedule from 1,200,000 to 9,000,000 while the approval sits in a queue and asserts the registration still bills 1,250,000 gross |
+| **Recurrence finally means something** | `PER_TERM` bills every term, `PER_YEAR` once a year, `ONE_OFF` once ever. The legacy screen had two fee boxes and charged both on every registration, so a fifth-year student paid the admission fee five times. Skipped lines are returned with the reason, so the registrar can see what was not charged and why |
+| Optional items are opt-in | A schedule marks hostel or transport `isMandatory: false`; nothing else on it can be declined |
+| Revenue recognised across the **term** | Deferrable tuition is sliced over the fiscal periods the term spans, not the one the registration falls in. The legacy system recognised a full year on registration day |
+| Cost centre from the **faculty** | The shipped tuition revenue account requires one and the catalogue item deliberately leaves it unset, because only registration knows the faculty. This closes the note A3 left in `charge.ts` |
+| **Cancellation is a linked reversal** (REQ-REG-03) | One reversing voucher for the whole registration, not one per fee item, stamped against the original — which is marked reversed. Deleting or editing a posted registration is refused by trigger |
+| Collected money becomes a **credit balance** | Cancelling a partly-paid registration moves what was allocated from student AR to student credit. The cash is still in the safe; it simply no longer pays for this |
+| Instalments that add back exactly | Weighted split with the residue on the first instalment — the one paid at registration. `[50, 25, 25]` of 1,250,000 gives 625,000 / 312,500 / 312,500, and an amount that does not divide by three still totals to the cent |
+| **Registration card with QR verification** (REQ-REG-05) | Bilingual card; the QR encodes a 128-bit opaque token, not a student number. `verifyRegistrationCard` runs without a session, returns name, university, programme, term and validity, and **no money at all** — asserted by checking the response does not contain the amount |
+| A cancelled card verifies as **found but not valid** | Someone presenting a card for a registration reversed last month is told exactly that. "No such registration" would read as a forgery and send them to the wrong desk |
+
+#### Two things settled during the build
+
+**The posting-coherence rule had to be deferred, and that is the honest form
+of it.** It began as a `CHECK` constraint — `REGISTERED` implies
+`posted_header_id IS NOT NULL` — which is unsatisfiable at statement time: the
+registration row must exist before its charges can reference it, and the
+voucher those charges post cannot exist until they do. Written as a
+`DEFERRABLE INITIALLY DEFERRED` constraint trigger it says the thing that
+actually matters: *when this transaction ends, a registered registration has a
+balanced ledger entry, or nothing happened at all.*
+
+A subtlety worth recording, because it cost a debugging cycle: a deferred
+`AFTER` row trigger is handed the tuple **as it was at the triggering
+statement**, not as it stands at COMMIT. A registration is deliberately written
+twice inside one transaction — created, then attached to the voucher it raised
+— so the trigger has to re-read the row by id. The existing deferred triggers
+in the ledger and the cashiering migration use exactly this shape
+(`PERFORM assert_charge_settlement(NEW.id)`); this one now does too.
+
+**Reversal became multi-charge.** `reverseCharge` posted one voucher per
+charge, which is right for a single library fine and wrong for a registration:
+REQ-REG-03 asks for *a* linked reversing entry. It is now
+`reverseChargesInTx(tx, principal, chargeIds, reason, { reversesHeaderId })`,
+posting one voucher however many charges, with `reverseCharge` a thin
+permission-checked wrapper over the single-charge case. The partly-paid and
+partly-recognised unwinding logic is shared rather than duplicated, which was
+the alternative.
+
+#### Verification
+
+42 tests. The ones that carry the most weight:
+
+- `refuses to register into a closed period, and creates nothing when it does`
+  — atomicity, asserted by counting rows after the failure rather than by
+  reading the code.
+- `bills the discount to an expense account, not by shrinking the receivable`
+  — defect 1, written down as an equality on one voucher.
+- `allows the SECOND TERM of the same year — the predicate the legacy check
+  dropped` — defect 4, in the direction people usually forget: the legacy bug
+  refused correct work, it did not only permit wrong work.
+- `posts the lines that were approved, not a re-resolution of the matrix` —
+  the fee matrix is revised mid-approval and the registration does not move.
+- `ties student charges to the Student AR control balance after registration
+  and cancellation` — the sub-ledger property the whole product exists to
+  keep, now exercised through registration rather than only through
+  cashiering.
+- `raises one linked reversing voucher and leaves the original on file` —
+  counts the reversal vouchers, because "one per fee item" would also pass a
+  weaker assertion.
+
+Five constraints are exercised by writing directly as the **owner role**,
+which bypasses RLS: a duplicate live registration for a term, forcing
+`REGISTERED` with no voucher, forcing an over-threshold discount with no
+approver, deleting a registration, and editing a posted one's amounts. All
+five are refused by the database rather than by application code.
+
+**Deferred to B5, deliberately:** REQ-REG-06 holds. A hold blocks registration,
+and the seam is a single check at the top of `quote()`; it is not written yet
+because holds have a placement-and-clearance authority model that belongs with
+the status lifecycle. Programme transfer (REQ-REG-04) is B5 for the same
+reason — it is a reversal of this registration plus a new one, and the
+reversal path it needs now exists.
+
+**Deferred to Track C:** the printed card itself. `registrationCard` returns
+the bilingual data and the verification path; rendering it to PDF uses the A7
+print path, and the public `/verify/registration/<token>` page is a Track C
+screen.
 
 ---
 
