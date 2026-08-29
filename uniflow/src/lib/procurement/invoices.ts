@@ -702,41 +702,51 @@ export async function reconcileVendorSubledger(
   principal: Principal,
 ): Promise<{ subledger: string; control: string; variance: string }> {
   requirePermission(principal, 'report.financial');
-  const { tenantId } = principal;
+  return withTenant(principal.tenantId, (tx) =>
+    vendorSubledgerVariance(tx, principal.tenantId),
+  );
+}
 
-  return withTenant(tenantId, async (tx) => {
-    const apId = await requireAccount(tx, tenantId, 'VENDOR_AP_CONTROL');
+/**
+ * The same comparison inside a caller's transaction, so the consolidated
+ * reconciliation report (REQ-RPT-06) can run every sub-ledger check against
+ * one consistent snapshot of the ledger rather than three successive ones.
+ */
+export async function vendorSubledgerVariance(
+  tx: Tx,
+  tenantId: string,
+): Promise<{ subledger: string; control: string; variance: string }> {
+  const apId = await requireAccount(tx, tenantId, 'VENDOR_AP_CONTROL');
 
-    const invoices = await tx.vendorInvoice.findMany({
-      where: {
-        tenantId,
-        state: { in: ['MATCHED', 'APPROVED', 'PARTIALLY_PAID', 'PAID'] },
-      },
-      select: { totalAmount: true, settledAmount: true },
-    });
-    const subledger = sum(invoices.map((i) => i.totalAmount.minus(i.settledAmount)));
-
-    const balances = await tx.accountPeriodBalance.findMany({
-      where: { tenantId, accountId: apId },
-      select: { movementDebit: true, movementCredit: true, openingDebit: true, openingCredit: true },
-    });
-    // AP is a credit-balance account, so its balance is credits less debits.
-    const control = balances.reduce(
-      (acc: Money, b) =>
-        acc
-          .plus(b.openingCredit)
-          .plus(b.movementCredit)
-          .minus(b.openingDebit)
-          .minus(b.movementDebit),
-      ZERO,
-    );
-
-    return {
-      subledger: subledger.toFixed(4),
-      control: control.toFixed(4),
-      variance: subledger.minus(control).toFixed(4),
-    };
+  const invoices = await tx.vendorInvoice.findMany({
+    where: {
+      tenantId,
+      state: { in: ['MATCHED', 'APPROVED', 'PARTIALLY_PAID', 'PAID'] },
+    },
+    select: { totalAmount: true, settledAmount: true },
   });
+  const subledger = sum(invoices.map((i) => i.totalAmount.minus(i.settledAmount)));
+
+  const balances = await tx.accountPeriodBalance.findMany({
+    where: { tenantId, accountId: apId },
+    select: { movementDebit: true, movementCredit: true, openingDebit: true, openingCredit: true },
+  });
+  // AP is a credit-balance account, so its balance is credits less debits.
+  const control = balances.reduce(
+    (acc: Money, b) =>
+      acc
+        .plus(b.openingCredit)
+        .plus(b.movementCredit)
+        .minus(b.openingDebit)
+        .minus(b.movementDebit),
+    ZERO,
+  );
+
+  return {
+    subledger: subledger.toFixed(4),
+    control: control.toFixed(4),
+    variance: subledger.minus(control).toFixed(4),
+  };
 }
 
 function addDays(d: Date, days: number): Date {

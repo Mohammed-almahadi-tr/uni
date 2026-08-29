@@ -182,7 +182,13 @@ export async function post(
     });
   }
 
-  await rollBalances(tx, tenantId, period.fiscalPeriodId, prepared);
+  await rollBalances(
+    tx,
+    tenantId,
+    period.fiscalPeriodId,
+    prepared,
+    doc.isOpeningEntry ? 'opening' : 'movement',
+  );
 
   return {
     headerId: header.id,
@@ -204,6 +210,12 @@ export async function post(
  * ON CONFLICT ... DO UPDATE against the NULLS NOT DISTINCT unique index, so a
  * line with no cost centre lands on one row rather than creating a new one
  * every time.
+ *
+ * An OPENING entry lands in `opening_*`, everything else in `movement_*`. SRS
+ * REQ-PER-03 requires opening balances to be excluded from period movement,
+ * and this is where that exclusion happens: a trial balance that showed a
+ * university's go-live balances as January activity would report the whole
+ * institution as having been created in one month.
  */
 async function rollBalances(
   tx: Tx,
@@ -215,6 +227,7 @@ async function rollBalances(
     debitAmount: Money;
     creditAmount: Money;
   }>,
+  column: 'opening' | 'movement',
 ): Promise<void> {
   // Collapse to one update per (account, cost centre) so a 40-line voucher
   // does not issue 40 upserts against the same row.
@@ -240,19 +253,43 @@ async function rollBalances(
   }
 
   for (const e of agg.values()) {
-    await tx.$executeRaw`
-      INSERT INTO account_period_balances
-        (id, tenant_id, account_id, cost_center_id, fiscal_period_id,
-         opening_debit, opening_credit, movement_debit, movement_credit)
-      VALUES
-        (gen_random_uuid(), ${tenantId}::uuid, ${e.accountId}::uuid,
-         ${e.costCenterId}::uuid, ${fiscalPeriodId}::uuid,
-         0, 0, ${e.debit.toFixed(4)}::numeric, ${e.credit.toFixed(4)}::numeric)
-      ON CONFLICT (tenant_id, account_id, cost_center_id, fiscal_period_id)
-      DO UPDATE SET
-        movement_debit  = account_period_balances.movement_debit  + EXCLUDED.movement_debit,
-        movement_credit = account_period_balances.movement_credit + EXCLUDED.movement_credit
-    `;
+    const d = e.debit.toFixed(4);
+    const c = e.credit.toFixed(4);
+
+    // Two nearly identical statements rather than one with interpolated column
+    // names. A column name cannot be a bound parameter, and building this SQL
+    // by concatenation to save eight lines is how an injection point gets
+    // introduced into the one function every posting in the system passes
+    // through.
+    if (column === 'opening') {
+      await tx.$executeRaw`
+        INSERT INTO account_period_balances
+          (id, tenant_id, account_id, cost_center_id, fiscal_period_id,
+           opening_debit, opening_credit, movement_debit, movement_credit)
+        VALUES
+          (gen_random_uuid(), ${tenantId}::uuid, ${e.accountId}::uuid,
+           ${e.costCenterId}::uuid, ${fiscalPeriodId}::uuid,
+           ${d}::numeric, ${c}::numeric, 0, 0)
+        ON CONFLICT (tenant_id, account_id, cost_center_id, fiscal_period_id)
+        DO UPDATE SET
+          opening_debit  = account_period_balances.opening_debit  + EXCLUDED.opening_debit,
+          opening_credit = account_period_balances.opening_credit + EXCLUDED.opening_credit
+      `;
+    } else {
+      await tx.$executeRaw`
+        INSERT INTO account_period_balances
+          (id, tenant_id, account_id, cost_center_id, fiscal_period_id,
+           opening_debit, opening_credit, movement_debit, movement_credit)
+        VALUES
+          (gen_random_uuid(), ${tenantId}::uuid, ${e.accountId}::uuid,
+           ${e.costCenterId}::uuid, ${fiscalPeriodId}::uuid,
+           0, 0, ${d}::numeric, ${c}::numeric)
+        ON CONFLICT (tenant_id, account_id, cost_center_id, fiscal_period_id)
+        DO UPDATE SET
+          movement_debit  = account_period_balances.movement_debit  + EXCLUDED.movement_debit,
+          movement_credit = account_period_balances.movement_credit + EXCLUDED.movement_credit
+      `;
+    }
   }
 }
 
