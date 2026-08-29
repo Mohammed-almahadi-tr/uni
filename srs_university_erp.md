@@ -1,14 +1,14 @@
 # Software Requirements Specification (SRS)
 ## Multi-Tenant University ERP & White-Label Web Platform
 **Project Name:** UniFlow Enterprise ERP (Next-Gen Transformation of Oasis E-University)
-**Document Version:** 2.5.0
-**Supersedes:** v1.0.0 - v2.4.0
+**Document Version:** 2.6.0
+**Supersedes:** v1.0.0 - v2.5.0
 **Target Audience:** University Management, Technical Architects, Development Team, Product Owners, Quality Assurance
 **Standard Compliance:** IEEE Std 830-1998 / ISO/IEC/IEEE 29148
 
 ---
 
-## 0.0 Corrections made while building (v2.1.0 - v2.5.0)
+## 0.0 Corrections made while building (v2.1.0 - v2.6.0)
 
 Version 2.0.0 was written before any of it was built. Building Phase 0 and
 Track A1-A3 showed several of its statements to be wrong, or weaker than what
@@ -36,6 +36,10 @@ diverge from the system.
 | 17 | REQ-PRC-02 gains the **three-step accrual chain** (receipt → invoice → payment) explicitly | The legacy `frmMakePayBill` collapsed all three into one document at payment time, so an expense incurred in March and paid in June was reported in June |
 | 18 | REQ-PRC-01 gains **dual authorisation enforced in the database**, not only in the SoD matrix | Invoice-redirection fraud needs no forged invoice — only an edit to one row — so the bank columns are refused to an ordinary UPDATE outright |
 | 19 | Module 16's note that the Ribat `frmRequestGetBill` is a procurement precursor is **withdrawn** | `RequestBill` is a request for a student fee bill and sits on the receipts side. There is no procurement precursor in either build |
+| 20 | REQ-PER-04's carry-forward is **derived, not copied**. Balance-sheet opening balances are summed from the periods before the window rather than written into the next year's opening columns | A copied figure can drift from the postings it summarises — a correction into a reopened period moves the movement and not the copy downstream, and nothing reports the divergence. A derived figure is recomputed from the same rows the movement column is built from and cannot drift. `opening_*` now holds only balances injected from outside the ledger, which is the go-live entry of REQ-PER-03 and nothing else |
+| 21 | REQ-RPT-03's claim that the legacy trial balance was a closing-balance-since-inception report is **corrected and sharpened** | It is worse than that. `Sum(TotalValueIn)-Sum(TotalValueOut)` is aliased to *both* the debit and the credit column ([frmTrialBalance.vb:161-168](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmTrialBalance.vb#L161-L168)), so the report prints one net figure twice and always appears to balance whatever the ledger holds. It also reads `Transactionees` while the balance sheet reads `Transactions` — the institution's two headline statements were built from different halves of its books |
+| 22 | Module 10's implicit assumption that a legacy income statement existed is **withdrawn** | `frmRptIncome` selects `StudID, StudName, Program, Class, TuitionFees1, RegsFees` from `View_1`. It is a student fee-collection listing, not revenue less expenses. There is no income statement in either build |
+| 23 | REQ-RPT-07's "bilingual PDF" is delivered as a **print stylesheet rendered by the browser**, not by a PDF writer in the codebase | Arabic shaping — four contextual forms per letter, obligatory ligatures, then bidirectional reordering against Latin text and figures — must be done before a PDF content stream can position a glyph. Output that is nearly right looks like Arabic, prints, and gets signed. Browsers already contain a correct shaping engine; the repository does not need a second, worse one |
 
 ---
 
@@ -172,7 +176,7 @@ The table below maps each legacy capability to its replacement. **The status col
 | **Budgeting** | `frmBudget.vb`, `AccBudget` | Budget amounts per account. **No commitment or encumbrance source exists** | Account- and cost-centre-level budgets with encumbrance fed by the procurement module, real-time utilisation and variance alerts | **Migrated + Extended** |
 | **Fiscal Year Close** | *(absent)* | The older `ADC Acc App` backup contains `frmCloseYear.vb`; **the E-University build dropped it**. There is no fiscal period concept, therefore no opening balances and no way to produce the opening columns of a trial balance | Full fiscal calendar with per-period lock states, opening balances, and year-end close to retained earnings | **New** |
 | **Multi-Currency** | *(absent)* | No currency column exists anywhere in the legacy schema | Functional currency per tenant, transaction currency per line, rate tables, and period-end revaluation | **New** |
-| **Financial Statements** | `frmBalanceSheetLevels.vb`, `frmTrialBalance.vb`, `frmRptIncome.vb`, `frmStatement.vb`, `frmUncollectedFees.vb` | Crystal Reports driven by ad-hoc `SUM(TotalIn)-SUM(TotalOut)` scans over the whole ledger | Interactive reporting engine over maintained period-balance aggregates: Trial Balance, Balance Sheet L1-L4, Income Statement, Student Ledger, Aging | **Migrated + Rebuilt** |
+| **Financial Statements** | `frmBalanceSheetLevels.vb`, `frmTrialBalance.vb`, `frmRptIncome.vb`, `frmStatement.vb`, `frmUncollectedFees.vb` | Crystal Reports over ad-hoc `SUM(TotalValueIn)-SUM(TotalValueOut)` scans, grouped by four *text* account names. The trial balance reads `Transactionees` and the balance sheet reads `Transactions` — the two statements are built from different ledger tables. The trial balance aliases one net expression to **both** its debit and credit columns, so it always appears to balance. No opening column, because there is no fiscal period model. `frmRptIncome` is a student fee-collection listing, **not** an income statement — there is none | Reporting engine over maintained period-balance aggregates, all statements reading one shared figure source: Trial Balance (opening/movement/closing, levels 1-5), Balance Sheet L1-L4 at any cutoff, Income Statement with comparatives and cost-centre filter, Student Ledger, Aging, and the Sub-Ledger Reconciliation the legacy design made uncomputable | **Rebuilt** |
 | **Amount in Words** | `SpellNumber`, `EgyCurr.CurText` | An English number speller, patched with `.Replace("Dollar","Pound")` and `.Replace("and No Cent","")`. **Arabic تفقيط does not work** | A correct Arabic and English monetary speller with per-tenant currency naming | **Rebuilt** |
 | **Seat Quotas** | `StudentsVacants` *(Ribat/UOT only)* | Seat capacity per college × batch, maintained manually | Quota model per program × batch × admission channel, enforced at offer time | **Migrated** |
 | **Receipt Book Serials** | `BillSNo`, `frmVouchersSerialsNo` *(Ribat/UOT only)* | Pre-printed receipt-book serial ranges allocated per cashier, with an overlap check on issue | Retained as a recommended (unscheduled) module — see §7 | **Deferred** |
@@ -442,12 +446,27 @@ graph LR
 - **REQ-RPT-03: Trial Balance (ميزان المراجعة)**
   - Opening Debit/Credit, Period Movement Debit/Credit, Closing Debit/Credit for all levels 1-5.
   - Opening balances are sourced from the fiscal period model (Module 12); they are not derivable without it.
+  - Each account is netted to **one** side on the raw debit-minus-credit direction, not on its normal balance, so an account sitting the wrong way round is visible rather than presented as though it were not.
+  - Totals are taken from postable accounts only — parent levels aggregate them — and are computed before any display filter, so restricting the report to a summary level changes what is shown and never what is totalled.
+  - Total debits **shall** equal total credits in all three column pairs. A run that does not balance is reported as such and is a data-integrity alert: it means the ledger has been written to outside the posting engine. *(The legacy report aliased one net expression to both its columns and therefore always balanced — see §0.0 correction 21.)*
+  - A run filtered to a cost centre is a **segment** of the ledger and is not expected to balance; it shall be labelled as such rather than reported as a failure.
 - **REQ-RPT-04: Multi-Level Balance Sheet (الميزانية العمومية)** — at Level 1 (Summary) through Level 4, for any cutoff date.
+  - Figures are signed by the account's **class**, not its own normal balance, so a contra account reduces the group it sits under. Accumulated depreciation appears as a negative within Assets rather than adding to them.
+  - Revenue and expense balances not yet transferred to reserves are shown as a result line inside equity. Without it the two sides cannot agree, because the ledger's own balance includes them.
+  - Where that result line spans a fiscal year that was never closed, the statement shall say so. The line otherwise reads as "this year's surplus" while meaning something else.
+  - A cutoff falling inside a period is answered exactly: whole periods are read from the maintained aggregates and only the period the cutoff cuts is read from the journal, so REQ-NFR-02 holds at any date.
 - **REQ-RPT-05: Income Statement (قائمة الدخل)** — revenues less operating expenses, net surplus/deficit, filterable by Faculty/Cost Centre, with comparative prior period.
+  - The comparative may be the preceding window of equal length or **the same window one year earlier**. Enrolment is seasonal, so the year-on-year comparison is the meaningful one for an academic institution and is offered directly rather than left to be constructed by hand.
+  - Opening-balance injections (REQ-PER-03) are excluded: they are the position the institution arrived with, not income it earned in the window.
+  - A cost-centre-filtered run reports a **contribution**, not a result — shared overheads carry no cost centre and are therefore absent — and shall be labelled so.
 - **REQ-RPT-06: Sub-Ledger Reconciliation Report**
   - For each control account, the sub-ledger total against the GL control balance, with any variance itemised. A non-zero variance is a P1 data-integrity alert. *(The legacy system's two divergent ledger tables made this impossible to compute at all.)*
 - **REQ-RPT-07: Export Formats & Print Engine**
   - Excel (.xlsx), CSV, and bilingual PDF with university letterhead. Arabic PDF output shall be correctly shaped and right-aligned, with tabular figures.
+  - Every format renders from **one** report model. A column present in one format shall be present in all of them.
+  - CSV shall carry a UTF-8 byte-order mark. Without it Excel on Windows opens the file in the system ANSI codepage and every Arabic account name is unreadable.
+  - Monetary values shall reach the spreadsheet as decimal text, never through a binary floating-point conversion.
+  - The PDF is produced by printing the bilingual print sheet, whose shaping is performed by the rendering engine. The system shall not implement its own Arabic shaper — see §0.0 correction 23.
 
 ---
 
@@ -480,10 +499,14 @@ graph LR
 - **REQ-PER-03: Opening Balances**
   - A dedicated opening-balance entry mode for tenant go-live: per GL account, and per sub-ledger party (student, sponsor, vendor) for control accounts.
   - The tenant cannot go live until total opening debits equal total opening credits and each control account equals the sum of its sub-ledger parties.
-  - Opening balances post as a single system-generated voucher into the first period, flagged as an opening entry and excluded from period-movement columns.
+  - Opening balances post as a single system-generated voucher into the first period, flagged as an opening entry and excluded from period-movement columns. *(A trial balance that reported a university's starting position as January activity would show the whole institution as having come into existence in one month.)*
+  - The set is validated in full before anything is written and refused in full on any issue. A partially entered opening position is worse than none, because it looks like a complete one.
+  - At most one live opening entry may exist. Correction is by reversal only: there is no edit mode, because there is no such thing as quietly adjusting where the books started.
 - **REQ-PER-04: Year-End Close**
-  - Revenue and expense accounts roll to Retained Earnings/Accumulated Surplus; balance-sheet accounts carry forward as the next year's opening balances.
-  - The close is reversible until the year is `Permanently Closed`.
+  - Revenue and expense accounts roll to Retained Earnings/Accumulated Surplus, posted as one balanced voucher dated the year's last day, so both open the following year at zero.
+  - Balance-sheet accounts carry forward as the next year's opening balances **by derivation** — summed from the periods that precede the window — rather than by copying closing figures into stored opening columns. See §0.0 correction 20 for why. The consequence worth stating: a balance-sheet opening balance is correct whether or not the close was run; what the close changes is that last year's revenue no longer appears in this year's income statement and the surplus sits in equity.
+  - The close is refused while any voucher of that year is still awaiting approval, since closing would shut the period those vouchers must post into.
+  - The close is reversible until the year is `Permanently Closed`, and the reversal is itself a posting carrying a reason — never a deletion.
 
 ---
 

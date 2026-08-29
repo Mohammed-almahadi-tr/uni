@@ -141,18 +141,15 @@ export async function buildTrialBalance(
   };
 
   for (const a of accounts) {
-    if (a.level > maxLevel) continue;
-    if (!a.isActive && !includeInactive) continue;
-
     const t = totals.get(a.id);
     if (!t) continue;
-    if (!opts.includeZeroRows && isEmpty(t)) continue;
 
-    const row = presentRow(a, t);
-    rows.push(row);
-
-    // Postable accounts are the leaves; everything above them is a sum of
-    // them. Totalling both would count each figure once per level it appears.
+    // Total first, filter second. Postable accounts are the leaves and
+    // everything above them is a sum of them, so only leaves are added —
+    // but they are added whether or not the reader asked to *see* them.
+    // Doing this after the level and visibility filters would mean a summary
+    // trial balance, which shows no level-5 rows at all, totalled zero: a
+    // display option that changes the numbers is a way to make money vanish.
     if (a.isPostable) {
       const c = columns(t);
       grand.openingDebit = grand.openingDebit.plus(c.openingDebit);
@@ -162,6 +159,12 @@ export async function buildTrialBalance(
       grand.closingDebit = grand.closingDebit.plus(c.closingDebit);
       grand.closingCredit = grand.closingCredit.plus(c.closingCredit);
     }
+
+    if (a.level > maxLevel) continue;
+    if (!a.isActive && !includeInactive) continue;
+    if (!opts.includeZeroRows && isEmpty(t)) continue;
+
+    rows.push(presentRow(a, t));
   }
 
   const segmented = Boolean(opts.costCenterId);

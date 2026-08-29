@@ -38,6 +38,7 @@ export const PERMISSIONS = [
   { key: 'academic.manage', description: 'Maintain faculties, programmes and batches' },
   { key: 'feematrix.read', description: 'View the fee matrix' },
   { key: 'feematrix.manage', description: 'Maintain the fee matrix and fee items' },
+  { key: 'feematrix.approve', description: 'Approve a fee schedule version, publishing it as what a cohort pays' },
 
   // ---- Admissions and students -----------------------------------------
   { key: 'application.read', description: 'View admission applications' },
@@ -148,6 +149,14 @@ export const SOD_CONFLICTS: readonly SodConflict[] = [
     b: 'voucher.approve',
     reason:
       'The two checker stages must be separate people, or the second review adds nothing.',
+  },
+  {
+    a: 'feematrix.manage',
+    b: 'feematrix.approve',
+    reason:
+      'A published fee is what every student in a cohort pays for years. Whoever drafts the ' +
+      'schedule must not also be the one who publishes it — that pair lets one person set ' +
+      'the price of an entire faculty with no second signature.',
   },
   {
     a: 'feematrix.manage',
@@ -347,7 +356,7 @@ export const DEFAULT_ROLES: Record<
       'coa.read', 'voucher.read', 'voucher.approve', 'voucher.reverse',
       'charge.reverse', 'period.read', 'period.close', 'budget.read',
       'budget.approve', 'discount.approve', 'po.approve', 'asset.dispose',
-      'payment.approve', 'vendor.approve', 'apinvoice.approve',
+      'payment.approve', 'vendor.approve', 'apinvoice.approve', 'feematrix.approve',
       'report.financial', 'audit.read',
     ],
   },
@@ -364,7 +373,7 @@ export const DEFAULT_ROLES: Record<
       'coa.read', 'coa.manage', 'voucher.read', 'voucher.create',
       'payment.create', 'cheque.manage', 'asset.manage', 'asset.depreciate',
       'budget.read', 'budget.manage', 'apinvoice.record', 'period.read',
-      'revenue.recognise', 'feematrix.read', 'report.financial',
+      'revenue.recognise', 'feematrix.read', 'feematrix.manage', 'report.financial',
     ],
   },
   Cashier: {

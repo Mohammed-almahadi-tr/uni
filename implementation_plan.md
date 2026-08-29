@@ -1,6 +1,6 @@
 # Implementation Plan: UniFlow Multi-Tenant University ERP & White-Label Web Platform
 
-**Version:** 2.5.0 · **Supersedes:** 1.0.0 - 2.4.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.5.0
+**Version:** 2.6.0 · **Supersedes:** 1.0.0 - 2.5.0 · **Companion document:** [`srs_university_erp.md`](srs_university_erp.md) v2.6.0
 
 Transformation of the legacy VB.NET / MS SQL desktop university system (Oasis E-University at Nile College; the Ribat University Application at Ribat and UOT) into a multi-tenant web application: student registration and lifecycle management, a double-entry university finance engine, and a white-label landing page per university client, built with **Next.js**, **shadcn UI** and **PostgreSQL**.
 
@@ -33,13 +33,16 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**450 tests pass across 16 suites; typecheck, lint and production build are all
+**500 tests pass across 17 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
-**Track A1-A6 are also complete**: chart of accounts, journal vouchers and
+**Track A is complete, A1-A7**: chart of accounts, journal vouchers and
 maker-checker, fee catalog / student AR / cashiering, the cheque clearing
-pipeline, fixed assets with the durable job runner, and budget /
-encumbrance / procure-to-pay — see §0.2.
+pipeline, fixed assets with the durable job runner, budget / encumbrance /
+procure-to-pay, and the financial statements — trial balance, balance sheet,
+income statement, sub-ledger reconciliation and their exports — together with
+the two Module 12 requirements the statements depend on, opening balances and
+the year-end close. See §0.2.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -611,6 +614,175 @@ not scheduled".
 
 ---
 
+### A7 — Financial Statements & Reports · complete
+
+The track that makes the previous six legible. Every posting A1-A6 produces
+converges here, and the two central properties are asserted rather than
+assumed: **the trial balance balances**, and **every control account agrees
+with its sub-ledger**.
+
+#### What the legacy reports actually did
+
+The trial balance and the balance sheet did not read the same table.
+
+```vb
+' frmTrialBalance
+"Select ... Acc1,Acc2,Acc3,Acc4," & _
+"Sum(TotalValueIn)-Sum(TotalValueOut) TotalValueIn," & _
+"Sum(TotalValueIn)-Sum(TotalValueOut) TotalValueOut " & _
+"From Transactionees where Transdate > ... Group By Acc1,Acc2,Acc3,Acc4"
+```
+([frmTrialBalance.vb:161-168](Nile College E-University System/Oasis - E-University/Financial System/Forms/frmTrialBalance.vb#L161-L168))
+
+```vb
+' frmBalanceSheetLevels
+"Select Acc1,Acc2,Acc3,Acc4,Sum(TotalValueIn)-Sum(TotalValueout) TotalValueout ... " & _
+"From Transactions Where Transdate < ... group by Acc1,Acc2,Acc3,Acc4"
+```
+([frmBalanceSheetLevels.vb:214-218](Nile College E-University System/Oasis - E-University/Financial System/Forms/frmBalanceSheetLevels.vb#L214-L218))
+
+Four findings, all visible in those eight lines:
+
+1. **The trial balance reads `Transactionees`; the balance sheet reads
+   `Transactions`.** The two divergent ledger tables named in §0.1 are not
+   merely a schema wart — the institution's two headline statements were built
+   from different halves of its books, so they could never be reconciled to
+   each other except on paper.
+2. **The trial balance's debit and credit columns are the same expression.**
+   `Sum(TotalValueIn)-Sum(TotalValueOut)` is aliased to `TotalValueIn` *and* to
+   `TotalValueOut`. The report prints one net figure in both columns. It
+   therefore always appears to balance, whatever the ledger contains, and the
+   one question a trial balance exists to answer cannot be asked of it.
+3. **No opening column, because there was nothing to open from.** With no
+   fiscal period model the query can only express a movement window, so
+   REQ-RPT-03's opening/movement/closing was not implementable against that
+   schema at all.
+4. **Grouping is by four text account names**, so there is no level-5 detail,
+   no code, and renaming an account silently splits its history into two rows.
+
+There is no income statement anywhere in either build. `frmRptIncome` looks
+like one and is not: it selects `StudID, StudName, Program, Class,
+TuitionFees1, RegsFees` from `View_1`
+([frmRptIncome.vb:61-64](Nile College E-University System/Oasis - E-University/Financial System/Forms/frmRptIncome.vb#L61-L64)) — a
+student fee-collection listing, not revenue less expenses. Levels 1-4 of the
+balance sheet are four separate Crystal files chosen by radio button rather
+than one report with a depth parameter.
+
+#### One source of figures
+
+Every statement reads `reports/balances.ts`. Three presentations of one
+question cannot be allowed three implementations, or they will eventually give
+three answers — which is exactly the defect above, in a newer costume.
+
+| Delivered | Notes |
+| :--- | :--- |
+| **Trial balance** (REQ-RPT-03) | Opening · Movement · Closing, each as a debit and a credit column, levels 1-5. Netted per account on the **raw** direction, not the account's normal balance, so an account sitting on the wrong side is visible rather than presented as though it were not |
+| Totals from postable accounts only | Parents are shown because REQ-RPT-03 asks for levels 1-5, but they aggregate the rows beneath them. Totalling both would count every figure once per level |
+| Hiding a row never changes a total | Totalling happens before the level filter and the zero-row filter. A summary trial balance that showed no level-5 rows and therefore totalled zero would be a display option that makes money vanish |
+| `balanced` is asserted, not assumed | All three column pairs must agree. False is a data-integrity alarm: something has written to the ledger outside `post()` |
+| **Balance sheet** L1-L4 (REQ-RPT-04) | Any cutoff date, including one inside a period |
+| **Income statement** (REQ-RPT-05) | Revenue less expenses, net surplus/deficit, cost-centre filter, and a comparative window — `prior-year` shifts by exactly a year, because enrolment is seasonal and last month is not a fair comparison for this month |
+| **Sub-ledger reconciliation** (REQ-RPT-06) | The three existing checks — student AR (A3), asset register (A5), vendor AP (A6) — plus a fourth, run inside **one** read transaction. Run separately they can disagree with each other merely because a receipt posted between two of them |
+| Contra accounts subtract | Figures are signed by the account's *class*, not its own normal balance, so accumulated depreciation reduces the asset group it sits under instead of adding to it |
+| **CSV · XLSX · print sheet** (REQ-RPT-07) | One `ReportDocument` model, three renderers. Writing each exporter against each statement would be nine implementations and nine places for a column to go missing from one format only |
+
+REQ-RPT-01 (student statement of account) and REQ-RPT-02 (receivables aging
+from the instalment due date) were delivered in **A3** and are not rebuilt here;
+the reconciliation report calls into the same functions rather than growing its
+own copy of them.
+
+#### Any cutoff date, without scanning the ledger
+
+REQ-RPT-04 wants a balance sheet at any date; REQ-NFR-02 forbids ad-hoc `SUM()`
+over `transaction_lines` in a report path. Both hold, because periods are
+classified against the report window: those wholly before it and wholly inside
+it come from `account_period_balances`, and **only a period the window cuts** is
+read line by line. A report run to a period boundary — which is nearly all of
+them — reads no journal lines at all.
+
+#### Opening balances carry forward by derivation, not by copy
+
+This is a deliberate departure from REQ-PER-04's literal wording and is
+recorded as SRS correction 20.
+
+The conventional design copies each year's closing balances into the next
+year's opening columns. A copied figure can drift from the postings it claims
+to summarise: a correction posted into a reopened period moves the movement and
+not the copy downstream, and nothing reports the divergence. Here
+`opening_debit`/`opening_credit` hold only balances **injected from outside the
+ledger** — the go-live opening entry — and everything else, a prior year's
+result included, is summed from the periods that came before. A derived figure
+cannot drift, because it is recomputed from the same rows the movement column is
+built from.
+
+Balance-sheet accounts therefore carry forward whether or not anyone ran the
+close. What the close is *for* is stated plainly in `ledger/year-end.ts`: it
+stops last year's revenue appearing in this year's income statement, and it
+moves the surplus into equity. A balance sheet whose result line still spans an
+unclosed prior year says so — `spansPriorYears` — rather than letting the figure
+quietly mean something other than "this year".
+
+#### Two Phase 0 requirements that were still unbuilt
+
+Module 12 specified them; nothing had needed them until a trial balance did.
+
+- **REQ-PER-03 opening balances.** One voucher, flagged `isOpeningEntry`, which
+  the posting engine routes into the `opening_*` columns instead of `movement_*`
+  — so a university's starting position is reported as an opening balance and
+  not as January activity, which would show the whole institution as having come
+  into existence in one month. Refused unless debits equal credits, every
+  control-account balance carries its party, and no live opening entry already
+  exists. Correctable only by reversal: there is no such thing as quietly
+  adjusting where the books started.
+- **REQ-PER-04 year-end close.** One posting zeroes every revenue and expense
+  account into Retained Surplus. Reversible until the year is
+  `PERMANENTLY_CLOSED`, and the undo is itself a posting with a reason — not a
+  delete. Refused while vouchers are still awaiting approval, because closing
+  would shut the period they have to post into.
+
+#### On the XLSX writer and the absence of a PDF writer
+
+The `.xlsx` exporter is about two hundred lines with no dependency. Entries are
+ZIP-stored rather than deflated and strings are inline rather than shared,
+which removes the compression step and the shared-string index entirely.
+Amounts are written into `<v>` as the decimal strings they already are; there
+is no `Number(...)` anywhere in the file, so nothing passes through IEEE-754 on
+its way to a spreadsheet.
+
+**PDF is produced by printing the HTML sheet, and that is a decision.** Arabic
+is cursive: four contextual forms per letter, obligatory ligatures, then
+bidirectional reordering against any Latin text or figures beside it. A PDF
+content stream carries positioned glyphs, so a generator must do all of that
+itself. The failure mode is what settles it — output that *looks* like Arabic,
+prints, gets signed, and is wrong in ways an English-reading developer cannot
+see. Browsers already contain a correct shaping engine. The print stylesheet
+carries the page setup, the letterhead and the repeated table header, so what
+leaves the print dialog is a document rather than a screenshot.
+
+#### Verification
+
+50 tests. Beyond the per-report assertions: closing equals opening plus movement
+on every row of every trial balance; a mid-period cutoff read line by line
+agrees with the same figures read from the aggregates; the level limit changes
+what is displayed and not what is totalled; a cost-centre segment is marked
+`segmented` and is *expected* not to balance; and a second university's reports
+read zero while the first university's read its own postings.
+
+One test is worth naming. The reconciliation report's fourth check looks for a
+control-account balance carrying no party — and the condition **cannot be
+produced**: `trg_line_postable` refuses it even to the owner role, which
+bypasses RLS entirely. That refusal is asserted as a test in its own right. The
+backstop is then exercised with the trigger suppressed for one transaction, on
+the principle that a backstop nobody has ever seen fire is a backstop nobody
+knows is connected.
+
+**Deferred:** the pre-close checklist gate of REQ-PER-02 (the reconciliation
+report computes every figure it needs; wiring it as a hard block on
+`setPeriodStatus` waits for the period-close screen), and FX revaluation, which
+has no exchange-rate data to revalue until a tenant runs a second currency.
+
+---
+
 
 ## 1. Architecture Decisions Requiring Sign-Off
 
@@ -841,7 +1013,7 @@ Even though Phases 7-8 are out of v1 scope, the Phase 0 schema must not preclude
 
 **A6 · Budget, Encumbrance & Procurement/AP** *(built — see §0.2)* — Budget versions with approval; available = allocated − encumbered − actual, checked at order approval rather than reported afterwards. Vendor master whose bank details a single person cannot change. Requisition → PO → GRN → invoice → three-way match → payment voucher. PO approval creates the encumbrance; receipt releases it and raises the accrual; the invoice moves the accrual to a payable; payment clears it. AP aging by due date and payment proposal runs. Year-end encumbrance lapse or carry-forward.
 
-**A7 · Financial Statements & Reports** — Trial Balance (opening / movement / closing, sourced from `account_period_balances`), Balance Sheet L1-L4, Income Statement with comparatives and cost-centre filtering, Student Statement of Account, Receivables Aging from **instalment due date**, and the Sub-Ledger Reconciliation report that makes control-account divergence visible. Excel, CSV and bilingual PDF export.
+**A7 · Financial Statements & Reports** *(built — see §0.2)* — Trial Balance (opening / movement / closing, sourced from `account_period_balances`), Balance Sheet L1-L4, Income Statement with comparatives and cost-centre filtering, Student Statement of Account, Receivables Aging from **instalment due date**, and the Sub-Ledger Reconciliation report that makes control-account divergence visible. Excel, CSV and bilingual PDF export.
 
 ---
 

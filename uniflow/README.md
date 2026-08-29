@@ -6,18 +6,22 @@ UOT). See [`../srs_university_erp.md`](../srs_university_erp.md) for
 requirements and [`../implementation_plan.md`](../implementation_plan.md) for
 the delivery plan.
 
-**Status: Phase 0 complete · Track A1-A6 complete.** Ledger invariants,
+**Status: Phase 0 complete · Track A complete (A1-A7).** Ledger invariants,
 platform spine, auth/RBAC with segregation of duties, the bilingual RTL shell,
 a normalised chart of accounts, a four-state maker-checker workflow whose
 drafts are never deleted, and a working cashier desk: fee catalog, student
 sub-ledger, multi-channel receipts, credit balances, deferred-revenue
 recognition, aging, a cheque clearing pipeline that posts at every transition,
-a fixed-asset register with an idempotent depreciation batch, and budgetary
-control with a full procure-to-pay chain. **450 tests across 16 suites;
-typecheck, lint and production build clean.**
+a fixed-asset register with an idempotent depreciation batch, budgetary control
+with a full procure-to-pay chain, and the financial statements that make all of
+it legible — trial balance, balance sheet, income statement, sub-ledger
+reconciliation, and their CSV, Excel and print exports. **500 tests across 17
+suites; typecheck, lint and production build clean.**
 
-Tracks A (finance), B (student) and C (public surface) run in parallel from
-here.
+The finance engine is done. **There is no user interface yet** — one demo route
+proving the localisation layer works end to end, and nothing else. Tracks B
+(student) and C (public surface), and the application UI over Track A, are the
+work that remains.
 
 ---
 
@@ -28,7 +32,7 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 450 tests
+npm test              # 500 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
@@ -296,6 +300,39 @@ unless a second person has approved a change request naming exactly those
 values. Redirecting a real supplier's payments needs no forged invoice, only an
 edit to one row.
 
+**A7 — Financial statements.** The legacy trial balance and balance sheet did
+not read the same table: `frmTrialBalance` summed `Transactionees`,
+`frmBalanceSheetLevels` summed `Transactions`. The institution's two headline
+statements were built from different halves of its books. Worse, the trial
+balance aliased `Sum(TotalValueIn)-Sum(TotalValueOut)` to *both* its debit and
+its credit column — one net figure printed twice — so it always appeared to
+balance whatever the ledger contained. And `frmRptIncome`, despite the name, is
+a student fee-collection listing: there was no income statement at all.
+
+Every statement here reads one function. Trial balance with opening, movement
+and closing at every level; balance sheet L1-L4 at any cutoff date; income
+statement with a cost-centre filter and a comparative that can be the same
+window a year earlier, because enrolment is seasonal. The trial balance
+**asserts** that it balances, and totals are computed before any display filter
+so restricting the report to a summary level changes what is shown and never
+what is totalled.
+
+Two things had to be built first, both specified in Phase 0 and neither needed
+until a statement asked: go-live **opening balances**, posted as one flagged
+voucher that lands in the opening columns rather than being reported as January
+activity, and the **year-end close**, which zeroes revenue and expense into
+retained surplus and is undone by reversal rather than by deletion.
+
+Balance-sheet accounts carry forward by *derivation* rather than by copying
+last year's closing figures into this year's opening columns. A copied figure
+drifts the first time anyone posts a correction into a reopened period, and
+nothing reports the drift; a derived one is recomputed from the same rows the
+movement column is built from.
+
+Any cutoff date works without breaking the performance promise: whole periods
+come from the maintained aggregates and only a period the report window *cuts*
+is read line by line — which, for a report run to a period boundary, is none.
+
 **A5 — Fixed assets, depreciation, and the job runner.** The legacy system had
 **no asset entity**: an "asset" was a row in the chart of accounts carrying a
 `DeprPerc` column — no dates, no salvage, no useful life, no custodian, and no
@@ -362,13 +399,23 @@ equals its control accounts **to the cent**.
 
 ## Next
 
-Track A finishes at **A7 — financial statements and reports**: trial balance
-with opening / movement / closing sourced from `account_period_balances`,
-balance sheet L1-L4, income statement with comparatives and cost-centre
-filtering, receivables aging from the instalment due date, and the sub-ledger
-reconciliation report that makes control-account divergence visible on a page
-rather than only in a test. Track B (student) and Track C (public surface) can
-run in parallel — see the roadmap in
-[`../implementation_plan.md`](../implementation_plan.md). They converge at the
-**registration-posts-to-GL** milestone, which is the integration the legacy
-system never made.
+Track A is complete. What it is not is an application: the finance engine is
+500 tests deep and has no screens over it. Three things run in parallel from
+here.
+
+**The application UI over Track A.** Auth screens, the app shell, and the
+operator screens — cashier desk, voucher grid, approvals queue, chart of
+accounts, budget, purchase orders, assets, and the statements this track just
+finished. Designs exist; the wiring does not.
+
+**Track B — student.** Academic structure and the effective-dated fee matrix,
+admissions with seat capacity, the student profile, the registration engine,
+the status lifecycle, and sponsors. Only `students/registry.ts` exists today.
+
+**Track C — public surface.** Theme engine and landing CMS, the public
+admissions portal, and student/guardian self-service.
+
+Tracks A and B converge at the **registration-posts-to-GL** milestone — the
+integration the legacy system never made, where a registration and its balanced
+ledger entry are created in one transaction or neither is. See the roadmap in
+[`../implementation_plan.md`](../implementation_plan.md).
