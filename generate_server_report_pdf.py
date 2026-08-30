@@ -1,0 +1,609 @@
+import os
+import subprocess
+
+html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UniFlow Platform - Server Infrastructure & Deployment Plan</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  @page {
+    size: A4 portrait;
+    margin: 12mm 14mm 12mm 14mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 8pt;
+      color: #64748b;
+      font-family: 'Inter', sans-serif;
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1e293b;
+    background: #ffffff;
+    line-height: 1.38;
+    font-size: 8.5pt;
+    margin: 0;
+    padding: 0;
+  }
+
+  .header-card {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #0284c7 100%);
+    color: #ffffff;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+  }
+
+  .header-title {
+    font-size: 15pt;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    margin: 0 0 2px 0;
+    color: #ffffff;
+  }
+
+  .header-subtitle {
+    font-size: 9.5pt;
+    font-weight: 500;
+    color: #38bdf8;
+    margin: 0 0 10px 0;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 7px 12px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .meta-label {
+    font-size: 6.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .meta-value {
+    font-size: 8pt;
+    font-weight: 600;
+    color: #f8fafc;
+  }
+
+  h2 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    border-bottom: 1.5px solid #e2e8f0;
+    padding-bottom: 3px;
+    margin-top: 10px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 1.5px 6px;
+    border-radius: 4px;
+    font-size: 7pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .badge-blue { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+  .badge-purple { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+  .badge-green { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+  .badge-amber { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+
+  .server-card {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    margin-bottom: 9px;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    overflow: hidden;
+  }
+
+  .server-header {
+    background: #f8fafc;
+    padding: 6px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .server-title {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+  }
+
+  .server-hostname {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    background: #0f172a;
+    color: #38bdf8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .server-body {
+    padding: 8px 12px;
+  }
+
+  .spec-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    background: #f1f5f9;
+    padding: 5px 8px;
+    border-radius: 5px;
+    margin-bottom: 6px;
+  }
+
+  .spec-box {
+    text-align: center;
+  }
+
+  .spec-name {
+    font-size: 6pt;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+
+  .spec-val {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #0f172a;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .services-list {
+    margin: 0;
+    padding-left: 15px;
+  }
+
+  .services-list li {
+    margin-bottom: 2px;
+    font-size: 7.8pt;
+    color: #334155;
+  }
+
+  .services-list strong {
+    color: #0f172a;
+  }
+
+  table.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: 7.5pt;
+  }
+
+  table.styled-table th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: left;
+    padding: 5px 7px;
+    border: 1px solid #1e293b;
+    font-size: 7pt;
+    text-transform: uppercase;
+  }
+
+  table.styled-table td {
+    padding: 4.5px 7px;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+  }
+
+  table.styled-table tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  .callout {
+    background: #eff6ff;
+    border-left: 3px solid #0284c7;
+    padding: 7px 10px;
+    border-radius: 0 5px 5px 0;
+    margin: 8px 0;
+    font-size: 7.8pt;
+    color: #0c4a6e;
+    line-height: 1.35;
+  }
+
+  .callout-warning {
+    background: #fffbeb;
+    border-left: 3px solid #d97706;
+    color: #78350f;
+  }
+
+  .roadmap-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .roadmap-card {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 5px;
+    padding: 7px 9px;
+    border-left: 3px solid #0284c7;
+  }
+
+  .step-title {
+    font-weight: 700;
+    font-size: 7.8pt;
+    color: #0f172a;
+    margin-bottom: 2px;
+  }
+
+  .step-desc {
+    font-size: 7.2pt;
+    color: #475569;
+    line-height: 1.3;
+  }
+
+  .page-break {
+    page-break-after: always;
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= PAGE 1 ================= -->
+<div class="header-card">
+  <div class="header-title">UniFlow University ERP & Virtual Labs</div>
+  <div class="header-subtitle">Server Infrastructure Sizing & Production Deployment Plan</div>
+  <div class="meta-grid">
+    <div class="meta-item">
+      <span class="meta-label">Prepared For</span>
+      <span class="meta-value">Dr. Ayman / Leadership</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Recommended Setup</span>
+      <span class="meta-value">4-Node Production Cluster</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Date & Version</span>
+      <span class="meta-value">August 2026 · v1.0</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Classification</span>
+      <span class="meta-value">Confidential Tech Report</span>
+    </div>
+  </div>
+</div>
+
+<h2>1. Executive Summary: Server Count & Separation Rationale</h2>
+<p style="margin: 0 0 6px 0;">
+  To host the <strong>UniFlow Platform</strong> with high-demand extensions (BigBlueButton Virtual Classrooms, Virtual Programming Labs (VPL), Medical/Science Simulators, and AI Proctoring), an enterprise workload-separated topology is mandatory.
+</p>
+
+<div class="callout">
+  <strong>Total Required Nodes: Exactly 4 Dedicated Servers + S3 Object Storage</strong><br>
+  <strong>Why separate nodes?</strong> Video transcoding (WebRTC UDP), untrusted student code execution (VPL Jails), and financial/student database transactions have conflicting resource patterns. Isolating them prevents exam crashes, guarantees 99.9% uptime, and eliminates security leak vectors.
+</div>
+
+<h2>2. Exact Hardware Specifications & Workload Breakdown</h2>
+
+<!-- SERVER 1 -->
+<div class="server-card">
+  <div class="server-header">
+    <span class="server-title">Server 1: Core Web & Application Gateway</span>
+    <span class="server-hostname">srv-uniflow-app</span>
+  </div>
+  <div class="server-body">
+    <div class="spec-grid">
+      <div class="spec-box"><div class="spec-name">vCPU</div><div class="spec-val">4 – 8 Cores</div></div>
+      <div class="spec-box"><div class="spec-name">RAM</div><div class="spec-val">16 GB DDR4/5</div></div>
+      <div class="spec-box"><div class="spec-name">Storage</div><div class="spec-val">120 GB NVMe</div></div>
+      <div class="spec-box"><div class="spec-name">Network</div><div class="spec-val">1 Gbps Public</div></div>
+      <div class="spec-box"><div class="spec-name">OS</div><div class="spec-val">Ubuntu 24.04 LTS</div></div>
+    </div>
+    <ul class="services-list">
+      <li><strong>UniFlow Core App:</strong> Next.js 16 (React 19, TypeScript) on Node.js 22 LTS under PM2 cluster mode (4-6 workers).</li>
+      <li><strong>Reverse Proxy / Edge:</strong> Nginx with HTTP/2, TLS 1.3, Let's Encrypt Certbot auto-renewal, and Brotli/Gzip compression.</li>
+      <li><strong>Cache & Task Queue:</strong> Redis in-memory store for session tokens, real-time push notifications, and API rate limiting.</li>
+      <li><strong>AI Gateway & Proctoring Controller:</strong> Webhook telemetry ingestion for AI proctoring and LLM tutoring proxies.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- SERVER 2 -->
+<div class="server-card">
+  <div class="server-header">
+    <span class="server-title">Server 2: Dedicated Database & Isolation Tier</span>
+    <span class="server-hostname">srv-uniflow-db</span>
+  </div>
+  <div class="server-body">
+    <div class="spec-grid">
+      <div class="spec-box"><div class="spec-name">vCPU</div><div class="spec-val">4 – 8 Cores</div></div>
+      <div class="spec-box"><div class="spec-name">RAM</div><div class="spec-val">16 – 32 GB</div></div>
+      <div class="spec-box"><div class="spec-name">Storage</div><div class="spec-val">300 GB Enterprise NVMe</div></div>
+      <div class="spec-box"><div class="spec-name">Network</div><div class="spec-val">1 Gbps Private LAN</div></div>
+      <div class="spec-box"><div class="spec-name">OS</div><div class="spec-val">Ubuntu 24.04 LTS</div></div>
+    </div>
+    <ul class="services-list">
+      <li><strong>PostgreSQL 17 Engine:</strong> Tuned buffer cache (<code>shared_buffers=8GB</code>, <code>work_mem=64MB</code>, <code>effective_cache_size=24GB</code>).</li>
+      <li><strong>PgBouncer Connection Pooler:</strong> Port <code>6543</code> in Transaction Mode for restricted <code>uniflow_app</code> runtime role.</li>
+      <li><strong>Dual-Role RLS Security:</strong> Strict Row-Level Security isolation; direct port <code>5432</code> reserved for owner schema migrations.</li>
+      <li><strong>Automated Backups & Archiving:</strong> WAL-G / pgBackRest for continuous Point-in-Time Recovery (PITR) replicated to S3.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ================= PAGE 2 ================= -->
+
+<!-- SERVER 3 -->
+<div class="server-card">
+  <div class="server-header">
+    <span class="server-title">Server 3: BigBlueButton (BBB) Video & Virtual Classrooms</span>
+    <span class="server-hostname">srv-uniflow-bbb</span>
+  </div>
+  <div class="server-body">
+    <div class="spec-grid">
+      <div class="spec-box"><div class="spec-name">vCPU</div><div class="spec-val">8 – 16 Cores</div></div>
+      <div class="spec-box"><div class="spec-name">RAM</div><div class="spec-val">16 – 32 GB</div></div>
+      <div class="spec-box"><div class="spec-name">Storage</div><div class="spec-val">300 GB NVMe (Buffer)</div></div>
+      <div class="spec-box"><div class="spec-name">Network</div><div class="spec-val">1 Gbps Unmetered</div></div>
+      <div class="spec-box"><div class="spec-name">OS</div><div class="spec-val">Ubuntu 22.04 LTS</div></div>
+    </div>
+    <ul class="services-list">
+      <li><strong>BigBlueButton 2.7+ Suite:</strong> FreeSWITCH (SIP/VoIP audio), Kurento/Mediasoup (WebRTC video & screen sharing), BBB HTML5 client.</li>
+      <li><strong>Coturn STUN/TURN Server:</strong> Traversal server allowing students behind restricted firewalls/cellular NATs to stream smoothly.</li>
+      <li><strong>Recording Processing Pipeline:</strong> Converts raw audio/video to web formats and pushes finished recordings directly to S3.</li>
+      <li><strong>Internal BBB Nginx & Redis:</strong> Manages WebSockets and live meeting state synchronization without touching core ERP.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- SERVER 4 -->
+<div class="server-card">
+  <div class="server-header">
+    <span class="server-title">Server 4: VPL Virtual Programming Labs & Simulators</span>
+    <span class="server-hostname">srv-uniflow-vpl</span>
+  </div>
+  <div class="server-body">
+    <div class="spec-grid">
+      <div class="spec-box"><div class="spec-name">vCPU</div><div class="spec-val">4 – 8 Cores</div></div>
+      <div class="spec-box"><div class="spec-name">RAM</div><div class="spec-val">8 – 16 GB</div></div>
+      <div class="spec-box"><div class="spec-name">Storage</div><div class="spec-val">80 GB NVMe</div></div>
+      <div class="spec-box"><div class="spec-name">Network</div><div class="spec-val">1 Gbps Private / Firewalled</div></div>
+      <div class="spec-box"><div class="spec-name">OS</div><div class="spec-val">Ubuntu 24.04 LTS</div></div>
+    </div>
+    <ul class="services-list">
+      <li><strong>vpl-jail-system Sandbox Daemon:</strong> Sandboxed execution engine with Linux <code>cgroups</code> (Max 5s CPU time, 256MB RAM per run).</li>
+      <li><strong>Compilers & Language Toolchains:</strong> GCC, G++, Python 3, OpenJDK (Java 17/21), Node.js, Rust, Go, and PHP.</li>
+      <li><strong>Medical & Science Simulators Hub:</strong> Docker Engine hosting WebAssembly/WebGL 3D simulation modules with LTI 1.3 sync.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- AUXILIARY S3 -->
+<div class="server-card">
+  <div class="server-header">
+    <span class="server-title">Auxiliary Cloud Tier: S3-Compatible Object Storage</span>
+    <span class="server-hostname">AWS S3 / Wasabi / MinIO</span>
+  </div>
+  <div class="server-body">
+    <div class="spec-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="spec-box"><div class="spec-name">Capacity</div><div class="spec-val">1 TB – 5 TB (Scalable)</div></div>
+      <div class="spec-box"><div class="spec-name">Durability</div><div class="spec-val">99.999999999% (11 9s)</div></div>
+      <div class="spec-box"><div class="spec-name">Type</div><div class="spec-val">Hot Object Storage</div></div>
+    </div>
+    <p style="margin: 3px 0 0 0; font-size: 7.5pt; color: #475569;">
+      Stores BBB video recordings, student identity/medical document attachments, and daily encrypted database disaster-recovery snapshots.
+    </p>
+  </div>
+</div>
+
+<h2>3. Server Specs & Network Matrix at a Glance</h2>
+<table class="styled-table">
+  <thead>
+    <tr>
+      <th>Server Role</th>
+      <th>Hostname</th>
+      <th>vCPU</th>
+      <th>RAM</th>
+      <th>Disk (NVMe)</th>
+      <th>Inbound Ports</th>
+      <th>Network Exposure</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Core Web & Gateway</strong></td>
+      <td><code>srv-uniflow-app</code></td>
+      <td>4 – 8</td>
+      <td>16 GB</td>
+      <td>120 GB</td>
+      <td>80, 443 (HTTP/S)</td>
+      <td><span class="badge badge-green">Public Edge</span></td>
+    </tr>
+    <tr>
+      <td><strong>Database & PgBouncer</strong></td>
+      <td><code>srv-uniflow-db</code></td>
+      <td>4 – 8</td>
+      <td>16 – 32 GB</td>
+      <td>300 GB</td>
+      <td>6543 (App), 5432 (Owner)</td>
+      <td><span class="badge badge-amber">Private LAN</span></td>
+    </tr>
+    <tr>
+      <td><strong>BigBlueButton (BBB)</strong></td>
+      <td><code>srv-uniflow-bbb</code></td>
+      <td>8 – 16</td>
+      <td>16 – 32 GB</td>
+      <td>300 GB</td>
+      <td>80, 443, UDP 16384-32768</td>
+      <td><span class="badge badge-green">Public Media</span></td>
+    </tr>
+    <tr>
+      <td><strong>VPL Jail & Simulators</strong></td>
+      <td><code>srv-uniflow-vpl</code></td>
+      <td>4 – 8</td>
+      <td>8 – 16 GB</td>
+      <td>80 GB</td>
+      <td>8080 (VPL Internal)</td>
+      <td><span class="badge badge-purple">Firewall Filtered</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-warning">
+  <strong>Budget 3-Server Alternative:</strong> Small universities (&lt;500 active students) can combine <strong>Server 1</strong> and <strong>Server 2</strong> into one high-spec node (8 vCPU, 32 GB RAM). <strong>Server 3 (BBB)</strong> and <strong>Server 4 (VPL)</strong> must always remain dedicated for WebRTC stability and sandbox security.
+</div>
+
+<div class="page-break"></div>
+
+<!-- ================= PAGE 3 ================= -->
+<h2>4. Phased Production Deployment Roadmap</h2>
+<div class="roadmap-grid">
+  <div class="roadmap-card">
+    <div class="step-title">Phase 1: Base Hardening & VPC</div>
+    <div class="step-desc">Provision Ubuntu nodes; configure SSH Ed25519 keys, UFW firewalls, Fail2ban brute-force defense, and private LAN network.</div>
+  </div>
+  <div class="roadmap-card">
+    <div class="step-title">Phase 2: Database & PgBouncer</div>
+    <div class="step-desc">Install PostgreSQL 17 + PgBouncer on DB node. Setup dual roles (<code>uniflow_app</code> vs <code>uniflow</code>) and WAL-G automated S3 archiving.</div>
+  </div>
+  <div class="roadmap-card">
+    <div class="step-title">Phase 3: UniFlow App Deployment</div>
+    <div class="step-desc">Deploy Next.js 16 standalone build under PM2. Run migrations and execute <code>npm run db:check-roles</code> to guarantee tenant RLS isolation.</div>
+  </div>
+  <div class="roadmap-card">
+    <div class="step-title">Phase 4: BigBlueButton & Coturn</div>
+    <div class="step-desc">Deploy BBB 2.7+ with FreeSWITCH, Kurento/Mediasoup, Coturn STUN/TURN, and post-recording S3 auto-export scripts.</div>
+  </div>
+  <div class="roadmap-card">
+    <div class="step-title">Phase 5: VPL Sandbox & Simulators</div>
+    <div class="step-desc">Install <code>vpl-jail-system</code> with cgroups CPU/memory quotas. Connect LTI 1.3 Advantage authentication for medical/science labs.</div>
+  </div>
+  <div class="roadmap-card">
+    <div class="step-title">Phase 6: Edge Proxy & Monitoring</div>
+    <div class="step-desc">Deploy Nginx with TLS 1.3 + Cloudflare WAF. Configure Prometheus, Grafana, and Uptime Kuma for 24/7 alerting and health checks.</div>
+  </div>
+</div>
+
+<h2>5. Monthly Hosting Cost Estimates</h2>
+<table class="styled-table">
+  <thead>
+    <tr>
+      <th>Infrastructure Component</th>
+      <th>Cloud VPS / Bare-Metal (Hetzner / OVH / DO)</th>
+      <th>Hyperscaler (AWS / Azure Managed)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Server 1: Web App & Redis Gateway</strong></td>
+      <td>$40 – $90 / mo</td>
+      <td>$160 – $380 / mo</td>
+    </tr>
+    <tr>
+      <td><strong>Server 2: PostgreSQL 17 + PgBouncer</strong></td>
+      <td>$60 – $140 / mo</td>
+      <td>$220 – $550 / mo</td>
+    </tr>
+    <tr>
+      <td><strong>Server 3: BigBlueButton Video Node</strong></td>
+      <td>$80 – $220 / mo</td>
+      <td>$300 – $750 / mo</td>
+    </tr>
+    <tr>
+      <td><strong>Server 4: VPL Sandbox & Simulators</strong></td>
+      <td>$40 – $100 / mo</td>
+      <td>$140 – $320 / mo</td>
+    </tr>
+    <tr>
+      <td><strong>S3 Storage (1–5 TB) & Offsite Backups</strong></td>
+      <td>$15 – $45 / mo (Wasabi / MinIO)</td>
+      <td>$50 – $160 / mo (AWS S3)</td>
+    </tr>
+    <tr>
+      <td><strong>WAF / CDN / Monitoring / SSL</strong></td>
+      <td>$20 – $50 / mo (Cloudflare Pro)</td>
+      <td>$80 – $200 / mo</td>
+    </tr>
+    <tr style="font-weight: 700; background: #e0f2fe;">
+      <td>Estimated Monthly Total</td>
+      <td style="color: #0369a1;">$255 – $645 / month</td>
+      <td style="color: #0369a1;">$950 – $2,560 / month</td>
+    </tr>
+    <tr style="font-weight: 700; background: #f1f5f9;">
+      <td>Estimated Annual Total</td>
+      <td style="color: #0f172a;">$3,000 – $7,700 / year</td>
+      <td style="color: #0f172a;">$11,400 – $30,700 / year</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6. Mandatory Security & Production Invariants</h2>
+<div class="callout" style="background: #f0fdf4; border-left: 3px solid #16a34a; color: #14532d;">
+  <strong>Key Architecture Guarantees:</strong><br>
+  1. <strong>Database RLS:</strong> The application connects only via <code>uniflow_app</code> behind PgBouncer so Row-Level Security cannot be bypassed.<br>
+  2. <strong>Jail Sandboxing:</strong> VPL executions operate under strictly isolated Linux <code>cgroups</code> with a 5s execution timeout and disabled networking.<br>
+  3. <strong>Disaster Recovery:</strong> Point-in-time database WAL archiving + encrypted daily offsite S3 sync ensures zero data loss.
+</div>
+
+<div style="margin-top: 18px; padding-top: 8px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 7pt; color: #94a3b8;">
+  <span>UniFlow Enterprise University ERP & LMS Platform</span>
+  <span>Infrastructure Sizing & Server Deployment Specification Report · August 2026</span>
+</div>
+
+</body>
+</html>
+"""
+
+html_path = "e:\\coding\\dr. Ayman work\\E-Unvevircity\\uniflow_server_deployment_report.html"
+pdf_path = "e:\\coding\\dr. Ayman work\\E-Unvevircity\\uniflow_server_deployment_report.pdf"
+
+with open(html_path, "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+edge_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+
+browser_exe = chrome_path if os.path.exists(chrome_path) else edge_path
+
+cmd = [
+    browser_exe,
+    "--headless",
+    "--disable-gpu",
+    "--no-pdf-header-footer",
+    f"--print-to-pdf={pdf_path}",
+    html_path
+]
+
+res = subprocess.run(cmd, capture_output=True, text=True)
+print(f"Generated PDF at {pdf_path} (size: {os.path.getsize(pdf_path)} bytes)")

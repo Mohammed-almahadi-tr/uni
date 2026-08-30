@@ -132,7 +132,7 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
       // §8 gives procure-to-pay *through payment* to D4, and this row said
       // D2 only because it sits in the finance menu.
       { key: 'payments', path: 'finance/payments', anyOf: ['payment.create', 'payment.approve'], phase: 'D4' },
-      { key: 'periods', path: 'finance/periods', anyOf: ['period.read', 'period.close'], phase: 'D4' },
+      { key: 'periods', path: 'finance/periods', anyOf: ['period.read', 'period.close'], phase: 'D4', built: true },
     ],
   },
   {
@@ -164,12 +164,12 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
     key: 'procurement',
     path: 'procurement',
     items: [
-      { key: 'vendors', path: 'procurement/vendors', anyOf: ['vendor.manage', 'vendor.approve'], phase: 'D4' },
+      { key: 'vendors', path: 'procurement/vendors', anyOf: ['vendor.manage', 'vendor.approve'], phase: 'D4', built: true },
       { key: 'orders', path: 'procurement/orders', anyOf: ['po.create', 'po.approve'], phase: 'D4' },
       { key: 'receiving', path: 'procurement/receiving', anyOf: ['grn.create'], phase: 'D4' },
       { key: 'invoices', path: 'procurement/invoices', anyOf: ['apinvoice.record', 'apinvoice.approve'], phase: 'D4' },
       { key: 'budgets', path: 'procurement/budgets', anyOf: ['budget.read', 'budget.manage', 'budget.approve'], phase: 'D4' },
-      { key: 'assets', path: 'procurement/assets', anyOf: ['asset.manage', 'asset.depreciate', 'asset.dispose'], phase: 'D4' },
+      { key: 'assets', path: 'procurement/assets', anyOf: ['asset.manage', 'asset.depreciate', 'asset.dispose'], phase: 'D4', built: true },
     ],
   },
   {
@@ -188,12 +188,12 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
     key: 'settings',
     path: 'settings',
     items: [
-      { key: 'users', path: 'settings/users', anyOf: ['user.read', 'user.manage'], phase: 'D4' },
-      { key: 'roles', path: 'settings/roles', anyOf: ['role.read', 'role.manage'], phase: 'D4' },
-      { key: 'branding', path: 'settings/branding', anyOf: ['cms.manage'], phase: 'D4' },
-      { key: 'content', path: 'settings/content', anyOf: ['cms.manage', 'cms.publish'], phase: 'D4' },
-      { key: 'enquiries', path: 'settings/enquiries', anyOf: ['inquiry.handle'], phase: 'D4' },
-      { key: 'audit', path: 'settings/audit', anyOf: ['audit.read'], phase: 'D4' },
+      { key: 'users', path: 'settings/users', anyOf: ['user.read', 'user.manage'], phase: 'D4', built: true },
+      { key: 'roles', path: 'settings/roles', anyOf: ['role.read', 'role.manage'], phase: 'D4', built: true },
+      { key: 'branding', path: 'settings/branding', anyOf: ['cms.manage'], phase: 'D4', built: true },
+      { key: 'content', path: 'settings/content', anyOf: ['cms.manage', 'cms.publish'], phase: 'D4', built: true },
+      { key: 'enquiries', path: 'settings/enquiries', anyOf: ['inquiry.handle'], phase: 'D4', built: true },
+      { key: 'audit', path: 'settings/audit', anyOf: ['audit.read'], phase: 'D4', built: true },
     ],
   },
 ] as const;

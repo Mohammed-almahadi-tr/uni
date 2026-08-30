@@ -1,4 +1,5 @@
 import 'server-only';
+import { Prisma } from '@/generated/prisma/client';
 import type { PermissionKey } from '@/lib/auth/permissions';
 import { withTenant } from '@/lib/db/client';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
@@ -492,6 +493,454 @@ export async function offersFor(
       overrideReason: r.overrideReason,
       closeReason: r.closeReason,
       promotedFromId: r.promotedFromId,
+    }));
+  });
+}
+
+export interface AuditRow {
+  seq: string;
+  actorName: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  occurredAt: Date;
+  before: unknown;
+  after: unknown;
+}
+
+/**
+ * A page of the audit trail, newest first.
+ *
+ * `seq` is a bigint in the database — a monotonic counter per tenant, and the
+ * thing the hash chain is ordered by. It crosses to the browser as a string,
+ * because a sequence long enough to matter is longer than a JavaScript number
+ * can hold exactly, and an audit trail that silently renumbers itself past
+ * 2^53 is worse than none.
+ *
+ * Reading is `audit.read` and there is no write path anywhere: the table has
+ * no update or delete route in this application, which is what makes the
+ * chain worth verifying.
+ */
+export async function auditPage(
+  principal: Principal,
+  filter: { resourceType?: string; take?: number; before?: string } = {},
+): Promise<AuditRow[]> {
+  return named(principal, 'audit.read', async (tx) => {
+    const rows = await tx.auditLog.findMany({
+      where: {
+        tenantId: principal.tenantId,
+        ...(filter.resourceType ? { resourceType: filter.resourceType } : {}),
+        ...(filter.before ? { seq: { lt: BigInt(filter.before) } } : {}),
+      },
+      orderBy: { seq: 'desc' },
+      take: filter.take ?? 100,
+      select: {
+        seq: true,
+        action: true,
+        resourceType: true,
+        resourceId: true,
+        occurredAt: true,
+        beforeJson: true,
+        afterJson: true,
+        actor: { select: { fullName: true } },
+      },
+    });
+    return rows.map((r) => ({
+      seq: r.seq.toString(),
+      actorName: r.actor?.fullName ?? null,
+      action: r.action,
+      resourceType: r.resourceType,
+      resourceId: r.resourceId,
+      occurredAt: r.occurredAt,
+      before: r.beforeJson,
+      after: r.afterJson,
+    }));
+  });
+}
+
+/** The distinct resource kinds present, for the filter. */
+export async function auditResourceTypes(principal: Principal): Promise<string[]> {
+  return named(principal, 'audit.read', async (tx) => {
+    const rows = await tx.auditLog.findMany({
+      where: { tenantId: principal.tenantId },
+      distinct: ['resourceType'],
+      orderBy: { resourceType: 'asc' },
+      select: { resourceType: true },
+    });
+    return rows.map((r) => r.resourceType);
+  });
+}
+
+export interface CalendarEntryRow {
+  id: string;
+  kind: string;
+  titleAr: string;
+  titleEn: string;
+  startDate: string;
+  endDate: string | null;
+  status: string;
+}
+
+/**
+ * Stored calendar entries, every status.
+ *
+ * `publishedCalendarInTx` merges the term-derived entries in for the public
+ * site; the editor wants only the rows somebody typed, because the derived
+ * three cannot be edited here and showing them beside editable ones invites
+ * the attempt.
+ */
+export async function calendarEntries(principal: Principal): Promise<CalendarEntryRow[]> {
+  return named(principal, 'cms.manage', async (tx) => {
+    const rows = await tx.calendarEvent.findMany({
+      where: { tenantId: principal.tenantId },
+      orderBy: { startDate: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        kind: true,
+        titleAr: true,
+        titleEn: true,
+        startDate: true,
+        endDate: true,
+        status: true,
+      },
+    });
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return rows.map((r) => ({
+      ...r,
+      startDate: iso(r.startDate),
+      endDate: r.endDate ? iso(r.endDate) : null,
+    }));
+  });
+}
+
+export interface FiscalPeriodRow {
+  id: string;
+  seq: number;
+  startDate: string;
+  endDate: string;
+  status: string;
+}
+
+export interface FiscalYearRow {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  periods: FiscalPeriodRow[];
+}
+
+/**
+ * Fiscal years and their periods.
+ *
+ * Read on `period.read` rather than `period.close`, because seeing which
+ * months are open is what a preparer needs before dating a voucher, and
+ * sealing one is a controller's act.
+ */
+export async function fiscalCalendar(principal: Principal): Promise<FiscalYearRow[]> {
+  return named(principal, 'period.read', async (tx) => {
+    const rows = await tx.fiscalYear.findMany({
+      where: { tenantId: principal.tenantId },
+      orderBy: { startDate: 'desc' },
+      take: 6,
+      select: {
+        id: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        status: true,
+        periods: {
+          orderBy: { seq: 'asc' },
+          select: { id: true, seq: true, startDate: true, endDate: true, status: true },
+        },
+      },
+    });
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return rows.map((y) => ({
+      ...y,
+      startDate: iso(y.startDate),
+      endDate: iso(y.endDate),
+      periods: y.periods.map((p) => ({
+        ...p,
+        startDate: iso(p.startDate),
+        endDate: iso(p.endDate),
+      })),
+    }));
+  });
+}
+
+export interface AssetRow {
+  id: string;
+  assetCode: string;
+  nameAr: string;
+  nameEn: string;
+  categoryName: string;
+  purchaseDate: string;
+  inServiceDate: string;
+  cost: string;
+  accumulated: string;
+  netBookValue: string;
+  status: string;
+  serialNo: string | null;
+  location: string | null;
+}
+
+/**
+ * The asset register with each asset's position.
+ *
+ * Accumulated depreciation is summed from the **posted** schedule rows, which
+ * is where `assetPosition` gets it too — never recomputed from cost and rate.
+ * A figure derived twice by two formulas is a figure that will eventually
+ * disagree with itself, and the legacy build's answer was worse still: with
+ * no accumulated-depreciation account at all, net book value was the
+ * purchase cost for ever.
+ */
+export async function assetRegister(principal: Principal): Promise<AssetRow[]> {
+  return named(principal, 'asset.manage', async (tx) => {
+    const rows = await tx.fixedAsset.findMany({
+      where: { tenantId: principal.tenantId },
+      orderBy: { assetCode: 'asc' },
+      take: 200,
+      select: {
+        id: true,
+        assetCode: true,
+        nameAr: true,
+        nameEn: true,
+        purchaseDate: true,
+        inServiceDate: true,
+        purchaseCost: true,
+        status: true,
+        serialNo: true,
+        location: true,
+        category: { select: { nameEn: true } },
+      },
+    });
+
+    // Posted rows only. A scheduled-but-unposted entry is a plan, and
+    // counting it as depreciation would make net book value disagree with the
+    // accumulated-depreciation account it is supposed to reconcile to.
+    const posted = await tx.depreciationEntry.groupBy({
+      by: ['assetId'],
+      where: { tenantId: principal.tenantId, postedAt: { not: null } },
+      _sum: { amount: true },
+    });
+    const byAsset = new Map<string, Prisma.Decimal | null>(
+      posted.map((row) => [row.assetId, row._sum.amount]),
+    );
+
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return rows.map((a) => {
+      const accumulated = byAsset.get(a.id) ?? null;
+      const acc = accumulated ? accumulated.toFixed(4) : '0.0000';
+      return {
+        id: a.id,
+        assetCode: a.assetCode,
+        nameAr: a.nameAr,
+        nameEn: a.nameEn,
+        categoryName: a.category.nameEn,
+        purchaseDate: iso(a.purchaseDate),
+        inServiceDate: iso(a.inServiceDate),
+        cost: a.purchaseCost.toFixed(4),
+        accumulated: acc,
+        netBookValue: a.purchaseCost.minus(accumulated ?? 0).toFixed(4),
+        status: a.status,
+        serialNo: a.serialNo,
+        location: a.location,
+      };
+    });
+  });
+}
+
+export interface OrderLineRow {
+  id: string;
+  lineNo: number;
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  amount: string;
+  receivedQty: string;
+  invoicedQty: string;
+}
+
+export interface OrderRow {
+  id: string;
+  poNo: string;
+  vendorCode: string;
+  vendorName: string;
+  orderDate: string;
+  expectedDate: string | null;
+  totalAmount: string;
+  state: string;
+  createdById: string;
+  lines: OrderLineRow[];
+}
+
+/**
+ * Purchase orders with their lines and what has arrived against each.
+ *
+ * `receivedQty` and `invoicedQty` are maintained on the line by the modules
+ * that move them, not recomputed here. The three-way match rests on those two
+ * figures agreeing with the goods receipts and the invoices, and a screen
+ * that derived its own version of them would be checking its own arithmetic
+ * rather than the system's.
+ */
+export async function orderRows(
+  principal: Principal,
+  filter: { state?: string; take?: number } = {},
+): Promise<OrderRow[]> {
+  return named(principal, 'po.create', async (tx) => {
+    const rows = await tx.purchaseOrder.findMany({
+      where: {
+        tenantId: principal.tenantId,
+        ...(filter.state ? { state: filter.state as never } : {}),
+      },
+      orderBy: { orderDate: 'desc' },
+      take: filter.take ?? 50,
+      select: {
+        id: true,
+        poNo: true,
+        orderDate: true,
+        expectedDate: true,
+        totalAmount: true,
+        state: true,
+        createdById: true,
+        vendor: { select: { code: true, nameEn: true } },
+        lines: {
+          orderBy: { lineNo: 'asc' },
+          select: {
+            id: true,
+            lineNo: true,
+            description: true,
+            quantity: true,
+            unitPrice: true,
+            amount: true,
+            receivedQty: true,
+            invoicedQty: true,
+          },
+        },
+      },
+    });
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return rows.map((o) => ({
+      id: o.id,
+      poNo: o.poNo,
+      vendorCode: o.vendor.code,
+      vendorName: o.vendor.nameEn,
+      orderDate: iso(o.orderDate),
+      expectedDate: o.expectedDate ? iso(o.expectedDate) : null,
+      totalAmount: o.totalAmount.toFixed(4),
+      state: o.state,
+      createdById: o.createdById,
+      lines: o.lines.map((l) => ({
+        id: l.id,
+        lineNo: l.lineNo,
+        description: l.description,
+        quantity: l.quantity.toFixed(4),
+        unitPrice: l.unitPrice.toFixed(4),
+        amount: l.amount.toFixed(4),
+        receivedQty: l.receivedQty.toFixed(4),
+        invoicedQty: l.invoicedQty.toFixed(4),
+      })),
+    }));
+  });
+}
+
+export interface InvoiceRow {
+  id: string;
+  internalNo: string;
+  vendorInvoiceNo: string;
+  vendorCode: string;
+  vendorName: string;
+  invoiceDate: string;
+  dueDate: string;
+  totalAmount: string;
+  settledAmount: string;
+  state: string;
+  holdReason: string | null;
+}
+
+export async function invoiceRows(
+  principal: Principal,
+  filter: { state?: string; take?: number } = {},
+): Promise<InvoiceRow[]> {
+  return named(principal, 'apinvoice.record', async (tx) => {
+    const rows = await tx.vendorInvoice.findMany({
+      where: {
+        tenantId: principal.tenantId,
+        ...(filter.state ? { state: filter.state as never } : {}),
+      },
+      orderBy: { invoiceDate: 'desc' },
+      take: filter.take ?? 50,
+      select: {
+        id: true,
+        internalNo: true,
+        vendorInvoiceNo: true,
+        invoiceDate: true,
+        dueDate: true,
+        totalAmount: true,
+        settledAmount: true,
+        state: true,
+        holdReason: true,
+        vendor: { select: { code: true, nameEn: true } },
+      },
+    });
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return rows.map((i) => ({
+      id: i.id,
+      internalNo: i.internalNo,
+      vendorInvoiceNo: i.vendorInvoiceNo,
+      vendorCode: i.vendor.code,
+      vendorName: i.vendor.nameEn,
+      invoiceDate: iso(i.invoiceDate),
+      dueDate: iso(i.dueDate),
+      totalAmount: i.totalAmount.toFixed(4),
+      settledAmount: i.settledAmount.toFixed(4),
+      state: i.state,
+      holdReason: i.holdReason,
+    }));
+  });
+}
+
+export interface PaymentRow {
+  id: string;
+  pvNo: string;
+  vendorCode: string;
+  vendorName: string;
+  paymentDate: string;
+  amount: string;
+  state: string;
+  channel: string;
+  createdById: string;
+}
+
+export async function paymentRows(principal: Principal): Promise<PaymentRow[]> {
+  return named(principal, 'payment.create', async (tx) => {
+    const rows = await tx.paymentVoucher.findMany({
+      where: { tenantId: principal.tenantId },
+      orderBy: { paymentDate: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        pvNo: true,
+        paymentDate: true,
+        amount: true,
+        state: true,
+        channel: true,
+        createdById: true,
+        vendor: { select: { code: true, nameEn: true } },
+      },
+    });
+    return rows.map((p) => ({
+      id: p.id,
+      pvNo: p.pvNo,
+      vendorCode: p.vendor.code,
+      vendorName: p.vendor.nameEn,
+      paymentDate: p.paymentDate.toISOString().slice(0, 10),
+      amount: p.amount.toFixed(4),
+      state: p.state,
+      channel: p.channel,
+      createdById: p.createdById,
     }));
   });
 }
