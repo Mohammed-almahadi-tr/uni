@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**846 tests pass across 24 suites; typecheck, lint and production build are all
+**870 tests pass across 25 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -71,14 +71,22 @@ staff-facing screens those deferrals meant had no owner. **§8 Track D — Staff
 Console** now owns them, and the deferral notes throughout §0.2 and §6.1 have
 been corrected to point at it.
 
-**Track C has started. C1 is complete** — the theme engine, the tenant-host
-resolver and the landing CMS, with the first pages this application has ever
-served to somebody who is not logged in. See §7.1.
+**C1 is complete** — the theme engine, the tenant-host resolver and the
+landing CMS, and the first pages this application ever served to somebody who
+is not logged in. See §7.1.
 
-That leaves, in order: **C2** (the public admissions application flow) and
-**C3** (the student and guardian portal); **Track D**, the staff console that
-turns the tested library into an application; the release phases §11-§13; and
-the two Phase 7-8 academic-records phases deliberately scoped out of v1.
+**D1 is complete** — the staff console's shell: sign-in bound to the host,
+TOTP step-up, and a navigation tree generated from the signed-in user's
+permissions against a route table that also guards the routes. See §8.1. It
+is the first screen in this system that a member of staff can log into, and
+the answer to a question the legacy build could not answer about itself:
+*what may I do here?*
+
+That leaves, in order: **D2-D5**, the screens themselves — the route table
+already declares thirty-eight of them with the permissions they demand;
+**C2** (the public admissions application flow) and **C3** (the student and
+guardian portal); the release phases §11-§13; and the two Phase 7-8
+academic-records phases deliberately scoped out of v1.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -955,7 +963,7 @@ gantt
     Student & guardian self-service portal          :c3, after c2, 8d
 
     section Track D — Staff Console
-    Console shell, session & permission navigation  :d1, after c1 b6, 6d
+    Console shell, session & permission navigation  :done, d1, after c1 b6, 6d
     Finance desk — cashier, cheques, vouchers       :d2, after d1, 10d
     Registration desk, holds, withdrawal & transfer :crit, d3, after d1, 9d
     Back office — academic, admissions, P2P, sponsors :d4, after d1, 12d
@@ -2245,7 +2253,7 @@ is a finding to take back to the phase that owns it — not something to
 implement inside a component, which is exactly how the legacy build ended up
 with its fee arithmetic in a button handler.
 
-**D1 · Console Shell, Session & Navigation** — The authenticated layout every
+**D1 · Console Shell, Session & Navigation** *(built — see §8.1)* — The authenticated layout every
 other screen mounts into: login, TOTP step-up, session expiry and rotation,
 tenant theme injection from C1's tokens, the locale and direction switch, and
 a navigation tree generated from the user's permission set. Generated, not
@@ -2304,6 +2312,144 @@ directly, bypassing the module that owns the rule. Every mutation goes through
 the exported function — `takeReceipt`, `registerStudent`, `postVoucher` — with
 its idempotency key, its permission check and its transaction. The console is
 a caller, and if it ever needs to be more than that, the module is wrong.
+
+---
+
+## 8.1 Track D progress
+
+### D1 — Console Shell, Session & Navigation · complete
+
+#### The role that was stored, loaded, and never read
+
+```vb
+Dim cmd As New SqlCommand(
+  "Select PWD,Priv From Users Where UserName=N'" & Me.txtUserName.Text & "'", cnn)
+...
+If Pass = CStr(Me.txtPass.Text) Then
+    CurrentUser = Me.txtUserName.Text
+    PWD = Pass
+    Priv = Reader.Item(1)
+```
+([frmLogin.vb:44-54](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Form/frmLogin.vb#L44-L54))
+
+Five defects in eleven lines, and the fifth is the one this phase exists for.
+
+The username is concatenated straight into SQL, on the one form reachable
+without credentials. The password is compared in application code against a
+column holding it in clear, and is then kept in a module-level global for the
+life of the process. `CurrentUser` is set to the contents of an **editable
+text box** rather than the row that authenticated — and in the Nile build that
+same variable is what the login log stores as `FullName`, so the audit trail
+records what the user typed rather than who they are.
+
+And `Priv`. It holds one of exactly two strings, typed into a combo box on the
+user form — `"مدير عام"` and `"محصل"`, general manager and collector
+([frmAddUser.designer.vb:88](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Form/frmAddUser.Designer.vb#L88)).
+It is loaded into a global at sign-in and then **never read again anywhere in
+the application**. The column's only other appearance in the entire codebase
+is `Select UserName From Users Where Priv=N'محصل'`
+([frmVouchersSerialsNo.vb:102](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Forms/frmVouchersSerialsNo.vb#L102)),
+populating a dropdown of collectors on a report filter.
+
+So the role exists, is stored, is loaded — and gates nothing. Every
+authenticated user could open every screen, including voucher approval and
+the chart of accounts. The Nile build does not get even that far: its login
+selects `Pass,Status` and the privilege read is commented out,
+`'Priv = Reader.Item(1)`.
+
+#### The staff directory that came free with the login form
+
+```vb
+Sub GetName()
+    Dim cmd As New SqlCommand("Select FullName From Users Where SNo=" & Me.txtSNo.Text, cnn)
+    Me.txtUserName.Text = CStr(cmd.ExecuteScalar)
+```
+([frmLogin.vb](Nile%20College%20E-University%20System/Oasis%20-%20E-University/frmLogin.vb))
+
+Bound to the serial-number field's `Leave` and `KeyUp` events. Type a number,
+press Tab, and the form fills in that employee's name — before anything has
+been authenticated. Counting upwards enumerates every member of staff at the
+institution, and the password field is a single string comparison away.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| **One declaration for every console route** | `CONSOLE_ROUTES` in [navigation.ts](uniflow/src/lib/console/navigation.ts). The menu renders from it and the guard reads the same rows, so a menu item and its page cannot disagree about who may see it |
+| **The menu is generated, not hidden** | A user without the permission is not sent the item, and typing the address is refused by the same declaration. Hiding a control by CSS while leaving its route open is the version of access control that passes a demonstration and fails an audit |
+| A section is the **union of what it contains** | No separate permission of its own to drift from its items. A section a user can see nothing inside does not open; one holding something they may reach does. Asserted both directions across every shipped role |
+| An **undeclared route is refused**, not allowed | A path `CONSOLE_ROUTES` does not describe is a path for which nobody decided the access rules, and the safe reading of that is no |
+| A structural test walks the routes **on disk** | Adding a screen and forgetting its guard is otherwise silent — the page simply renders for whoever finds it. The test enumerates `page.tsx` under `src/app/[locale]/console` rather than a list somebody maintains, in the same spirit as the RLS coverage test in §9.3 |
+| **The session is bound to the host** | A token issued for one university is refused on another university's address, even though it verifies and its user is live. Without it, a platform operator holding an account at one tenant carries it onto every other tenant's console, silently, on a cookie the browser is happy to send. C1's host resolver is what made this expressible |
+| Sign-in takes the tenant from the **host**, never the form | There is no university selector and no hidden field. The host is the one part of the request whose meaning the sender does not control |
+| Nothing tells an anonymous caller whether an account exists | No name lookup, no distinct "no such account" — Phase 0's `login()` already equalises the timing against a dummy Argon2 verification. D1's contribution is not adding a `GetName()` back |
+| **MFA is a step-up, not a second half** | A password establishes the session; the code raises it. Everything but `MFA_REQUIRED_PERMISSIONS` works without one, the form says so, and it offers to continue — a control people resent is a control people route around. A banner across the console says which actions will ask |
+| Sign-out clears the cookie and **does not** bump `sessionVersion` | That lever revokes every session that person holds anywhere and belongs to role changes and deactivation. Conflating the two makes the real revocation look like an ordinary button, which is how it stops being used |
+| The redirect after sign-in cannot be pointed elsewhere | `safeNext` accepts a path only when `CONSOLE_ROUTES` declares it. An open redirect on a login form is worth more to an attacker than most bugs in a finance system |
+| **One theme path, not two** | The console renders C1's branding tokens — the same `tenant_branding` row, the same custom properties, the same inline `<style>`. §2's diagram always said the admin portal renders the tenant's tokens; it now does, rather than there being a second implementation to keep in step |
+| A dashboard that answers *what may I do here?* | Generated from the roles held. It is the question the legacy build could not answer about itself, and it is the screen a new member of staff opens first |
+| Unbuilt screens are **named, not hidden** | A user holding `voucher.approve` sees that the approval queue is coming and which phase brings it, rather than wondering whether their permission is broken. The function behind each one is complete and tested; what is missing is the screen |
+| Every label in both catalogues | Asserted by test against `CONSOLE_SECTIONS` — a missing translation renders as a raw key path in the menu of the screen everybody opens first |
+
+#### Two things settled during the build
+
+**The layout does not guard; the page does.** A Next.js layout cannot see
+which route beneath it is rendering, so a permission check placed there would
+be a check for the wrong thing — it would either pass everything or guard the
+console as a whole. The layout establishes only that a usable session exists
+for this host and renders the shell; each page calls `guardConsole()` with its
+own path. The temptation to put one check in one place is exactly how a
+console ends up with a guard that looks thorough and covers nothing.
+
+**The guard is a convenience over `requirePermission()`, not a replacement.**
+The permission that protects the money is the one checked in the data access
+layer when the mutation runs, and every D2-D5 screen will still call the
+module function that checks again. What the route guard does is stop a user
+reaching a screen they have no business on — a different and lesser job. It is
+written down here because the opposite belief, that the screen is the control,
+is what produces systems where the API is wide open behind a tidy menu.
+
+#### One thing separated for testability, and why it was right anyway
+
+`sessionServes` and `safeNext` began inside the modules that use them, which
+import `next/headers` and the Next redirect machinery and therefore cannot be
+loaded in the test runner. Rather than stub Next, both moved into modules that
+import nothing but types — [tenancy.ts](uniflow/src/lib/console/tenancy.ts)
+and the route table. That is the better shape regardless: both are *rules*
+rather than transport, they are now asserted directly against two real
+tenants and the real route table, and the files that do the transport got
+shorter.
+
+#### Verification
+
+24 tests. The ones that carry the most weight:
+
+- `declares every console page that exists on disk` — the structural one.
+- `only ever offers items the same declaration would let through`, and its
+  mirror `withholds every item the role does not carry`, run across all ten
+  shipped roles.
+- `gives a cashier the till and not the approval queue`, and
+  `shows a cashier no settings section whatsoever`.
+- `gives the Stores Officer a single section and a single screen` — `grn.create`
+  and `voucher.read` and deliberately nothing else, because confirming
+  delivery is the one independent piece of evidence in the three-way match.
+- `refuses a token from one university on another university's address`, built
+  from two provisioned tenants, two real hosts and a real sign-in.
+- `falls back to the dashboard for anything else` — the open-redirect list.
+- `never renders an empty section heading`.
+
+**Deferred to D2-D5, by design:** every screen. D1 is the shell, and the
+screens are the phases that follow — the route table already declares
+thirty-eight of them with the permissions they will demand, so D2 adds pages
+under paths that are guarded before they exist.
+
+**Not built, and named rather than assumed:** MFA *enrolment*. `beginEnrolment`
+and `generateRecoveryCodes` have been in `lib/auth/mfa.ts` since Phase 0 and
+are tested, but the screen that shows a QR code and records the first verified
+code is a settings screen, and settings screens are D4. Until it exists, a
+tenant enrols an approver by seeding `mfa_secret` — which is exactly the sort
+of gap that gets forgotten if it is not written down, because everything
+around it works.
 
 ---
 

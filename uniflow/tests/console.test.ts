@@ -1,0 +1,373 @@
+import { readdirSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
+import { disconnectAll, makePrincipal, makeUniversity, type University } from './helpers';
+import {
+  CONSOLE_ROUTES,
+  CONSOLE_SECTIONS,
+  navigationFor,
+  normaliseConsolePath,
+  ruleFor,
+  satisfies,
+  sectionOf,
+} from '@/lib/console/navigation';
+import { safeNext } from '@/lib/console/navigation';
+import { sessionServes } from '@/lib/console/tenancy';
+import { addDomain, resolveTenantByHost } from '@/lib/cms/hosts';
+import { login, resolvePrincipal } from '@/lib/auth/login';
+import { provisionTenant, syncPermissions } from '@/lib/auth/provisioning';
+import { DEFAULT_ROLES, isPermissionKey, type PermissionKey } from '@/lib/auth/permissions';
+
+/**
+ * The staff console shell (Track D1).
+ *
+ * The legacy baseline is a role that exists and is never read:
+ *
+ *     Select PWD,Priv From Users Where UserName=N'" & Me.txtUserName.Text & "'"
+ *     Priv = Reader.Item(1)                            ' frmLogin.vb:44, 54
+ *
+ * `Priv` holds one of two strings typed into a combo box — general manager or
+ * collector — is assigned to a module-level global at sign-in, and is then
+ * never consulted anywhere in the application. The column's only other
+ * appearance is `Where Priv=N'محصل'` populating a dropdown on a report filter.
+ * Every authenticated user could open every screen, including voucher
+ * approval and the chart of accounts. The Nile build's login does not even
+ * select the column: `'Priv = Reader.Item(1)` is commented out.
+ *
+ * So the property under test is: **the menu is generated from the permission
+ * set, and the route is refused by the same declaration.** Not hidden — a
+ * control hidden by CSS with its route left open is the version of this that
+ * passes a demonstration and fails an audit.
+ */
+
+afterAll(disconnectAll);
+
+const setOf = (...keys: PermissionKey[]) => new Set<PermissionKey>(keys);
+
+// ---------------------------------------------------------------------------
+// One declaration, read by both the menu and the guard
+// ---------------------------------------------------------------------------
+
+describe('the route table is the single declaration', () => {
+  it('names only real permissions', () => {
+    for (const route of CONSOLE_ROUTES) {
+      for (const key of route.anyOf) {
+        expect(isPermissionKey(key), `${route.path} names "${key}"`).toBe(true);
+      }
+    }
+  });
+
+  it('declares every path once', () => {
+    const paths = CONSOLE_ROUTES.map((r) => r.path);
+    expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  it('puts every item under its own section', () => {
+    for (const section of CONSOLE_SECTIONS) {
+      for (const item of section.items) {
+        expect(item.path.startsWith(`${section.path}/`), `${item.path} vs ${section.path}`).toBe(
+          true,
+        );
+      }
+    }
+  });
+
+  it('reaches a section on the union of what it contains', () => {
+    // A section a user can see nothing inside must not open, and a section
+    // holding something they may reach must. Union rather than a permission
+    // of its own, so the two cannot drift apart.
+    for (const section of CONSOLE_SECTIONS) {
+      const rule = ruleFor(section.path)!;
+      const union = new Set(section.items.flatMap((i) => i.anyOf));
+      expect(new Set(rule.anyOf)).toEqual(union);
+    }
+  });
+
+  it('refuses a path nobody declared', () => {
+    // Not "allows by default". A route this table does not describe is a
+    // route for which nobody decided the access rules.
+    expect(ruleFor('finance/secret-ledger')).toBeNull();
+    expect(ruleFor('../settings/users')).toBeNull();
+    expect(ruleFor('settings/users')).not.toBeNull();
+  });
+
+  it('normalises the path it is asked about', () => {
+    expect(normaliseConsolePath('/finance/vouchers/')).toBe('finance/vouchers');
+    expect(ruleFor('/finance/vouchers/')).not.toBeNull();
+  });
+
+  it('locates the section a path belongs to', () => {
+    expect(sectionOf('finance/vouchers')?.key).toBe('finance');
+    expect(sectionOf('finance')?.key).toBe('finance');
+    expect(sectionOf('financial')).toBeNull();
+    expect(sectionOf('')).toBeNull();
+  });
+
+  /**
+   * The structural one. Adding a screen and forgetting its guard is otherwise
+   * silent — the page renders for whoever reaches it. This walks the console
+   * routes on disk rather than a list somebody maintains, in the same spirit
+   * as the RLS coverage test in §9.3.
+   */
+  it('declares every console page that exists on disk', () => {
+    const root = resolve(__dirname, '..', 'src', 'app', '[locale]', 'console');
+
+    const pages: string[] = [];
+    const walk = (dir: string, prefix: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          walk(full, prefix ? `${prefix}/${entry}` : entry);
+        } else if (entry === 'page.tsx') {
+          pages.push(prefix);
+        }
+      }
+    };
+    walk(root, '');
+
+    expect(pages.length).toBeGreaterThan(0);
+    const undeclared = pages.filter((p) => ruleFor(p) === null);
+    expect(undeclared).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The menu is generated, not filtered
+// ---------------------------------------------------------------------------
+
+describe('navigation is generated from the permission set', () => {
+  it('gives a user with no permissions nothing at all', () => {
+    expect(navigationFor(setOf())).toEqual([]);
+  });
+
+  it('gives a cashier the till and not the approval queue', () => {
+    const cashier = setOf('student.read', 'registration.read', 'receipt.create', 'voucher.read', 'period.read');
+    const nav = navigationFor(cashier);
+
+    const finance = nav.find((s) => s.key === 'finance');
+    expect(finance).toBeDefined();
+    const keys = finance!.items.map((i) => i.key);
+    expect(keys).toContain('cashierDesk');
+    expect(keys).toContain('vouchers');
+    expect(keys).not.toContain('approvals');
+    expect(keys).not.toContain('payments');
+  });
+
+  it('shows a cashier no settings section whatsoever', () => {
+    const cashier = setOf('student.read', 'registration.read', 'receipt.create', 'voucher.read');
+    expect(navigationFor(cashier).map((s) => s.key)).not.toContain('settings');
+  });
+
+  it('never renders an empty section heading', () => {
+    // An empty heading tells a user that something exists which they do not
+    // have, which the console has no reason to volunteer.
+    for (const role of Object.values(DEFAULT_ROLES)) {
+      const nav = navigationFor(new Set(role.permissions));
+      for (const section of nav) expect(section.items.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('only ever offers items the same declaration would let through', () => {
+    // The menu and the guard cannot disagree, because this is the property
+    // that makes hiding-by-CSS unnecessary.
+    for (const role of Object.values(DEFAULT_ROLES)) {
+      const held = new Set(role.permissions);
+      for (const section of navigationFor(held)) {
+        expect(satisfies(held, ruleFor(section.path)!.anyOf)).toBe(true);
+        for (const item of section.items) {
+          expect(satisfies(held, ruleFor(item.path)!.anyOf)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('withholds every item the role does not carry', () => {
+    // The other direction: nothing is offered that should not be.
+    for (const role of Object.values(DEFAULT_ROLES)) {
+      const held = new Set(role.permissions);
+      const offered = new Set(navigationFor(held).flatMap((s) => s.items.map((i) => i.path)));
+      for (const section of CONSOLE_SECTIONS) {
+        for (const item of section.items) {
+          if (!satisfies(held, item.anyOf)) expect(offered.has(item.path)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('gives the Financial Controller approvals but not the cashier desk', () => {
+    const nav = navigationFor(new Set(DEFAULT_ROLES['Financial Controller'].permissions));
+    const finance = nav.find((s) => s.key === 'finance')!;
+    const keys = finance.items.map((i) => i.key);
+    expect(keys).toContain('approvals');
+    expect(keys).not.toContain('cashierDesk');
+  });
+
+  it('gives the Stores Officer a single section and a single screen', () => {
+    // grn.create and voucher.read, and deliberately nothing else — the one
+    // independent piece of evidence in the three-way match.
+    const nav = navigationFor(new Set(DEFAULT_ROLES['Stores Officer'].permissions));
+    expect(nav.map((s) => s.key).sort()).toEqual(['finance', 'procurement']);
+    expect(nav.find((s) => s.key === 'procurement')!.items.map((i) => i.key)).toEqual([
+      'receiving',
+    ]);
+  });
+
+  it('marks a screen that is declared and not yet built', () => {
+    const nav = navigationFor(new Set(DEFAULT_ROLES.Registrar.permissions));
+    const items = nav.flatMap((s) => s.items);
+    expect(items.length).toBeGreaterThan(0);
+    // D1 ships the shell; every screen behind it belongs to a later phase and
+    // says so rather than linking nowhere.
+    expect(items.every((i) => i.built === (i.phase === 'D1'))).toBe(true);
+  });
+
+  it('lets the console root through on authentication alone', () => {
+    // The dashboard answers "what may I do here?", which is exactly the
+    // question a user with no permissions still needs answered.
+    expect(satisfies(setOf(), ruleFor('')!.anyOf)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Where sign-in sends you
+// ---------------------------------------------------------------------------
+
+describe('the sign-in redirect cannot be pointed elsewhere', () => {
+  it('accepts a declared console path', () => {
+    expect(safeNext('/console/finance/vouchers')).toBe('/console/finance/vouchers');
+    expect(safeNext('/console')).toBe('/console');
+  });
+
+  it('falls back to the dashboard for anything else', () => {
+    for (const hostile of [
+      'https://evil.example/steal',
+      '//evil.example/steal',
+      '/console/../../etc',
+      '/login',
+      '/programmes',
+      '/console/finance/not-a-screen',
+      '',
+      null,
+      undefined,
+    ]) {
+      expect(safeNext(hostile), String(hostile)).toBe('/console');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A session belongs to one university
+// ---------------------------------------------------------------------------
+
+describe('a session is bound to the university whose address it arrived on', () => {
+  it('resolves a real principal and matches its own host', async () => {
+    await syncPermissions();
+    const slug = `d1a${Date.now().toString(36)}`;
+    const t = await provisionTenant({
+      slug,
+      nameEn: 'Console University A',
+      nameAr: 'جامعة الواجهة أ',
+      admin: { email: `admin@${slug}.test`, fullName: 'Console Admin', password: 'Khartoum2026Uni' },
+    });
+
+    const platform = await makePrincipal(t.tenantId, ['tenant.manage'], { name: 'platformA' });
+    const host = `${slug}.example.edu`;
+    await addDomain(platform, t.tenantId, { host, canonical: true });
+
+    const result = await login(t.tenantId, `admin@${slug}.test`, 'Khartoum2026Uni');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const principal = await resolvePrincipal(result.token);
+    expect(principal).not.toBeNull();
+
+    const tenant = await resolveTenantByHost(host);
+    expect(tenant).not.toBeNull();
+    expect(sessionServes(principal!, tenant!)).toBe(true);
+
+    // …and the navigation it produces is the admin's, not everyone's.
+    const nav = navigationFor(principal!.permissions);
+    expect(nav.map((s) => s.key)).toContain('settings');
+    expect(nav.find((s) => s.key === 'finance')?.items.map((i) => i.key) ?? []).not.toContain(
+      'cashierDesk',
+    );
+  });
+
+  it('refuses a token from one university on another university’s address', async () => {
+    await syncPermissions();
+    const slugA = `d1b${Date.now().toString(36)}`;
+    const slugB = `d1c${Date.now().toString(36)}`;
+
+    const a = await provisionTenant({
+      slug: slugA,
+      nameEn: 'Console University B',
+      nameAr: 'جامعة الواجهة ب',
+      admin: { email: `admin@${slugA}.test`, fullName: 'Admin B', password: 'Khartoum2026Uni' },
+    });
+    const b = await provisionTenant({
+      slug: slugB,
+      nameEn: 'Console University C',
+      nameAr: 'جامعة الواجهة ج',
+      admin: { email: `admin@${slugB}.test`, fullName: 'Admin C', password: 'Khartoum2026Uni' },
+    });
+
+    const platformA = await makePrincipal(a.tenantId, ['tenant.manage'], { name: 'platB' });
+    const platformB = await makePrincipal(b.tenantId, ['tenant.manage'], { name: 'platC' });
+    await addDomain(platformA, a.tenantId, { host: `${slugA}.example.edu`, canonical: true });
+    await addDomain(platformB, b.tenantId, { host: `${slugB}.example.edu`, canonical: true });
+
+    const signedInAtA = await login(a.tenantId, `admin@${slugA}.test`, 'Khartoum2026Uni');
+    expect(signedInAtA.ok).toBe(true);
+    if (!signedInAtA.ok) return;
+
+    const principal = (await resolvePrincipal(signedInAtA.token))!;
+    const hostB = (await resolveTenantByHost(`${slugB}.example.edu`))!;
+
+    // The token verifies and the user is live. It is still not a session for
+    // this address — otherwise a cookie the browser is happy to send would
+    // carry one university's operator onto another's console.
+    expect(principal.tenantId).toBe(a.tenantId);
+    expect(sessionServes(principal, hostB)).toBe(false);
+
+    const hostA = (await resolveTenantByHost(`${slugA}.example.edu`))!;
+    expect(sessionServes(principal, hostA)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Every shipped role reaches something
+// ---------------------------------------------------------------------------
+
+describe('the shipped roles are usable', () => {
+  let uni: University;
+
+  it('gives every default role at least one screen', async () => {
+    uni = await makeUniversity();
+    expect(uni.tenantId).toBeTruthy();
+
+    for (const [name, role] of Object.entries(DEFAULT_ROLES)) {
+      const nav = navigationFor(new Set(role.permissions));
+      expect(nav.length, `${name} can reach nothing`).toBeGreaterThan(0);
+    }
+  });
+
+  it('names every navigation label in both catalogues', async () => {
+    // A missing label renders as the raw key path in the menu of the screen
+    // every member of staff opens first.
+    const en = (await import('../messages/en.json')).default;
+    const ar = (await import('../messages/ar.json')).default;
+
+    for (const cat of [en, ar]) {
+      const console_ = cat.console as {
+        sections: Record<string, string>;
+        items: Record<string, string>;
+      };
+      for (const section of CONSOLE_SECTIONS) {
+        expect(console_.sections[section.key], `sections.${section.key}`).toBeTruthy();
+        for (const item of section.items) {
+          expect(console_.items[item.key], `items.${item.key}`).toBeTruthy();
+        }
+      }
+    }
+  });
+});

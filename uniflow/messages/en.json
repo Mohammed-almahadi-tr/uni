@@ -118,5 +118,95 @@
       "body": "Nothing is published on {host}.",
       "noHost": "This request did not carry a host we recognise."
     }
+  },
+  "console": {
+    "sections": {
+      "academic": "Academic",
+      "finance": "Finance",
+      "procurement": "Procurement",
+      "registry": "Registry",
+      "reports": "Reports",
+      "settings": "Settings"
+    },
+    "items": {
+      "admissions": "Admissions",
+      "aging": "Aged receivables",
+      "approvals": "Approval queue",
+      "assets": "Fixed assets",
+      "audit": "Audit trail",
+      "branding": "Branding",
+      "budgets": "Budgets",
+      "capacity": "Seat quotas",
+      "cashierDesk": "Cashier desk",
+      "cheques": "Cheques",
+      "content": "Website content",
+      "discountExposure": "Discount exposure",
+      "documents": "Document verification",
+      "enquiries": "Public enquiries",
+      "feeMatrix": "Fee matrix",
+      "holds": "Holds",
+      "invoices": "Vendor invoices",
+      "lifecycle": "Status, transfer and withdrawal",
+      "medical": "Medical records",
+      "orders": "Purchase orders",
+      "payments": "Payment vouchers",
+      "periods": "Fiscal periods",
+      "receipts": "Receipts",
+      "receiving": "Goods received",
+      "reconciliation": "Sub-ledger reconciliation",
+      "registrationDesk": "Registration desk",
+      "registrations": "Registrations",
+      "roles": "Roles and permissions",
+      "scholarships": "Scholarships",
+      "sponsors": "Sponsors",
+      "statements": "Financial statements",
+      "structure": "Faculties and programmes",
+      "studentAccount": "Statement of account",
+      "students": "Students",
+      "trialBalance": "Trial balance",
+      "users": "Staff accounts",
+      "vendors": "Vendors",
+      "vouchers": "Journal vouchers"
+    },
+    "title": "Staff console",
+    "signIn": {
+      "heading": "Sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "working": "Signing in…",
+      "invalid": "That email address and password do not match an account.",
+      "locked": "This account is locked for a short time after repeated failed attempts.",
+      "inactive": "This account is not active. Contact your administrator.",
+      "noSite": "No university is configured at this address."
+    },
+    "mfa": {
+      "heading": "Verification code",
+      "hint": "Enter the six-digit code from your authenticator app.",
+      "code": "Code",
+      "submit": "Verify",
+      "working": "Checking…",
+      "invalid": "That code is not valid.",
+      "replayed": "That code has already been used. Wait for the next one.",
+      "notEnrolled": "This account has no authenticator enrolled.",
+      "skip": "Continue without verifying",
+      "why": "Approving vouchers, releasing payments and closing periods need this. You can sign in without it and do everything else."
+    },
+    "signOut": "Sign out",
+    "dashboard": {
+      "heading": "What you may do here",
+      "blurb": "Generated from the roles you hold. Anything not listed is not on your menu and is refused if you go to its address.",
+      "nothing": "You hold no permissions yet. An administrator assigns your role.",
+      "mfaBanner": "This session has not completed a second factor, so approvals and payments will ask for your code."
+    },
+    "forbidden": {
+      "heading": "Not available to you",
+      "body": "Your roles do not include this screen. If you need it, an administrator adds the permission to your role.",
+      "back": "Back to the console"
+    },
+    "pending": {
+      "badge": "Not built yet",
+      "note": "This screen arrives in phase {phase}. The function behind it is complete and tested; what is missing is the screen."
+    }
   }
 }
