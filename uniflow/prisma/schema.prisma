@@ -434,6 +434,14 @@ model Tenant {
   /// (SRS REQ-SPN-04, REQ-REG-01). Configurable because the figure an
   /// institution is comfortable with is a policy, not a constant.
   discountApprovalThresholdPct Decimal  @default(10) @map("discount_approval_threshold_pct") @db.Decimal(7, 4)
+  /// How long an overdue instalment is tolerated before the derived financial
+  /// hold blocks a registration (SRS REQ-REG-06). Zero means the day after it
+  /// falls due; institutions in practice allow a fortnight.
+  arrearsGraceDays             Int      @default(14) @map("arrears_grace_days")
+  /// And how much has to be overdue before it blocks at all. A student owing
+  /// the price of an ID card is not a student to turn away from the
+  /// registration desk.
+  arrearsBlockThreshold        Decimal  @default(0) @map("arrears_block_threshold") @db.Decimal(19, 4)
   isActive                     Boolean  @default(true) @map("is_active")
   createdAt                    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -515,6 +523,12 @@ model Tenant {
   registrations     SemesterRegistration[]
   registrationLines RegistrationLine[]
 
+  statusHistory     StudentStatusHistory[]
+  holds             Hold[]
+  programmeHistory  StudentProgrammeHistory[]
+  refundPolicies    RefundPolicy[]
+  refundPolicyBands RefundPolicyBand[]
+
   @@map("tenants")
 }
 
@@ -578,6 +592,13 @@ model User {
   documentsVerified StudentDocument[] @relation("DocumentVerifier")
   medicalRecorded   MedicalRecord[]   @relation("MedicalRecorder")
 
+  statusRecorded    StudentStatusHistory[]    @relation("StatusRecorder")
+  statusApproved    StudentStatusHistory[]    @relation("StatusApprover")
+  holdsPlaced       Hold[]                    @relation("HoldPlacer")
+  holdsCleared      Hold[]                    @relation("HoldClearer")
+  transfersRecorded StudentProgrammeHistory[] @relation("TransferRecorder")
+  transfersApproved StudentProgrammeHistory[] @relation("TransferApprover")
+
   registrationsCreated   SemesterRegistration[] @relation("RegistrationCreator")
   registrationsApproved  SemesterRegistration[] @relation("RegistrationDiscountApprover")
   registrationsCancelled SemesterRegistration[] @relation("RegistrationCanceller")
@@ -623,9 +644,10 @@ model Role {
   name     String
   nameAr   String @map("name_ar")
 
-  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  users       UserRole[]
-  permissions RolePermission[]
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users        UserRole[]
+  permissions  RolePermission[]
+  holdsToClear Hold[]           @relation("HoldClearanceRole")
 
   @@unique([tenantId, name])
   @@map("roles")
@@ -1034,6 +1056,8 @@ model TransactionHeader {
   depreciationEntries   DepreciationEntry[]    @relation("DepreciationPosting")
   registrationsBilled   SemesterRegistration[] @relation("RegistrationPosting")
   registrationsReversed SemesterRegistration[] @relation("RegistrationReversal")
+  statusReversals       StudentStatusHistory[] @relation("StatusReversal")
+  statusRetentions      StudentStatusHistory[] @relation("StatusRetention")
 
   goodsReceipt        GoodsReceipt?   @relation("GoodsReceiptPosting")
   vendorInvoice       VendorInvoice?  @relation("InvoicePosting")
@@ -1266,19 +1290,22 @@ model Student {
   admissionCategoryId String? @map("admission_category_id") @db.Uuid
   nationalityId       String? @map("nationality_id") @db.Uuid
 
-  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  programme         Programme?             @relation(fields: [programmeId], references: [id])
-  batch             Batch?                 @relation(fields: [batchId], references: [id])
-  admissionCategory AdmissionCategory?     @relation(fields: [admissionCategoryId], references: [id])
-  nationality       Nationality?           @relation(fields: [nationalityId], references: [id])
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  programme         Programme?                @relation(fields: [programmeId], references: [id])
+  batch             Batch?                    @relation(fields: [batchId], references: [id])
+  admissionCategory AdmissionCategory?        @relation(fields: [admissionCategoryId], references: [id])
+  nationality       Nationality?              @relation(fields: [nationalityId], references: [id])
   charges           StudentCharge[]
   receipts          StudentReceipt[]
   plans             InstalmentPlan[]
-  application       Application?           @relation("ApplicationStudent")
+  application       Application?              @relation("ApplicationStudent")
   profile           StudentProfile?
   documents         StudentDocument[]
   medicalRecords    MedicalRecord[]
   registrations     SemesterRegistration[]
+  statusHistory     StudentStatusHistory[]
+  holds             Hold[]
+  programmeHistory  StudentProgrammeHistory[]
 
   @@unique([tenantId, studentNo])
   @@index([tenantId, searchKey])
@@ -2537,6 +2564,8 @@ model Programme {
   admissionOffers      AdmissionOffer[]
   documentRequirements ProgrammeDocumentRequirement[]
   registrations        SemesterRegistration[]
+  transfersFrom        StudentProgrammeHistory[]      @relation("TransferFrom")
+  transfersTo          StudentProgrammeHistory[]      @relation("TransferTo")
 
   @@unique([tenantId, code])
   @@index([tenantId, facultyId, isActive])
@@ -2582,9 +2611,10 @@ model AcademicTerm {
   registrationClosesOn DateTime?            @map("registration_closes_on") @db.Date
   status               AcademicPeriodStatus @default(PLANNED)
 
-  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  academicYear  AcademicYear           @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  tenant        Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  academicYear  AcademicYear              @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   registrations SemesterRegistration[]
+  transfers     StudentProgrammeHistory[]
 
   @@unique([academicYearId, seq])
   @@index([tenantId, startDate, endDate])
@@ -3207,11 +3237,12 @@ model StudentDocument {
   uploadedById String   @map("uploaded_by_id") @db.Uuid
   uploadedAt   DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  documentType DocumentType @relation(fields: [documentTypeId], references: [id])
-  uploadedBy   User         @relation("DocumentUploader", fields: [uploadedById], references: [id])
-  verifiedBy   User?        @relation("DocumentVerifier", fields: [verifiedById], references: [id])
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student       Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  documentType  DocumentType           @relation(fields: [documentTypeId], references: [id])
+  uploadedBy    User                   @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  verifiedBy    User?                  @relation("DocumentVerifier", fields: [verifiedById], references: [id])
+  statusChanges StudentStatusHistory[] @relation("StatusChangeEvidence")
 
   @@index([tenantId, studentId])
   @@index([tenantId, state, expiresOn])
@@ -3386,21 +3417,23 @@ model SemesterRegistration {
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student            Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  programme          Programme          @relation(fields: [programmeId], references: [id])
-  batch              Batch              @relation(fields: [batchId], references: [id])
-  admissionCategory  AdmissionCategory  @relation(fields: [admissionCategoryId], references: [id])
-  academicYear       AcademicYear       @relation(fields: [academicYearId], references: [id])
-  academicTerm       AcademicTerm       @relation(fields: [academicTermId], references: [id])
-  feeSchedule        FeeSchedule        @relation(fields: [feeScheduleId], references: [id])
-  posting            TransactionHeader? @relation("RegistrationPosting", fields: [postedHeaderId], references: [id])
-  reversal           TransactionHeader? @relation("RegistrationReversal", fields: [reversalHeaderId], references: [id])
-  createdBy          User               @relation("RegistrationCreator", fields: [createdById], references: [id])
-  discountApprovedBy User?              @relation("RegistrationDiscountApprover", fields: [discountApprovedById], references: [id])
-  cancelledBy        User?              @relation("RegistrationCanceller", fields: [cancelledById], references: [id])
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student            Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  programme          Programme                @relation(fields: [programmeId], references: [id])
+  batch              Batch                    @relation(fields: [batchId], references: [id])
+  admissionCategory  AdmissionCategory        @relation(fields: [admissionCategoryId], references: [id])
+  academicYear       AcademicYear             @relation(fields: [academicYearId], references: [id])
+  academicTerm       AcademicTerm             @relation(fields: [academicTermId], references: [id])
+  feeSchedule        FeeSchedule              @relation(fields: [feeScheduleId], references: [id])
+  posting            TransactionHeader?       @relation("RegistrationPosting", fields: [postedHeaderId], references: [id])
+  reversal           TransactionHeader?       @relation("RegistrationReversal", fields: [reversalHeaderId], references: [id])
+  createdBy          User                     @relation("RegistrationCreator", fields: [createdById], references: [id])
+  discountApprovedBy User?                    @relation("RegistrationDiscountApprover", fields: [discountApprovedById], references: [id])
+  cancelledBy        User?                    @relation("RegistrationCanceller", fields: [cancelledById], references: [id])
   lines              RegistrationLine[]
   charges            StudentCharge[]
+  transferReversedBy StudentProgrammeHistory? @relation("TransferReversed")
+  transferRaisedBy   StudentProgrammeHistory? @relation("TransferRaised")
 
   @@unique([tenantId, registrationNo])
   @@unique([tenantId, verifyToken])
@@ -3446,4 +3479,263 @@ model RegistrationLine {
   @@unique([registrationId, feeItemId])
   @@index([tenantId, feeItemId])
   @@map("registration_lines")
+}
+
+// ---------------------------------------------------------------------------
+// Student status lifecycle, holds and programme transfer
+// (SRS Module 14 REQ-LIF-01/02/03, REQ-REG-04, REQ-REG-06, REQ-FEE-03 — B5)
+//
+// The legacy build has no status column anywhere. A student's standing is
+// **which table their row is in**: `StudentsProfilees` for accepted,
+// `StudentsProfilesIndecent` for not accepted, chosen by the text of a combo
+// box (`If Me.ComboBox1.Text = "يقبل"`). Changing the verdict inserts into the
+// other table and deletes only from the one being written, so a student
+// flipped from accepted to rejected exists in **both** — and `StdForm.CH` is
+// set to 1 either way, so the admission form cannot tell them apart
+// (frmStudentProfiles.vb:241-292).
+//
+// There is no effective date, no approver — `Employee` is the data-entry
+// clerk — and no history at all. Deferral, suspension, dismissal and
+// re-admission have nowhere to be recorded, which is why the SRS notes
+// `ReasonofIndecent` as evidence that these are real events the schema had no
+// room for.
+// ---------------------------------------------------------------------------
+
+/// Why a student cannot register (SRS REQ-REG-06).
+///
+/// The legacy build has arrears reporting — `StudentsUnpaidList`,
+/// `ProgramsUnpaidFeesDetails`, `frmUncollectedFees` — and no arrears
+/// *control*. Nothing consults what a student owes when they register, which
+/// is the same shape as the seat quota B2 found: a report nobody reads before
+/// the decision it exists to inform.
+enum HoldType {
+  FINANCIAL
+  ACADEMIC
+  DISCIPLINARY
+  DOCUMENTARY
+}
+
+/// What a status transition does to the student's money (SRS REQ-LIF-02).
+///
+/// Declared on the transition and recorded on the history row, so the
+/// financial consequence of a change of standing is a stated property of the
+/// transition rather than something a reader has to infer from the ledger.
+enum StatusConsequence {
+  /// Charges stand. Suspension, dismissal, transfer out and graduation do not
+  /// forgive what is already owed.
+  RETAIN_CHARGES
+  /// The live registration for the term is cancelled by linked reversal and
+  /// anything paid becomes a credit balance carried forward. Deferral.
+  REVERSE_TERM_BILLING
+  /// The refund schedule (REQ-FEE-03) decides how much of the term is
+  /// refundable; the rest is re-billed as retained. Withdrawal.
+  APPLY_REFUND_POLICY
+  /// Nothing financial. Admission, re-admission, lifting a suspension.
+  NONE
+}
+
+/// What the student elects to do with the credit a withdrawal leaves behind
+/// (SRS REQ-FEE-03, REQ-FEE-04).
+enum RefundElection {
+  /// Held on the account and applied to the next registration.
+  RETAIN_AS_CREDIT
+  /// Paid out. The credit balance already *is* the liability, so this is an
+  /// election recorded here and disbursed through the A6 payment-voucher
+  /// workflow — a refund is a payment voucher against a student rather than
+  /// against a vendor.
+  REFUND
+}
+
+/// One transition in a student's standing, effective-dated and append-only.
+///
+/// The chain is closed: `from_status` must equal the student's status at the
+/// moment the row is written, and a transition may not be back-dated before
+/// the latest one already recorded. That makes "who was Active in Fall 2026"
+/// answerable after the fact (REQ-LIF-02) rather than a question about the
+/// current value of a column.
+model StudentStatusHistory {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  /// Null on the opening row — the one written when the record is created,
+  /// and the one backfilled for students admitted before this module existed.
+  /// It is what an opening balance looks like in a history table.
+  fromStatus StudentStatus? @map("from_status")
+  toStatus   StudentStatus  @map("to_status")
+
+  effectiveDate DateTime @map("effective_date") @db.Date
+  reason        String
+
+  consequence StatusConsequence @default(NONE)
+
+  /// The party who asked for this — the student, a dean, the finance office.
+  /// Free text because most of them are not system users.
+  requestedBy String? @map("requested_by")
+  /// Supporting evidence: the withdrawal letter, the medical certificate, the
+  /// disciplinary minute.
+  documentId  String? @map("document_id") @db.Uuid
+
+  /// The linked reversal raised, when the consequence called for one.
+  reversalHeaderId  String? @map("reversal_header_id") @db.Uuid
+  /// The voucher re-billing the retained portion after a refund calculation.
+  retentionHeaderId String? @map("retention_header_id") @db.Uuid
+
+  amountReversed   Decimal?        @map("amount_reversed") @db.Decimal(19, 4)
+  amountRefundable Decimal?        @map("amount_refundable") @db.Decimal(19, 4)
+  amountRetained   Decimal?        @map("amount_retained") @db.Decimal(19, 4)
+  refundElection   RefundElection? @map("refund_election")
+
+  approvedById String?  @map("approved_by_id") @db.Uuid
+  /// Null only on rows backfilled by the migration for students who predate
+  /// this module.
+  createdById  String?  @map("created_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student    Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  document   StudentDocument?   @relation("StatusChangeEvidence", fields: [documentId], references: [id])
+  reversal   TransactionHeader? @relation("StatusReversal", fields: [reversalHeaderId], references: [id])
+  retention  TransactionHeader? @relation("StatusRetention", fields: [retentionHeaderId], references: [id])
+  approvedBy User?              @relation("StatusApprover", fields: [approvedById], references: [id])
+  createdBy  User?              @relation("StatusRecorder", fields: [createdById], references: [id])
+
+  @@index([tenantId, studentId, effectiveDate])
+  @@index([tenantId, toStatus, effectiveDate])
+  @@map("student_status_history")
+}
+
+/// A block on a student, and the authority to lift it (SRS REQ-REG-06).
+///
+/// The hold names **who may clear it**, not merely who placed it. A
+/// disciplinary hold placed by a dean is not something a cashier lifts because
+/// they happen to hold `hold.manage`; that would make the hold a note rather
+/// than a control, which is what the legacy arrears reports were.
+model Hold {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  holdType  HoldType @map("hold_type")
+
+  reason             String
+  /// Some holds warn rather than stop. A documentary hold on a certificate
+  /// still awaited may be advisory in the first term and blocking in the
+  /// second, and an institution should be able to say so.
+  blocksRegistration Boolean @default(true) @map("blocks_registration")
+
+  effectiveFrom DateTime @map("effective_from") @db.Date
+
+  placedById String   @map("placed_by_id") @db.Uuid
+  placedAt   DateTime @default(now()) @map("placed_at") @db.Timestamptz(6)
+
+  /// Only a user holding this role may clear it. Null means anyone with
+  /// `hold.manage`.
+  clearanceRoleId String? @map("clearance_role_id") @db.Uuid
+
+  clearedById   String?   @map("cleared_by_id") @db.Uuid
+  clearedAt     DateTime? @map("cleared_at") @db.Timestamptz(6)
+  clearanceNote String?   @map("clearance_note")
+
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student       Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  placedBy      User    @relation("HoldPlacer", fields: [placedById], references: [id])
+  clearedBy     User?   @relation("HoldClearer", fields: [clearedById], references: [id])
+  clearanceRole Role?   @relation("HoldClearanceRole", fields: [clearanceRoleId], references: [id])
+
+  @@index([tenantId, studentId, clearedAt])
+  @@index([tenantId, holdType, clearedAt])
+  @@map("holds")
+}
+
+/// A programme transfer, effective-dated (SRS REQ-REG-04).
+///
+/// `frmTransferStudent.vb` did this with
+/// `update StudentsProfilees set Program=@Program`, having first run
+/// `Delete from Registrationees` on the old programme's registration. The
+/// record that the student was ever on the old programme is destroyed, and
+/// the student's programme has no history and no effective date — so a prior
+/// year's registration, read back through the student row, reports the
+/// programme they transferred *to*.
+model StudentProgrammeHistory {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  /// Null on the opening row, and on a student who had no programme before.
+  fromProgrammeId String? @map("from_programme_id") @db.Uuid
+  toProgrammeId   String  @map("to_programme_id") @db.Uuid
+
+  effectiveDate  DateTime @map("effective_date") @db.Date
+  academicTermId String?  @map("academic_term_id") @db.Uuid
+  reason         String
+
+  /// The registration reversed under the old programme, and the one raised
+  /// under the new. Both, or neither — a transfer mid-term that bills the new
+  /// programme without unwinding the old is the legacy defect.
+  reversedRegistrationId String? @unique @map("reversed_registration_id") @db.Uuid
+  newRegistrationId      String? @unique @map("new_registration_id") @db.Uuid
+
+  approvedById String?  @map("approved_by_id") @db.Uuid
+  createdById  String?  @map("created_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student              Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromProgramme        Programme?            @relation("TransferFrom", fields: [fromProgrammeId], references: [id])
+  toProgramme          Programme             @relation("TransferTo", fields: [toProgrammeId], references: [id])
+  academicTerm         AcademicTerm?         @relation(fields: [academicTermId], references: [id])
+  reversedRegistration SemesterRegistration? @relation("TransferReversed", fields: [reversedRegistrationId], references: [id])
+  newRegistration      SemesterRegistration? @relation("TransferRaised", fields: [newRegistrationId], references: [id])
+  approvedBy           User?                 @relation("TransferApprover", fields: [approvedById], references: [id])
+  createdBy            User?                 @relation("TransferRecorder", fields: [createdById], references: [id])
+
+  @@index([tenantId, studentId, effectiveDate])
+  @@map("student_programme_history")
+}
+
+/// How much of a term is refundable, by how long the student stayed
+/// (SRS REQ-FEE-03).
+///
+/// The legacy build has no refund concept at all — `frmTransferStudent`
+/// reverses whatever two numbers happen to be in its text boxes, one of which
+/// is the string literal `"1,030.00"`.
+model RefundPolicy {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  code     String
+  nameAr   String  @map("name_ar")
+  nameEn   String  @map("name_en")
+  isActive Boolean @default(true) @map("is_active")
+
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bands  RefundPolicyBand[]
+
+  @@unique([tenantId, code])
+  @@map("refund_policies")
+}
+
+/// One band: withdraw within `withinDays` of the term starting and this much
+/// of a refundable fee item comes back.
+///
+/// Bands are read in ascending `withinDays` and the first match wins; a
+/// withdrawal past every band refunds nothing. A fee item whose
+/// `is_refundable` flag is false is outside this entirely — stamp duty and
+/// fines are not refunded however early somebody leaves.
+model RefundPolicyBand {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  policyId String @map("policy_id") @db.Uuid
+
+  withinDays    Int     @map("within_days")
+  refundablePct Decimal @map("refundable_pct") @db.Decimal(7, 4)
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  policy RefundPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, withinDays])
+  @@index([tenantId, policyId])
+  @@map("refund_policy_bands")
 }

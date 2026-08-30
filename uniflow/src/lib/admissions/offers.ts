@@ -6,6 +6,7 @@ import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { buildSearchKey } from '@/lib/i18n/arabic';
 import { money, type Money, type MoneyInput } from '@/lib/money';
 import { toDateOnly } from '@/lib/ledger/period';
+import { recordOpeningStatus } from '@/lib/students/status';
 import { CapacityExceededError, lockQuota, quotaFor, SeatQuotaError } from './quota';
 import { ApplicationError, decideApplication, requireApplication } from './applications';
 
@@ -697,6 +698,17 @@ export async function enrolAcceptedOffer(
         nationalityId: app.nationalityId,
       },
       select: { id: true, studentNo: true },
+    });
+
+    // The opening row of the status chain (B5). An accepted offer is where a
+    // student's standing begins, and `statusOn` has to be able to answer for
+    // that day as much as for any later one.
+    await recordOpeningStatus(tx, principal.tenantId, {
+      studentId: student.id,
+      status: 'ADMITTED',
+      effectiveDate: admittedOn,
+      createdById: principal.userId,
+      reason: `Offer accepted — application ${app.applicationNo}`,
     });
 
     // Seed the profile from what the applicant already told us (B3). The

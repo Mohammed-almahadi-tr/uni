@@ -6,6 +6,7 @@ import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { buildSearchKey, searchTerms } from '@/lib/i18n/arabic';
 import { composeName, type NameParts } from '@/lib/students/profile';
 import { toDateOnly } from '@/lib/ledger/period';
+import { recordOpeningStatus } from '@/lib/students/status';
 
 /**
  * The student master — finance-facing slice (Track A3).
@@ -149,6 +150,18 @@ export async function createStudent(
       select: { id: true, studentNo: true },
     });
 
+    // The opening row of the status chain (B5). Written here so that
+    // `statusOn` is total from the student's first day — without it a student
+    // has no standing on any date until their first transition, and
+    // "who was Active in Fall 2026" answers for part of the intake and
+    // silently omits the rest.
+    await recordOpeningStatus(tx, principal.tenantId, {
+      studentId: student.id,
+      status: input.status ?? 'ACTIVE',
+      effectiveDate: input.admittedOn ?? new Date(),
+      createdById: principal.userId,
+    });
+
     await audit(tx, principal.tenantId, {
       actorId: principal.userId,
       action: 'INSERT',
@@ -166,6 +179,15 @@ export async function createStudent(
   });
 }
 
+/**
+ * Edit a student's identifying details.
+ *
+ * Deliberately cannot change `status`. A change of standing is a transition
+ * with a from-state, an effective date, a reason, an approver and a financial
+ * consequence — `changeStudentStatus` in students/status.ts (B5). Allowing it
+ * here as one field among several would be a way round the state machine, and
+ * the machine is the point.
+ */
 export async function updateStudent(
   principal: Principal,
   studentId: string,
@@ -173,11 +195,9 @@ export async function updateStudent(
     fullNameAr?: string;
     fullNameEn?: string;
     nationalId?: string | null;
-    status?: StudentStatus;
   },
 ): Promise<void> {
   requirePermission(principal, 'student.manage');
-  if (changes.status) requirePermission(principal, 'student.status');
 
   await withTenant(principal.tenantId, async (tx) => {
     const before = await tx.student.findUnique({
@@ -203,7 +223,6 @@ export async function updateStudent(
         fullNameAr,
         fullNameEn,
         nationalId,
-        ...(changes.status ? { status: changes.status } : {}),
         // Recomputed on every write. A stale search key is a student who
         // cannot be found by the name they were just renamed to.
         searchKey: buildSearchKey(fullNameAr, fullNameEn, before.studentNo, nationalId),
@@ -216,7 +235,7 @@ export async function updateStudent(
       resourceType: 'student',
       resourceId: studentId,
       before,
-      after: { ...before, fullNameAr, fullNameEn, nationalId, ...(changes.status ? { status: changes.status } : {}) },
+      after: { ...before, fullNameAr, fullNameEn, nationalId },
     });
   });
 }

@@ -537,7 +537,27 @@ export async function applyCreditBalance(
 ): Promise<{ applied: string; headerId: string | null }> {
   requirePermission(principal, 'receipt.create');
 
-  return withTenant(principal.tenantId, async (tx) => {
+  return withTenant(principal.tenantId, (tx) =>
+    applyCreditBalanceInTx(tx, principal, studentId, opts),
+  );
+}
+
+/**
+ * The body of `applyCreditBalance`, for callers already inside a transaction
+ * that has established the right to do it — a withdrawal (B5) re-billing the
+ * retained portion of a term and settling it from the money the student had
+ * already paid. REQ-FEE-04 requires a credit balance to be applied
+ * automatically to what the student next owes; doing it in the same
+ * transaction is what stops the account reading as a debt and a credit of
+ * comparable size that nobody has matched.
+ */
+export async function applyCreditBalanceInTx(
+  tx: Tx,
+  principal: Principal,
+  studentId: string,
+  opts: { docDate?: Date } = {},
+): Promise<{ applied: string; headerId: string | null }> {
+  {
     const { tenantId } = principal;
 
     const student = await tx.student.findUnique({
@@ -652,7 +672,7 @@ export async function applyCreditBalance(
     });
 
     return { applied: applied.toFixed(4), headerId: posted.headerId };
-  });
+  }
 }
 
 /** Assign a cashier the safe their cash receipts post to. */

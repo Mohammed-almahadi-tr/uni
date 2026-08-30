@@ -14,6 +14,8 @@ import {
   type ResolvedFeeSchedule,
 } from '@/lib/academic/fee-matrix';
 import { raiseChargesInTx, reverseChargesInTx } from '@/lib/billing/charge';
+import { assertRegistrationAllowed } from '@/lib/students/holds';
+import { activateOnFirstRegistration } from '@/lib/students/status';
 import { toDateOnly } from '@/lib/ledger/period';
 import { idempotent } from '@/lib/idempotency';
 import { money, sum, toStorage, ZERO, type Money, type MoneyInput } from '@/lib/money';
@@ -261,6 +263,12 @@ async function quote(
         `register. Change the student's status first, so that the reason is on the record.`,
     );
   }
+
+  // Holds (B5, REQ-REG-06). Checked here rather than at save, so a preview
+  // shows the block as plainly as a save does — a registrar should find out
+  // before they have typed the discount, not after. The legacy build computed
+  // arrears in four separate reports and consulted none of them here.
+  await assertRegistrationAllowed(tx, tenantId, student.id, student.studentNo, docDate);
 
   const term = await tx.academicTerm.findUnique({
     where: { id: input.academicTermId },
@@ -658,6 +666,15 @@ async function registerInTx(
 
   const posted = await billRegistration(tx, principal, registration.id);
   const planId = await scheduleInstalments(tx, principal, registration.id, input);
+
+  // `Admitted --> Active: First registration` (SRS REQ-LIF-01). The status
+  // moves inside the same transaction that billed the term, because a student
+  // who is active is one the institution has billed.
+  await activateOnFirstRegistration(tx, principal, {
+    studentId: q.studentId,
+    effectiveDate: toDateOnly(input.registrationDate ?? new Date()),
+    registrationNo,
+  });
 
   return {
     ...q,

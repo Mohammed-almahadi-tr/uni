@@ -17,6 +17,7 @@ import { installFeeCatalog } from '@/lib/fees/catalog';
 import { installAssetCategories } from '@/lib/assets/register';
 import { installAcademicDefaults } from '@/lib/academic/defaults';
 import { installDocumentTypes } from '@/lib/students/defaults';
+import { installRefundPolicy } from '@/lib/students/refunds';
 import type { Principal } from '@/lib/auth/rbac';
 import type { PermissionKey } from '@/lib/auth/permissions';
 
@@ -327,6 +328,7 @@ export async function makeUniversity(
   await installAssetCategories(t.tenantId, t.adminUserId);
   await installAcademicDefaults(t.tenantId, t.adminUserId);
   await installDocumentTypes(t.tenantId, t.adminUserId);
+  await installRefundPolicy(t.tenantId, t.adminUserId);
 
   const { fiscalYearId, periodIds } = await withSystem(
     (tx) =>

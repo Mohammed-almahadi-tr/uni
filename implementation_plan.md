@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**705 tests pass across 21 suites; typecheck, lint and production build are all
+**745 tests pass across 22 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -44,18 +44,25 @@ income statement, sub-ledger reconciliation and their exports — together with
 the two Module 12 requirements the statements depend on, opening balances and
 the year-end close. See §0.2.
 
-**Track B is under way, and the convergence milestone is reached.** B1 —
-academic structure and the effective-dated, versioned fee matrix — B2 —
+**Track B is five-sixths complete, and the convergence milestone is passed.**
+B1 — academic structure and the effective-dated, versioned fee matrix — B2 —
 admissions capacity, eligibility screening and the committee workflow — B3 —
 the student profile, per-programme document checklists and medical records —
-and **B4, the semester registration engine**, are all complete; see §6.1.
+**B4, the semester registration engine** — and **B5, the status lifecycle,
+programme transfer and holds** — are all complete; see §6.1.
 
-B4 closes milestone `m1`: a registration and its balanced double entry are now
-one database transaction. In the legacy build they were two systems reconciled
-by hand, and the posting block that would have joined them is commented out in
+B4 closed milestone `m1`: a registration and its balanced double entry are one
+database transaction. In the legacy build they were two systems reconciled by
+hand, and the posting block that would have joined them is commented out in
 the source with the note *"the debit/cridit will be inserted from financial
-system"*. B5 — status lifecycle, transfer and holds — is next, and inherits
-both the reversal path and the seam where a hold blocks a registration.
+system"*.
+
+B5 closed the seam B4 left open — a hold now blocks a registration, and
+arrears are a control rather than the four reports the legacy build computed
+and never consulted. **B6 — sponsors, scholarships and discount governance —
+is the last of Track B**, and it inherits one deferral named in §6.1: a
+withdrawal currently refunds to the student's own credit balance, and where a
+sponsor paid the fees the refund is owed to the sponsor.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -1040,7 +1047,7 @@ Even though Phases 7-8 are out of v1 scope, the Phase 0 schema must not preclude
 
 **B4 · Semester Registration Engine** *(built — see §6.1; convergence milestone `m1`)* — Student lookup auto-filling programme and the effective fee schedule version. Per-item discount application with approval above threshold. **Atomic**: the registration row and its balanced GL posting are created in one database transaction through the Phase 0 posting engine, carrying an idempotency key and rejected if the period is closed. Registration card with QR verification.
 
-**B5 · Status Lifecycle, Transfer & Holds** — The full status state machine with effective-dated history, each transition declaring its financial consequence. Programme transfer reversing the prior programme's billing by linked reversal and posting the new. Holds (financial, academic, disciplinary, documentary) that block registration, with placement and clearance authority.
+**B5 · Status Lifecycle, Transfer & Holds** *(built — see §6.1)* — The full status state machine with effective-dated history, each transition declaring its financial consequence. Programme transfer reversing the prior programme's billing by linked reversal and posting the new. Holds (financial, academic, disciplinary, documentary) that block registration, with placement and clearance authority.
 
 **B6 · Sponsors, Scholarships & Discount Governance** — Sponsor master with contract terms. Split funding apportioning charges across self-pay and sponsors at billing time, so a student's statement shows only what the student owes. Sponsor invoicing, settlement and aging; sponsor-default transfer back to the student. Scholarship schemes with budget caps and award approval. Discount exposure reporting by faculty, programme, batch, scheme and year.
 
@@ -1688,6 +1695,209 @@ reversal path it needs now exists.
 the bilingual data and the verification path; rendering it to PDF uses the A7
 print path, and the public `/verify/registration/<token>` page is a Track C
 screen.
+
+---
+
+### B5 — Status Lifecycle, Transfer & Holds · complete
+
+Three screens' worth of legacy behaviour, and between them they lose every
+fact this phase exists to keep: what a student's standing is, when it changed,
+who decided, what it cost, and what stops them registering.
+
+#### Standing is which table the row is in
+
+`frmStudentProfiles` decides whether somebody is a student by the text of a
+combo box, and records the answer by choosing a table:
+
+```vb
+If Me.ComboBox1.Text = "يقبل" Then
+    cmd.CommandText = "Delete From StudentsProfilees Where StudentIndex=N'" & (Me.TxtYear.Text) + (Me.txtStdIndex.Text.Trim) & "'"
+    ...
+    cmd.CommandText = "Insert Into StudentsProfilees (...)"
+Else
+    cmd.CommandText = "Delete From StudentsProfilesIndecent Where StudentIndex=N'" & Me.txtStdIndex.Text & "'"
+    ...
+    cmd.CommandText = "Insert Into StudentsProfilesIndecent (..., ReasonofIndecent, ...)"
+End If
+cmd.CommandText = "Update StdForm Set CH=@CH Where UnivID=" & Me.txtStdIndex.Text
+```
+([frmStudentProfiles.vb:232-289](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmStudentProfiles.vb#L232-L289))
+
+Three defects, in one `If`:
+
+- **Each branch deletes only from the table it is about to write.** A student
+  whose verdict is changed from accepted to rejected is inserted into
+  `StudentsProfilesIndecent` and **left in `StudentsProfilees`**. They are now
+  both.
+- **The two branches key the row differently.** The accepted branch writes
+  `StudentIndex = TxtYear + txtStdIndex` — the batch-prefixed number — and
+  deletes on the same. The rejected branch's `DELETE` keys on `txtStdIndex`
+  **alone** while its `INSERT` writes the prefixed value, so it never matches
+  its own insert and a student rejected twice gets two rows.
+- **`Update StdForm Set CH=1` runs either way**, so the admission form cannot
+  tell an accepted student from a rejected one.
+
+`' Trans.Commit()` is commented out on the line below, on an autocommit
+connection — the same shape B3 found in the profile save.
+
+There is no status column anywhere in either build, no effective date, no
+approver (`Employee` is the clerk who typed it), and no history. Deferral,
+suspension, dismissal and re-admission have nowhere at all to be recorded,
+which is what SRS §0 meant by naming `ReasonofIndecent` as evidence of events
+the schema had no room for.
+
+#### Transfer destroys the evidence, then bills the wrong programme
+
+```vb
+'Delete the record for old program
+cmd.CommandText = "Delete from Registrationees where StudentIndex=N'" & .. & "' and Program=N'" & .. & "' and AcademicYear=N'" & .. & "'"
+'Update Student profile
+cmd.CommandText = "update StudentsProfilees set Program=@Program Where StudentIndex=@StudentIndex"
+```
+([frmTransferStudent.vb:183-190](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmTransferStudent.vb#L183-L190))
+
+The registration under the old programme is **deleted** rather than reversed,
+and the programme on the student row is overwritten with no effective date and
+no history — so a prior year's record, read back through the student, reports
+the programme they transferred *to*.
+
+Four more in the same handler, and the first is the one that matters:
+
+- **The new programme's revenue is credited to the old programme.** Every
+  posting in the second half uses `@Acc4 = Me.txtProgram.Text.Trim` — the
+  read-only box holding the programme being *left*
+  ([lines 250, 263](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmTransferStudent.vb#L245-L277)) —
+  while the `Registrationees` row it writes alongside uses
+  `Me.CombProgram.SelectedItem`, the programme being *joined*
+  ([lines 232-241](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmTransferStudent.vb#L232-L241)).
+  The registration says one programme and the ledger says the other, on the
+  same transfer, in the same transaction.
+- **The new programme's registration fee is billed but never recorded.** The
+  insert names five columns —
+  `(StudentIndex,StudentName,Program,AcademicYear,TuitionFees1)` — and the
+  handler then adds a sixth parameter, `@RegsFees`, that no column receives.
+  The ledger is debited for it regardless.
+- **The amount reversed is whatever is in the text boxes**, and one of them is
+  a hardcoded string: `Me.txtRegsFees.Text = "1,030.00"` in `FillStudDetails`
+  ([line 66](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmTransferStudent.vb#L66))
+  and `"1,030,00"` — a comma where the decimal point belongs — in `FillStdfees`
+  ([line 97](Nile College E-University System/Oasis - E-University/Registration System/Forms/frmTransferStudent.vb#L97)).
+  Which one runs depends on whether the user pressed Enter in the index box or
+  picked from the search dialog, and `CDbl` of the second is locale-dependent.
+- **A student with more than one registration transfers on an arbitrary one.**
+  Both loaders run `While reader.Read` over every registration and assign each
+  row to the same text boxes, keeping whichever came last — the same disease
+  as the B3 medical loader.
+
+#### Arrears were a report, not a control
+
+`StudentsUnpaidList`, `ProgramsUnpaidFeesDetails`, `ProgramsUnpaidFeesTotal`
+and `frmUncollectedFees` all compute exactly what every student owes.
+**Nothing consults any of them when a student registers.**
+`frmStudentRegisteration` reads the name, the programme and the fees, and
+posts; the balance is never looked at.
+
+That is the same shape B2 found in the seat quota — a number computed after the
+fact for a decision it was supposed to inform — and it is how an institution
+discovers in the fourth term that a student has been registering for three
+years without paying.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| **A status state machine**, thirteen declared transitions | `lifecycle.ts` is the specification. Anything not in it is refused *by name*, with the list of what is possible from where the student stands |
+| Each transition **declares its financial consequence** (REQ-LIF-02) | `RETAIN_CHARGES`, `REVERSE_TERM_BILLING`, `APPLY_REFUND_POLICY`, `NONE` — stated on the transition and recorded on the history row, so the consequence is a property of the transition rather than something to infer from the ledger |
+| **The history chains, and cannot fork** | Trigger: `from_status` must equal the student's standing at the moment the row is written. A hand-written row claiming a status the student was never in is refused |
+| **No back-dating behind a recorded change** | Trigger. Back-dating would silently rewrite the answer to "who was Active in Fall 2026" after the term has been reported on |
+| Append-only | Editing or deleting a transition is refused by the same trigger. Correction is the correcting transition |
+| **`statusOn` and `cohortOn`** (REQ-LIF-02) | "Who was Active in Fall 2026", answered from history rather than from `students.status`, so it stays right after everybody in it has deferred, graduated or left. Asserted by a test that withdraws a student in March and still finds them on the January roster |
+| The chain is **total** | `createStudent` and the B2 offer-acceptance path both write an opening row, and the migration backfills one for every student who predates the module — `created_by_id` null, which is what an opening balance looks like in a history table. Without it `cohortOn` would answer for part of an intake and silently omit the rest |
+| `Admitted --> Active` on first registration | Taken inside the same transaction that billed the term, because a student who is active is one the institution has billed |
+| **Withdrawal applies the refund schedule** (REQ-FEE-03) | Bands by days from term start, first match wins, honouring each fee item's `isRefundable` flag. The term is reversed in full and the retained portion re-billed and recognised immediately — which keeps the sub-ledger's settlement arithmetic intact, and is how a bursar describes the act |
+| The credit balance **is** the refund liability | It already sits in Student Credit Control, which is money the institution owes, so there is no second account for a "refund payable" to raise it into and posting one would report a debt twice. `RETAIN_AS_CREDIT` / `REFUND` records the student's election; disbursing it is an A6 payment voucher against a student rather than a vendor. REQ-FEE-03 said the two were alternatives — recorded as SRS correction 37 |
+| Credit is applied to what is retained, automatically (REQ-FEE-04) | Otherwise the account reads as a debt and a credit of comparable size that nobody has matched |
+| Deferral reverses the term in full and carries the money forward | Not a withdrawal: no refund band applies, and what was paid waits on the account for the student's return (REQ-LIF-03) |
+| **Suspension places a hold; reinstatement lifts it** | Part of the transition, not a separate act — a suspended student who can still register is not suspended |
+| **Holds** (REQ-REG-06), four types | Placed with a reason and an effective date. `blocksRegistration` is per-hold, because a documentary hold may be advisory in the first term and blocking in the second |
+| A hold names **who may clear it** | A clearance role, not merely a permission. A disciplinary hold placed by a dean is not something a cashier lifts because they happen to hold `hold.manage` |
+| Nobody clears a hold they placed | Refused in the application and again by CHECK constraint. One person placing and lifting a block is a note to self |
+| Holds are cleared, never deleted; a cleared hold is not reopened | Trigger. The clearance note is the only evidence the block was ever satisfied |
+| **The derived financial hold** | Overdue past the tenant's grace period **and** above its threshold. Computed from the account, not stored — a materialised one is wrong the moment the student pays, and a student turned away over a debt they settled that morning is how a control gets switched off |
+| **Programme transfer** (REQ-REG-04) | Reverses the old programme by linked reversal, records the move with its effective date, and raises the new programme's billing **through the B4 registration engine** — the fee matrix version in force, the posting engine, the idempotency key, the closed-period refusal. Nothing about a transfer deserves its own billing code, and the legacy screen having its own is why its ledger and its registration disagree |
+| `programmeOn` | Which programme a student was on for a given day — the question `update StudentsProfilees set Program=@Program` makes unanswerable |
+| A recorded transfer is not edited or deleted | Trigger, with one permitted stamp: attaching the registration it raised, once |
+| `updateStudent` can no longer change `status` | It was a way round the state machine. A change of standing is a transition with a from-state, an effective date, a reason, an approver and a financial consequence |
+
+#### Two things settled during the build
+
+**Rejection is not a student status, and the SRS diagram is corrected.**
+REQ-LIF-01 draws `Applicant --> Rejected`. There is no `REJECTED` student
+status here and there should not be: a rejected applicant is an *application*
+with a REJECT decision (B2) and never becomes a student record at all. Making
+rejection a standing is precisely the legacy mistake —
+`StudentsProfilesIndecent` is a table of people the institution decided were
+not its students, keyed and reported as though they were. Recorded as SRS
+correction 36.
+
+**A system-generated transition clamps its date; a human-entered one is
+refused.** The back-dating rule initially applied to both, and broke an
+ordinary case: a student record opened today and registered for a term that
+started in January is a backfill, not a rewrite. `activateOnFirstRegistration`
+now takes the later of the registration date and the last date on the chain —
+a student's standing cannot begin before their record did. `changeStudentStatus`
+still refuses back-dating outright, because that is somebody rewriting a term
+that has already been reported on. The split is the point: the machine adjusts,
+the operator is stopped.
+
+#### One expectation corrected by the tests
+
+The transfer test was written expecting the one-off registration fee **not** to
+be re-billed under the new programme. It should be, and the code was right:
+the transfer reverses the old registration, which credits the 50,000 back, so
+re-billing it means the student pays it exactly once across the move. Skipping
+it would credit the fee and never charge it again. The assertion now says so,
+with the reasoning next to it.
+
+#### Verification
+
+40 tests. The ones that carry the most weight:
+
+- `answers who was active in a term, from history rather than from the column`
+  — a student withdrawn in March is still on the January roster, and off the
+  April one. The question the legacy schema cannot express at all.
+- `applies the refund schedule on a withdrawal and re-bills what is retained`
+  — 1,050,000 reversed, 500,000 refundable, 550,000 retained, with the
+  non-refundable registration fee retained in full.
+- `blocks on overdue arrears — the report the legacy build never consulted`,
+  alongside `does not block inside the grace period, and stops blocking once
+  paid` — the control, and the reason it is derived rather than stored.
+- `bills the ledger for the programme the registration names` — the fee
+  schedule the ledger billed against belongs to the programme on the
+  registration. The legacy handler's `@Acc4` defect, written as an equality.
+- `keeps the old programme readable for the dates it applied` — `programmeOn`
+  before and after the effective date.
+- `ties the sub-ledger to the control account through a withdrawal` — the
+  reversal, the retention and the credit application all land, and the two
+  figures still agree.
+
+Nine constraints are exercised by writing directly as the **owner role**,
+which bypasses RLS: a status row that does not chain, a back-dated transition,
+editing and deleting a recorded transition, deleting a hold, reopening a
+cleared one, a self-cleared hold, editing and deleting a recorded transfer,
+and deleting the bands out from under an active refund policy. All nine are
+refused by the database rather than by application code.
+
+**Deferred to B6, deliberately:** sponsor-funded students. A withdrawal
+currently returns the whole refundable amount to the student's own credit
+balance; where a sponsor paid it, the refund is owed to the sponsor and the
+split belongs with the sponsorship contract terms that B6 introduces. Flagged
+here rather than approximated, because getting it wrong refunds an embassy's
+money to a student.
+
+**Deferred to Track C:** the screens. The withdrawal wizard, the hold banner on
+the registration desk and the status timeline on the student profile are all
+Track C surfaces over the functions above.
 
 ---
 
