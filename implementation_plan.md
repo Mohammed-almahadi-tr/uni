@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**870 tests pass across 25 suites; typecheck, lint and production build are all
+**882 tests pass across 25 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -77,13 +77,21 @@ is not logged in. See §7.1.
 
 **D1 is complete** — the staff console's shell: sign-in bound to the host,
 TOTP step-up, and a navigation tree generated from the signed-in user's
-permissions against a route table that also guards the routes. See §8.1. It
-is the first screen in this system that a member of staff can log into, and
-the answer to a question the legacy build could not answer about itself:
-*what may I do here?*
+permissions against a route table that also guards the routes. It is the
+first screen in this system a member of staff can log into, and the answer to
+a question the legacy build could not answer about itself: *what may I do
+here?*
 
-That leaves, in order: **D2-D5**, the screens themselves — the route table
-already declares thirty-eight of them with the permissions they demand;
+**D3 is complete** — the registration desk and everything around it: student
+search in either script, the student record on one page, preview → discount →
+save with the figures that post, the hold banner before the work rather than
+after it, the registration card and its QR, the withdrawal and transfer
+wizards stating their financial consequence before confirmation, and document
+and medical verification. It was scheduled ahead of D2 for the reason §8
+records: D2 without D3 collects money against charges nobody can raise. See
+§8.1.
+
+That leaves, in order: **D2** (the finance desk), then **D4** and **D5**;
 **C2** (the public admissions application flow) and **C3** (the student and
 guardian portal); the release phases §11-§13; and the two Phase 7-8
 academic-records phases deliberately scoped out of v1.
@@ -919,7 +927,8 @@ graph TB
 | ORM | Prisma with a tenant-scoping client extension | §4 |
 | Money | `numeric(19,4)` / `Prisma.Decimal` | Decision 4 |
 | Jobs | A durable job runner (depreciation, revenue recognition, dunning, FX revaluation) | Must be idempotent and period-aware |
-| PDF | `@react-pdf/renderer` with embedded Arabic fonts | Arabic shaping verified by visual snapshot, not assumed |
+| PDF | Printed from the HTML sheet, not generated | A7 decision — a generator that shapes Arabic wrongly produces documents that look right, print, get signed and are wrong |
+| QR | `qrcode`, server-rendered to inline SVG | D3. Not hand-rolled, for the same reason as the PDF: a wrong symbol looks exactly like a right one and scans as nothing |
 | i18n | `next-intl` + a custom Arabic/English monetary speller + Hijri calendar | |
 | Auth | Argon2id, session cookies, TOTP MFA for financial approval | |
 
@@ -965,7 +974,7 @@ gantt
     section Track D — Staff Console
     Console shell, session & permission navigation  :done, d1, after c1 b6, 6d
     Finance desk — cashier, cheques, vouchers       :d2, after d1, 10d
-    Registration desk, holds, withdrawal & transfer :crit, d3, after d1, 9d
+    Registration desk, holds, withdrawal & transfer :crit, done, d3, after d1, 9d
     Back office — academic, admissions, P2P, sponsors :d4, after d1, 12d
     Reports & the print surface                     :d5, after d1, 8d
 
@@ -1544,9 +1553,11 @@ refused by the database rather than by application code.
 **Deferred:** webcam photo capture and the object-storage upload endpoint
 itself — the metadata, digest and supersession model are complete and the
 bytes land in the same store as voucher attachments (A2), but the browser
-capture surface is a **Track D** screen — D3, at the registration desk, since
-that is where the photograph is actually taken. Bilingual profile printing
-uses the A7 print path; the profile card template is D5.
+capture surface waits on the object-storage upload endpoint, which does not
+exist yet and is one piece of work serving A2, B3 and the registration desk
+alike. **D3 shipped without it**: documents can be verified and rejected at
+the desk, and cannot yet be uploaded there. Bilingual profile printing uses
+the A7 print path; the profile card template is D5.
 
 ---
 
@@ -1723,9 +1734,10 @@ the status lifecycle. Programme transfer (REQ-REG-04) is B5 for the same
 reason — it is a reversal of this registration plus a new one, and the
 reversal path it needs now exists.
 
-**Deferred to the console:** the printed card itself. `registrationCard`
-returns the bilingual data and the verification path; rendering it uses the A7
-print path and the template belongs to **D5**, while the sessionless
+**Deferred to the console, and since built:** the card. **D3** renders it with
+a QR encoding an absolute verification URL built from C1's canonical host, and
+it prints from the browser through the A7 path; the letterhead and page setup
+still belong to **D5**, with the receipt and the voucher. The sessionless
 `/verify/registration/<token>` page is genuinely public and stays in Track C.
 
 ---
@@ -1927,9 +1939,11 @@ split belongs with the sponsorship contract terms that B6 introduces. Flagged
 here rather than approximated, because getting it wrong refunds an embassy's
 money to a student.
 
-**Deferred to the console:** the screens. The withdrawal wizard, the hold
+**Deferred to the console, and since built:** the withdrawal wizard, the hold
 banner on the registration desk and the status timeline on the student profile
-are all **D3** surfaces over the functions above.
+are **D3** — see §8.1. Each one states the financial consequence the
+transition declares before it is confirmed, which is what the consequence was
+made a property of the transition for.
 
 ---
 
@@ -2271,7 +2285,7 @@ step-up at approval. These are the two screens the legacy system's cashiers
 spent the working day in — with the arithmetic no longer done in the
 operator's head, which is where A3 found it.
 
-**D3 · Registration Desk** — Student search across both keyboards; the
+**D3 · Registration Desk** *(built — see §8.1)* — Student search across both keyboards; the
 registration wizard as **preview → discount → save**, showing the quote and
 its instalment schedule before anything is committed; the hold banner that
 stops it, naming which hold and who may clear it; the registration card and
@@ -2450,6 +2464,121 @@ code is a settings screen, and settings screens are D4. Until it exists, a
 tenant enrols an approver by seeding `mfa_secret` — which is exactly the sort
 of gap that gets forgotten if it is not written down, because everything
 around it works.
+
+---
+
+### D3 — Registration Desk, Holds, Transfer & Withdrawal · complete
+
+Scheduled before D2 on the reasoning §8 already records: *D2 without D3
+collects money against charges nobody can raise.*
+
+#### The screen this replaces, and what a registrar could not see
+
+B4 documented the five defects in `frmStudentRegisteration.vb` and negated
+them in the engine. D3 is about the other half — what the operator was shown
+while those defects were happening.
+
+The discount was typed into a text box, the **net** was written to the
+registration and the **gross** was written to the ledger, and the two figures
+were never on one screen. There was nothing to check against anything. The
+duplicate-registration test ran on a second connection with its semester
+clause commented out, so the screen could not warn about a duplicate it was
+not looking for. And a hold did not exist as a concept, so nothing could be
+shown before the work rather than after it.
+
+Underneath that, four things about one student lived in four tables keyed four
+different ways — including `StudentsProfilesIndecent`, a table of people the
+institution had decided were *not* its students, which a student whose verdict
+changed ended up in **as well as** the accepted table, because
+`frmStudentProfiles` deleted only from the table it was about to write.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| **Search that works in both keyboards** | Over `students.search_key`, the normalised column B3 built — diacritics stripped, alef and yaa folded, Latin lowercased. The legacy screen's four `Like '%…%'` clauses over raw name columns could not, because أحمد and احمد are different strings and the same institution spells the same student both ways |
+| A GET form, not a live filter | The result survives a reload, a bookmark and a link pasted to a colleague. At a counter that matters more than it animating |
+| **The student record on one screen** | What they owe *net of anything a sponsor carries*, what blocks them, their standing over time, and every term they have registered for including cancelled ones. Four tables, one page, no `StudentsProfilesIndecent` |
+| **The hold banner, before the work** | B5 made a hold a control; D3 is where a registrar sees it at the top of the profile and at the top of the desk, naming which hold and **who may lift it** — rather than discovering it as a refusal after pricing a term. The derived financial hold says it is derived and lifts itself when the arrears are paid |
+| **Preview → discount → save**, on one screen | The quote table carries a discount box on every line. Re-pricing creates nothing; committing re-runs the identical engine path rather than trusting a figure the browser sent back. Gross, discount and net sit in the same row, which is the arrangement the legacy screen made impossible |
+| No priced figure crosses the wire as an input | The form sends the *inputs* — student, term, level, discounts — and the engine prices them again. A hidden field holding a total is a number an attacker controls |
+| The approval threshold is stated **before** committing | A discount above the tenant's percentage says so on the quote, in the sentence that explains what will happen: the registration is created, held, and nothing posts until somebody with `discount.approve` signs it |
+| Registration card with a **QR that is not hand-rolled** | An encoder with its own conformance tests, for the reason A7 gave about Arabic PDFs: a wrong QR looks exactly like a right one and scans as nothing. Error correction level Q, because these cards are folded and carried for a term. Rendered as SVG so it survives printing |
+| The QR encodes an **absolute** URL | Built from the tenant's canonical host (C1). `registrationCard` returns a path on purpose — the module that knows the fee arithmetic has no business knowing the university's domain — and the origin is joined at the screen. A card printed with the wrong origin verifies against nothing |
+| Approval and cancellation are **separate forms** | Separate acts, usually by separate people, with separate permissions. One form with two buttons lets a mis-click do the other one |
+| **Every transition states its money before it is made** | The change-of-standing dropdown offers only what is legal from where the student stands, each labelled with its declared financial consequence, and the consequence updates as the destination changes. B5 made that a property of the transition; this is the first place a human reads it |
+| Withdrawal asks what happens to the refund | `RETAIN_AS_CREDIT` or `REFUND`, and only where the consequence is `APPLY_REFUND_POLICY` — the field does not appear on transitions where it would mean nothing |
+| Transfer names both postings | The reversal of the old programme and the new registration, with the amount reversed, because a registrar asked next week to explain the balance has to be able to find them |
+| Document verification, with `EXPIRED` outranking `VERIFIED` | A passport verified in 2024 and expired in 2025 is not a satisfied requirement. The landing view lists what expires within sixty days, so it is seen in March rather than in June |
+| Rejection carries its reason in the same submission | The student is told what was wrong with the file, not that it "was not accepted" |
+| Screening results are **always submitted** | The selects start at *not tested* and post a value every time, so "we did not test" and "we tested and it was negative" cannot collapse into one another the way `AddWithValue("@Aids", CombAids.Text)` on an unset combo box did |
+| `LAPSED` is its own state | A clearance that has run out is an examination to repeat, not a finding of unfitness. Telling a student they are unfit when their certificate has merely expired is a different and worse conversation |
+| The name in **both scripts, always** | On every student-scoped screen, whichever language the interface is in. A registrar working in Arabic still checks a passport printed in English |
+
+#### Two things settled during the build
+
+**Money had to become printable without the Decimal library.** The desk prices
+a term in a client component — the quote comes back from a server action and
+is rendered in the browser — and `lib/money.ts` is built on `Prisma.Decimal`,
+which pulls Node built-ins into a browser bundle. The build said so, loudly.
+
+The fix was not to stop showing money on the desk. It was to notice that
+*displaying* an already-computed figure is string work: `lib/currency.ts`
+rounds a decimal string half-up and groups it, with no dependency, and
+`lib/money.ts` now imports the minor-unit table from it rather than keeping a
+second copy. That second copy was already wrong — the `Money` component had
+its own hardcoded list in which Omani rial and Jordanian dinar were two-decimal
+currencies.
+
+A second rounding implementation is exactly the kind of thing that drifts, so
+it is pinned by test against `toCurrency` on ten values including the
+half-way cases, the all-nines carry, and negative zero.
+
+**The route table gained detail routes.** `registry/students/[id]` is a page
+the structural test would have flagged as undeclared — correctly, because
+nothing had decided who may open it. Rather than loosen the test, `ConsoleItem`
+gained a `detail` path that carries **the item's own permissions**: a detail
+page is the same screen with one row selected, and giving it a looser rule
+than the list it came from is how a read permission turns into a way to
+enumerate by guessing identifiers.
+
+#### Verification
+
+Six new tests in `console.test.ts`, six in `money.test.ts`, and the two
+structural ones extended:
+
+- `has a page on disk for every screen it says is built`, and its inverse
+  `does not link to a screen that has no page` — together these mean the
+  console never offers a link to a 404 and never ships a page nobody declared.
+- `gives a detail route the same permissions as the list it came from`.
+- `separates looking at a student from registering one` — a dean reads the
+  directory, a registrar works the desk; the legacy build had one privilege
+  column and never read it, so both were the same person by default.
+- `keeps holds, standing and medical behind their own permissions`.
+- `rounds half-up, away from zero, like toCurrency` — the display formatter
+  against the ledger arithmetic.
+
+The engine behind every screen was already covered: 42 tests in
+`registration.test.ts`, 40 in `lifecycle.test.ts`, and the student and
+document suites. D3 adds no business rule, so it adds no test of one — which
+is the point of §8's rule, and is what makes a phase of this size safe to
+build in one pass.
+
+**Deferred, and named rather than assumed:**
+
+- **Photograph capture.** B3 pointed the webcam surface at D3, and it stays
+  unbuilt for the same reason B3 deferred it: the object-storage upload
+  endpoint does not exist yet, and it is one piece of work serving voucher
+  attachments (A2), student documents (B3) and this. Documents can be verified
+  and rejected here; they cannot yet be uploaded here.
+- **The printed card template.** The card renders and prints from the browser
+  — `globals.css` already carries the print rules — but the letterhead, the
+  page setup and the signature block belong with D5's print surface, where the
+  receipt, the voucher and the offer letter get the same treatment at once.
+- **Instalment plans at the desk.** `registerStudent` accepts a schedule of
+  due dates and weights and B4 tested it; the desk does not offer one yet,
+  because a plan is a conversation about dates that wants its own step rather
+  than three more boxes on a pricing screen.
 
 ---
 

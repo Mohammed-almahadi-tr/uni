@@ -16,6 +16,7 @@ import {
   toFunctional,
   toStorage,
 } from '@/lib/money';
+import { formatMoney, roundDecimalString } from '@/lib/currency';
 
 describe('precision', () => {
   it('does not lose the classic float case', () => {
@@ -112,5 +113,68 @@ describe('functional currency conversion', () => {
 
   it('keeps rate precision that a 2dp rate would lose', () => {
     expect(toFunctional('1000.00', '0.00123456').toFixed(4)).toBe('1.2346');
+  });
+});
+
+/**
+ * Display formatting (Track D3).
+ *
+ * `lib/currency.ts` exists so a figure can be printed inside a client
+ * component without dragging the Decimal library into the browser. That makes
+ * it a second implementation of rounding, which is exactly the kind of thing
+ * that drifts — so these tests pin it against `toCurrency`, which is the
+ * arithmetic the ledger actually uses.
+ */
+describe('display formatting agrees with the arithmetic', () => {
+  it('rounds half-up, away from zero, like toCurrency', () => {
+    const cases = [
+      ['2.5', 'JPY'],
+      ['3.5', 'JPY'],
+      ['1234.565', 'SDG'],
+      ['1234.5649', 'SDG'],
+      ['0.005', 'SDG'],
+      ['-2.345', 'SDG'],
+      ['-0.004', 'SDG'],
+      ['1200000.0000', 'SDG'],
+      ['999.999', 'SDG'],
+      ['0.9995', 'KWD'],
+    ] as const;
+
+    for (const [value, currency] of cases) {
+      expect(roundDecimalString(value, minorUnits(currency)), `${value} ${currency}`).toBe(
+        toCurrency(value, currency).toFixed(minorUnits(currency)),
+      );
+    }
+  });
+
+  it('carries all the way when every digit is a nine', () => {
+    expect(roundDecimalString('9.999', 2)).toBe('10.00');
+    expect(roundDecimalString('99.995', 2)).toBe('100.00');
+  });
+
+  it('uses the currency’s own minor unit', () => {
+    expect(formatMoney('1234.5', 'SDG')).toBe('1,234.50');
+    expect(formatMoney('1234.5', 'KWD')).toBe('1,234.500');
+    expect(formatMoney('1234.5', 'JPY')).toBe('1,235');
+    // An unknown code falls back to two, which is the common case and is
+    // never silently wrong by more than a rounding.
+    expect(formatMoney('1234.5', 'XYZ')).toBe('1,234.50');
+  });
+
+  it('groups the whole part and never the fraction', () => {
+    expect(formatMoney('1200000', 'SDG')).toBe('1,200,000.00');
+    expect(formatMoney('999', 'SDG')).toBe('999.00');
+    expect(formatMoney('1000', 'KWD')).toBe('1,000.000');
+  });
+
+  it('keeps the sign in front of the digits, and never prints minus zero', () => {
+    expect(formatMoney('-1234.5', 'SDG')).toBe('-1,234.50');
+    expect(roundDecimalString('-0.001', 2)).toBe('0.00');
+  });
+
+  it('formats a storage-scale string without changing its value', () => {
+    // What actually crosses the wire from a server action: numeric(19,4).
+    expect(formatMoney('1050000.0000', 'SDG')).toBe('1,050,000.00');
+    expect(formatMoney('0.0000', 'SDG')).toBe('0.00');
   });
 });

@@ -48,9 +48,13 @@ import type { PermissionKey } from '@/lib/auth/permissions';
  * access control that looks right in a demonstration and is not one.
  */
 
-/** The build phase that delivers a screen. D1 is this phase; the rest name
- *  what a user is waiting for rather than pretending it exists. */
+/** The build phase that delivers a screen. The rest name what a user is
+ *  waiting for rather than pretending it exists. */
 export type ConsolePhase = 'D1' | 'D2' | 'D3' | 'D4' | 'D5';
+
+/** Phases whose screens exist. An item outside this set renders as a name and
+ *  a phase rather than a link to a 404. */
+export const BUILT_PHASES: ReadonlySet<ConsolePhase> = new Set<ConsolePhase>(['D1', 'D3']);
 
 export interface ConsoleItem {
   /** Message key under `console.items`. */
@@ -60,6 +64,15 @@ export interface ConsoleItem {
   /** Held **any** of these and the item is visible and the route reachable. */
   anyOf: readonly PermissionKey[];
   phase: ConsolePhase;
+  /**
+   * A dynamic sub-route belonging to this screen — `registry/students/[id]`.
+   * Declared rather than inferred, so the guard covers it and the structural
+   * test finds it. It carries the item's own permissions: a detail page is
+   * the same screen with one row selected, and giving it a looser rule than
+   * the list it came from is how a "read" permission turns into a way to
+   * enumerate.
+   */
+  detail?: string;
 }
 
 export interface ConsoleSection {
@@ -93,9 +106,9 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
     key: 'registry',
     path: 'registry',
     items: [
-      { key: 'students', path: 'registry/students', anyOf: ['student.read', 'student.manage'], phase: 'D3' },
+      { key: 'students', path: 'registry/students', anyOf: ['student.read', 'student.manage'], phase: 'D3', detail: 'registry/students/[id]' },
       { key: 'registrationDesk', path: 'registry/register', anyOf: ['registration.create'], phase: 'D3' },
-      { key: 'registrations', path: 'registry/registrations', anyOf: ['registration.read'], phase: 'D3' },
+      { key: 'registrations', path: 'registry/registrations', anyOf: ['registration.read'], phase: 'D3', detail: 'registry/registrations/[id]' },
       { key: 'holds', path: 'registry/holds', anyOf: ['hold.manage'], phase: 'D3' },
       { key: 'lifecycle', path: 'registry/lifecycle', anyOf: ['student.status', 'registration.transfer'], phase: 'D3' },
       { key: 'admissions', path: 'registry/admissions', anyOf: ['application.read', 'application.decide', 'application.offer'], phase: 'D4' },
@@ -173,6 +186,11 @@ export const CONSOLE_ROUTES: readonly RouteRule[] = [
     anyOf: [...new Set(s.items.flatMap((i) => i.anyOf))],
   })),
   ...CONSOLE_SECTIONS.flatMap((s) => s.items.map((i) => ({ path: i.path, anyOf: i.anyOf }))),
+  ...CONSOLE_SECTIONS.flatMap((s) =>
+    s.items
+      .filter((i) => i.detail)
+      .map((i) => ({ path: i.detail!, anyOf: i.anyOf })),
+  ),
 ];
 
 const ROUTE_BY_PATH = new Map(CONSOLE_ROUTES.map((r) => [r.path, r]));
@@ -222,7 +240,7 @@ export function navigationFor(held: ReadonlySet<PermissionKey>): VisibleSection[
   for (const section of CONSOLE_SECTIONS) {
     const items = section.items
       .filter((i) => satisfies(held, i.anyOf))
-      .map((i) => ({ ...i, built: i.phase === 'D1' }));
+      .map((i) => ({ ...i, built: BUILT_PHASES.has(i.phase) }));
     if (items.length > 0) out.push({ key: section.key, path: section.path, items });
   }
   return out;

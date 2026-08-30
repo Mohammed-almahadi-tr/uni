@@ -31,25 +31,12 @@ export type MoneyInput = string | number | Prisma.Decimal;
 export const SCALE = 4;
 
 /** Currencies are rounded to their own minor unit for presentation and for
- *  settlement, which is not always 2. */
-const CURRENCY_MINOR_UNITS: Record<string, number> = {
-  SDG: 2,
-  USD: 2,
-  EUR: 2,
-  SAR: 2,
-  AED: 2,
-  EGP: 2,
-  GBP: 2,
-  KWD: 3,
-  BHD: 3,
-  OMR: 3,
-  JOD: 3,
-  JPY: 0,
-};
-
-export function minorUnits(currency: string): number {
-  return CURRENCY_MINOR_UNITS[currency.toUpperCase()] ?? 2;
-}
+ *  settlement, which is not always 2. The table lives in `currency.ts` so the
+ *  browser can read it without pulling the Decimal library in with it — one
+ *  table, two callers, no chance of the display disagreeing with the
+ *  settlement. */
+export { minorUnits, CURRENCY_MINOR_UNITS } from './currency';
+import { minorUnits } from './currency';
 
 /**
  * The single rounding policy. Half-up (away from zero), matching the

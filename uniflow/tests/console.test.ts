@@ -1,8 +1,9 @@
-import { readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { disconnectAll, makePrincipal, makeUniversity, type University } from './helpers';
 import {
+  BUILT_PHASES,
   CONSOLE_ROUTES,
   CONSOLE_SECTIONS,
   navigationFor,
@@ -16,7 +17,12 @@ import { sessionServes } from '@/lib/console/tenancy';
 import { addDomain, resolveTenantByHost } from '@/lib/cms/hosts';
 import { login, resolvePrincipal } from '@/lib/auth/login';
 import { provisionTenant, syncPermissions } from '@/lib/auth/provisioning';
-import { DEFAULT_ROLES, isPermissionKey, type PermissionKey } from '@/lib/auth/permissions';
+import {
+  DEFAULT_ROLES,
+  isPermissionKey,
+  PERMISSION_KEYS,
+  type PermissionKey,
+} from '@/lib/auth/permissions';
 
 /**
  * The staff console shell (Track D1).
@@ -216,9 +222,13 @@ describe('navigation is generated from the permission set', () => {
     const nav = navigationFor(new Set(DEFAULT_ROLES.Registrar.permissions));
     const items = nav.flatMap((s) => s.items);
     expect(items.length).toBeGreaterThan(0);
-    // D1 ships the shell; every screen behind it belongs to a later phase and
-    // says so rather than linking nowhere.
-    expect(items.every((i) => i.built === (i.phase === 'D1'))).toBe(true);
+    // A screen is a link when the phase that builds it has landed, and a name
+    // with a phase against it when it has not. `BUILT_PHASES` is the one place
+    // that changes as Track D proceeds.
+    expect(items.every((i) => i.built === BUILT_PHASES.has(i.phase))).toBe(true);
+    // …and there is still something waiting, or this test has stopped saying
+    // anything.
+    expect(items.some((i) => !i.built)).toBe(true);
   });
 
   it('lets the console root through on authentication alone', () => {
@@ -369,5 +379,111 @@ describe('the shipped roles are usable', () => {
         }
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D3: the screens that now exist
+// ---------------------------------------------------------------------------
+
+describe('the registry screens are declared and reachable', () => {
+  it('gives a detail route the same permissions as the list it came from', () => {
+    // A detail page is the same screen with one row selected. Giving it a
+    // looser rule than its list is how a "read" permission turns into a way
+    // to enumerate by guessing identifiers.
+    for (const section of CONSOLE_SECTIONS) {
+      for (const item of section.items) {
+        if (!item.detail) continue;
+        expect(item.detail.startsWith(`${item.path}/`)).toBe(true);
+        expect(ruleFor(item.detail)).not.toBeNull();
+        expect(new Set(ruleFor(item.detail)!.anyOf)).toEqual(new Set(item.anyOf));
+      }
+    }
+  });
+
+  it('has a page on disk for every screen it says is built', () => {
+    const root = resolve(__dirname, '..', 'src', 'app', '[locale]', 'console');
+    const exists = (p: string) => existsSync(join(root, ...p.split('/'), 'page.tsx'));
+
+    const built = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) =>
+      BUILT_PHASES.has(i.phase),
+    );
+    expect(built.length).toBeGreaterThan(0);
+
+    for (const item of built) {
+      expect(exists(item.path), `${item.path} claims to be built`).toBe(true);
+      if (item.detail) {
+        expect(exists(item.detail), `${item.detail} claims to be built`).toBe(true);
+      }
+    }
+  });
+
+  it('does not link to a screen that has no page', () => {
+    // The inverse of the test above, and the one that matters to a user: an
+    // item is a link only when its page exists, so nothing on the console
+    // leads to a 404.
+    const root = resolve(__dirname, '..', 'src', 'app', '[locale]', 'console');
+    const nav = navigationFor(new Set(PERMISSION_KEYS));
+    for (const section of nav) {
+      for (const item of section.items) {
+        if (!item.built) continue;
+        expect(existsSync(join(root, ...item.path.split('/'), 'page.tsx'))).toBe(true);
+      }
+    }
+  });
+
+  it('separates looking at a student from registering one', () => {
+    // A dean reads the directory; a registrar works the desk. The legacy
+    // build had one privilege column and never read it, so both were the
+    // same person by default.
+    const reader = new Set<PermissionKey>(['student.read', 'registration.read']);
+    const registrar = new Set<PermissionKey>([
+      'student.read',
+      'registration.read',
+      'registration.create',
+    ]);
+
+    const readerItems = navigationFor(reader).flatMap((s) => s.items.map((i) => i.key));
+    const registrarItems = navigationFor(registrar).flatMap((s) => s.items.map((i) => i.key));
+
+    expect(readerItems).toContain('students');
+    expect(readerItems).not.toContain('registrationDesk');
+    expect(registrarItems).toContain('registrationDesk');
+  });
+
+  it('keeps holds, standing and medical behind their own permissions', () => {
+    const base = new Set<PermissionKey>(['student.read']);
+    const items = navigationFor(base).flatMap((s) => s.items.map((i) => i.key));
+    expect(items).not.toContain('holds');
+    expect(items).not.toContain('lifecycle');
+    expect(items).not.toContain('medical');
+    expect(items).not.toContain('documents');
+
+    expect(
+      navigationFor(new Set<PermissionKey>(['hold.manage']))
+        .flatMap((s) => s.items.map((i) => i.key)),
+    ).toContain('holds');
+    expect(
+      navigationFor(new Set<PermissionKey>(['document.verify']))
+        .flatMap((s) => s.items.map((i) => i.key)),
+    ).toContain('documents');
+  });
+
+  it('lets the Registrar reach every registry screen D3 built', () => {
+    const nav = navigationFor(new Set(DEFAULT_ROLES.Registrar.permissions));
+    const registry = nav.find((s) => s.key === 'registry');
+    expect(registry).toBeDefined();
+    const built = registry!.items.filter((i) => i.built).map((i) => i.key);
+    expect(built).toEqual(
+      expect.arrayContaining([
+        'students',
+        'registrationDesk',
+        'registrations',
+        'holds',
+        'lifecycle',
+        'documents',
+        'medical',
+      ]),
+    );
   });
 });
