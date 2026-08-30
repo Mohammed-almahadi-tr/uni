@@ -31,6 +31,9 @@ import {
   applyCreditBalance,
   assignTill,
   cancelReceipt,
+  cashierDaySheet,
+  previewAllocation,
+  receiptRegister,
   ReceiptError,
   takeReceipt,
 } from '@/lib/cashier/receipt';
@@ -1247,5 +1250,315 @@ describe('the database refuses what the application forgets', () => {
     expect(seen.students).toBe(0);
     expect(seen.charges).toBe(0);
     expect(seen.receipts).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// What the desk shows before it takes the money (Track D2)
+// ---------------------------------------------------------------------------
+
+/**
+ * The cashier desk's whole claim is that the split it displays — this much
+ * settles charges, this much becomes a credit balance — is computed by the
+ * code that will do the saving. These tests are that claim, stated as an
+ * equality between what `previewAllocation` says and what `takeReceipt` does.
+ *
+ * The legacy desk could not make the claim, because it had nothing to
+ * allocate against: the grid was two hardcoded rows and there was no charge
+ * entity, so a receipt was credited whole against a student's *name*.
+ */
+describe('the cashier desk previews exactly what it will do', () => {
+  it('proposes the same oldest-first plan the receipt then follows', async () => {
+    const studentId = await newStudent('Preview Student');
+    await raiseCharges(registrar, {
+      studentId,
+      docDate: JAN,
+      termLabel: '2026/1',
+      lines: [{ feeItemId: uni.feeItems.REGISTRATION, grossAmount: '500', dueDate: JAN }],
+    });
+    await raiseCharges(registrar, {
+      studentId,
+      docDate: FEB,
+      termLabel: '2026/1',
+      lines: [{ feeItemId: uni.feeItems.LIBRARY, grossAmount: '300', dueDate: FEB }],
+    });
+
+    // 600 covers the older charge whole and part of the newer one.
+    const preview = await previewAllocation(cashier, studentId, '600');
+    expect(preview.charges).toHaveLength(2);
+    expect(preview.allocated).toBe('600.0000');
+    expect(preview.unallocated).toBe('0.0000');
+    expect(preview.plan.map((p) => p.amount)).toEqual(['500.0000', '100.0000']);
+
+    const taken = await takeReceipt(
+      cashier,
+      { studentId, docDate: MAR, channel: 'CASH', amount: '600' },
+      key(),
+    );
+
+    expect(taken.allocated).toBe(preview.allocated);
+    expect(taken.unallocated).toBe(preview.unallocated);
+    expect(taken.settledCharges).toEqual(
+      preview.plan.map((p) => ({ chargeId: p.chargeId, amount: p.amount })),
+    );
+  });
+
+  it('shows money beyond the debt as a credit balance rather than as payment', async () => {
+    // The distinction the legacy chart could not express: it had no
+    // overpayment liability, so paying too much produced a negative
+    // receivable — a liability reported as an asset.
+    const studentId = await newStudent('Overpaying Student');
+    await raiseCharges(registrar, {
+      studentId,
+      docDate: JAN,
+      lines: [{ feeItemId: uni.feeItems.REGISTRATION, grossAmount: '500' }],
+    });
+
+    const preview = await previewAllocation(cashier, studentId, '800');
+    expect(preview.allocated).toBe('500.0000');
+    expect(preview.unallocated).toBe('300.0000');
+
+    const taken = await takeReceipt(
+      cashier,
+      { studentId, docDate: JAN, channel: 'CASH', amount: '800' },
+      key(),
+    );
+    expect(taken.unallocated).toBe('300.0000');
+
+    const balance = await studentBalance(cashier, studentId);
+    expect(balance.outstanding).toBe('0.0000');
+    expect(balance.creditBalance).toBe('300.0000');
+  });
+
+  it('honours an allocation the cashier typed, and refuses one that overpays a charge', async () => {
+    const studentId = await newStudent('Directed Student');
+    await raiseCharges(registrar, {
+      studentId,
+      docDate: JAN,
+      lines: [
+        { feeItemId: uni.feeItems.REGISTRATION, grossAmount: '500', dueDate: JAN },
+        { feeItemId: uni.feeItems.LIBRARY, grossAmount: '300', dueDate: JAN },
+      ],
+    });
+    const listed = await previewAllocation(cashier, studentId, 0);
+    const library = listed.charges.find((c) => c.code === 'LIBRARY')!;
+
+    // Straight past the older charge, at the cashier's direction.
+    const directed = await previewAllocation(cashier, studentId, '300', [
+      { chargeId: library.chargeId, amount: '300' },
+    ]);
+    expect(directed.plan).toHaveLength(1);
+    expect(directed.plan[0].chargeId).toBe(library.chargeId);
+
+    await expect(
+      previewAllocation(cashier, studentId, '400', [
+        { chargeId: library.chargeId, amount: '400' },
+      ]),
+    ).rejects.toThrow(/overpay/i);
+  });
+
+  it('proposes nothing against an amount nobody has typed', async () => {
+    // The opening view of the screen: the charges are listed, and no figure
+    // is proposed, because a proposal against an unentered amount is a number
+    // waiting to be misread.
+    const studentId = await newStudent('Opening Student');
+    await raiseCharges(registrar, {
+      studentId,
+      docDate: JAN,
+      lines: [{ feeItemId: uni.feeItems.REGISTRATION, grossAmount: '500' }],
+    });
+
+    const opening = await previewAllocation(cashier, studentId, 0);
+    expect(opening.charges).toHaveLength(1);
+    expect(opening.plan).toEqual([]);
+    expect(opening.allocated).toBe('0.0000');
+  });
+
+  it('lists what is left on a part-paid charge, not what it started at', async () => {
+    // The desk is read after money has already moved. A charge showing its
+    // original figure invites a second full payment against a debt that is
+    // half settled — and the legacy screen could not have shown either
+    // figure, because the balance it displayed came from a `Remain` column
+    // that whichever screen touched last had rewritten.
+    const studentId = await newStudent('Part Paid Student');
+    await raiseCharges(registrar, {
+      studentId,
+      docDate: JAN,
+      lines: [{ feeItemId: uni.feeItems.REGISTRATION, grossAmount: '500', dueDate: JAN }],
+    });
+
+    await takeReceipt(
+      cashier,
+      { studentId, docDate: JAN, channel: 'CASH', amount: '200' },
+      key(),
+    );
+
+    const preview = await previewAllocation(cashier, studentId, '500');
+    expect(preview.charges).toHaveLength(1);
+    expect(preview.charges[0].outstanding).toBe('300.0000');
+    expect(preview.allocated).toBe('300.0000');
+    expect(preview.unallocated).toBe('200.0000');
+  });
+
+  it('drops a charge from the desk once it is settled', async () => {
+    const studentId = await newStudent('Settled Student');
+    await raiseCharges(registrar, {
+      studentId,
+      docDate: JAN,
+      lines: [{ feeItemId: uni.feeItems.REGISTRATION, grossAmount: '500', dueDate: JAN }],
+    });
+    await takeReceipt(
+      cashier,
+      { studentId, docDate: JAN, channel: 'CASH', amount: '500' },
+      key(),
+    );
+
+    const preview = await previewAllocation(cashier, studentId, 0);
+    expect(preview.charges).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The day sheet (Track D2)
+// ---------------------------------------------------------------------------
+
+describe('a cashier’s day sheet', () => {
+  it('counts this cashier’s live receipts and nobody else’s', async () => {
+    // The question is "who is short today", and the legacy answer had to be
+    // reconstructed by grouping on a `UserName` column, because every
+    // cashier's cash posted to one account literally called "Cash on Hand".
+    const other = await makePrincipal(uni.tenantId, ['student.read', 'receipt.create'], {
+      name: 'cashier2',
+    });
+    await assignTill(admin, other.userId, uni.accounts['11111']);
+
+    const day = new Date(Date.UTC(2026, 2, 20));
+    const mine = await newStudent('Day Sheet A');
+    const theirs = await newStudent('Day Sheet B');
+
+    await takeReceipt(
+      cashier,
+      { studentId: mine, docDate: day, channel: 'CASH', amount: '250' },
+      key(),
+    );
+    await takeReceipt(
+      cashier,
+      { studentId: mine, docDate: day, channel: 'BANK_TRANSFER', amount: '400' },
+      key(),
+    );
+    await takeReceipt(
+      other,
+      { studentId: theirs, docDate: day, channel: 'CASH', amount: '900' },
+      key(),
+    );
+
+    const sheet = await cashierDaySheet(cashier, { on: day });
+    expect(sheet.total).toBe('650.0000');
+    expect(sheet.cashTotal).toBe('250.0000');
+    expect(sheet.till).not.toBeNull();
+    expect(new Set(sheet.byChannel.map((b) => b.channel))).toEqual(
+      new Set(['CASH', 'BANK_TRANSFER']),
+    );
+
+    const theirSheet = await cashierDaySheet(other, { on: day });
+    expect(theirSheet.total).toBe('900.0000');
+  });
+
+  it('stops counting a receipt that was cancelled, and says how many', async () => {
+    const day = new Date(Date.UTC(2026, 2, 21));
+    const studentId = await newStudent('Cancelled Day');
+    const taken = await takeReceipt(
+      cashier,
+      { studentId, docDate: day, channel: 'CASH', amount: '120' },
+      key(),
+    );
+    await cancelReceipt(supervisor, taken.receiptId, 'Counted twice at the counter', {
+      on: day,
+    });
+
+    const sheet = await cashierDaySheet(cashier, { on: day });
+    expect(sheet.total).toBe('0.0000');
+    expect(sheet.cancelledCount).toBe(1);
+    expect(sheet.cancelledTotal).toBe('120.0000');
+  });
+
+  it('will not show one cashier another cashier’s day without a reporting permission', async () => {
+    const nosy = await makePrincipal(uni.tenantId, ['student.read', 'receipt.create'], {
+      name: 'nosy',
+    });
+    await expect(
+      cashierDaySheet(nosy, { userId: cashier.userId }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    // A supervisor holding `report.financial` may.
+    await expect(
+      cashierDaySheet(controller, { userId: cashier.userId }),
+    ).resolves.toMatchObject({ cashierName: 'cashier' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The register (Track D2)
+// ---------------------------------------------------------------------------
+
+describe('the receipt register', () => {
+  it('keeps a cancelled receipt in the list rather than losing it', async () => {
+    // A gap in a receipt book is a question an auditor asks. The legacy
+    // system had no cancellation at all: a receipt was two rows in
+    // `Transactionees` and undoing one meant deleting them.
+    const day = new Date(Date.UTC(2026, 2, 22));
+    const studentId = await newStudent('Register Student');
+    const taken = await takeReceipt(
+      cashier,
+      { studentId, docDate: day, channel: 'CASH', amount: '75' },
+      key(),
+    );
+    await cancelReceipt(supervisor, taken.receiptId, 'Wrong student', { on: day });
+
+    const rows = await receiptRegister(cashier, { studentId });
+    const row = rows.find((r) => r.id === taken.receiptId);
+    expect(row).toBeDefined();
+    expect(row!.cancelledAt).not.toBeNull();
+    expect(row!.receiptNo).toBe(taken.receiptNo);
+  });
+
+  it('does not offer cancellation on a receipt issued before today', async () => {
+    // `cancelReceipt` refuses anything but the day of issue; the register says
+    // so in advance rather than presenting a button the module will turn down.
+    //
+    // Only the negative is asserted here. The positive would need a receipt
+    // dated today, and this fixture's open periods are January to March 2026,
+    // so posting one is impossible by design — which is the period lock doing
+    // its job. That the module accepts a same-day cancellation is proved
+    // above, in "cancelling a receipt".
+    const studentId = await newStudent('Yesterday Student');
+    const old = await takeReceipt(
+      cashier,
+      { studentId, docDate: JAN, channel: 'CASH', amount: '60' },
+      key(),
+    );
+
+    const rows = await receiptRegister(cashier, { studentId });
+    expect(rows.find((r) => r.id === old.receiptId)!.cancellableToday).toBe(false);
+  });
+
+  it('shows a cashier their own takings by default and everyone’s on request', async () => {
+    const solo = await makePrincipal(uni.tenantId, ['student.read', 'receipt.create'], {
+      name: 'solo',
+    });
+    await assignTill(admin, solo.userId, uni.accounts['11111']);
+    const studentId = await newStudent('Scope Student');
+    await takeReceipt(
+      solo,
+      { studentId, docDate: MAR, channel: 'CASH', amount: '45' },
+      key(),
+    );
+
+    const own = await receiptRegister(solo, { mine: true });
+    expect(own.length).toBeGreaterThan(0);
+    expect(own.every((r) => r.cashierName === 'solo')).toBe(true);
+
+    const all = await receiptRegister(solo, { studentId });
+    expect(all.length).toBeGreaterThanOrEqual(own.length ? 1 : 0);
   });
 });

@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**882 tests pass across 25 suites; typecheck, lint and production build are all
+**902 tests pass across 25 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -242,6 +242,12 @@ every tenant's rows. There is now a sweep over `pg_class` that fails if any
 table in `public` lacks row-level security and a policy, with two names
 declared global on purpose (`permissions`, `_prisma_migrations`).
 
+**Deferred to the console, and since built:** the voucher grid and the
+maker-checker queue. **D2** builds both — with the running balance computed by
+`summariseLines` on the server rather than by the grid, which is the specific
+thing `frmMakeVoucher` got wrong. Attachments are the exception and remain
+unbuilt; see §8.1.
+
 ---
 
 ### A3 — Fee Catalog, Student AR & Cashiering · complete
@@ -311,6 +317,12 @@ Worth watching for elsewhere: the only symptom is a `DeprecationWarning` from
 | Automatic late fees (REQ-CSH-02) | The durable job runner it needed now exists (A5). The `LATE_FEE` catalog item and the overdue query are in place; only the schedule that raises it is missing |
 | Refund disbursement (REQ-FEE-03) | The payment-voucher workflow it follows now exists (A6); a refund is a payment voucher against a student rather than a vendor. The withdrawal refund *policy* is a Track B lifecycle concern |
 
+**Deferred to the console, and since built:** the cashier desk, the receipt
+register and till assignment. **D2** builds all three. The one item §8 listed
+against D2 that A3 has no function for is the **shift close**, which §14
+defers by decision; D2 ships a day sheet instead and the finding is recorded
+in §8.1.
+
 ---
 
 ### A4 — Cheque Clearing Pipeline · complete
@@ -369,6 +381,11 @@ pipeline rather than fail it.
 the cash-controls module listed under "recommended, not scheduled" in SRS §7.
 The clearing side is complete without it; reconciliation automates the reading
 of the advice, not the accounting for it.
+
+**Deferred to the console, and since built:** the portfolio, the deposit and
+clearance batches, the return with its bank reason and optional fee, and the
+repeat-drawer report. **D2** builds all five, and the transition history it
+shows is the thing the legacy boolean could not have — see §8.1.
 
 ---
 
@@ -973,7 +990,7 @@ gantt
 
     section Track D — Staff Console
     Console shell, session & permission navigation  :done, d1, after c1 b6, 6d
-    Finance desk — cashier, cheques, vouchers       :d2, after d1, 10d
+    Finance desk — cashier, cheques, vouchers       :done, d2, after d1, 10d
     Registration desk, holds, withdrawal & transfer :crit, done, d3, after d1, 9d
     Back office — academic, admissions, P2P, sponsors :d4, after d1, 12d
     Reports & the print surface                     :d5, after d1, 8d
@@ -2233,7 +2250,11 @@ adds forms over them and nothing else.
 and cover photographs are stored as URLs, and the bytes are expected in the
 same object store as voucher attachments (A2) and student documents (B3) —
 none of which has its upload endpoint yet either. It is one piece of work
-serving three phases and it belongs with whichever of them is scheduled first.
+serving four phases now — A2's voucher attachments, B3's student documents,
+this, and the photograph capture D3 shipped without — and it has stopped
+being a thing future phases want: **D2 and D3 have both now shipped a screen
+with a hole in it where an upload belongs.** It should be scheduled on its own
+rather than waiting for a phase to adopt it.
 Rich text in a post body is stored and rendered as plain paragraphs for the
 same reason the editor is deferred: HTML from an editor must be sanitised
 before it reaches a public page, and shipping the storage before the
@@ -2276,14 +2297,21 @@ does not see a Finance menu, and the route refuses them if they type the URL,
 because `requirePermission()` runs in the data access layer and the menu is
 only a convenience over it.
 
-**D2 · Finance Desk** — Cashier receipt capture with live allocation against
-outstanding charges, till assignment and end-of-shift close; the cheque
-pipeline's state transitions with their deposit and clearance dates; the
-journal voucher grid with running debit/credit balancing, attachments and
-draft save; and the maker-checker queue with rejection comments and MFA
-step-up at approval. These are the two screens the legacy system's cashiers
-spent the working day in — with the arithmetic no longer done in the
-operator's head, which is where A3 found it.
+**D2 · Finance Desk** *(built — see §8.1)* — Cashier receipt capture with live allocation
+against outstanding charges, till assignment and the cashier's **day sheet**;
+the cheque pipeline's state transitions with their deposit and clearance
+dates; the journal voucher grid with running debit/credit balancing and draft
+save; and the maker-checker queue with rejection comments and MFA step-up at
+approval. These are the two screens the legacy system's cashiers spent the
+working day in — with the arithmetic no longer done in the operator's head,
+which is where A3 found it.
+
+*This paragraph first read "end-of-shift close", which §14 defers by decision.
+A day sheet is a figure to count the drawer against; a close is a counted,
+asserted, retained record, and that is a business rule Track D does not
+write. Corrected during D2 — see the finding in §8.1. "Attachments" is
+likewise struck: the upload endpoint they need does not exist in any phase
+yet.*
 
 **D3 · Registration Desk** *(built — see §8.1)* — Student search across both keyboards; the
 registration wizard as **preview → discount → save**, showing the quote and
@@ -2579,6 +2607,215 @@ build in one pass.
   due dates and weights and B4 tested it; the desk does not offer one yet,
   because a plan is a conversation about dates that wants its own step rather
   than three more boxes on a pricing screen.
+
+### D2 — Finance Desk · complete
+
+The two screens the legacy system's cashiers spent the working day in, plus
+the two the accountants did — and the one nobody had, which is where a
+cashier's till is assigned.
+
+#### What was on the screen before
+
+Four handlers carry almost all of it. Each is quoted where the code that
+negates it lives, so the citation and the fix stay together.
+
+**The receipt.** `frmStudantReceiptVoucher.vb`, one Save button:
+
+```vb
+'Get Move No.
+cmd.CommandText = "Select IsNull(Max(MoveNo),0) From Transactionees " &
+                  "Where Year(TransDate)=Year(Getdate())"
+MoveNo = CInt(cmd.ExecuteScalar) + 1
+```
+([:366-367](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmStudantReceiptVoucher.vb#L366-L371))
+
+- **The number** is `MAX + 1` read inside the transaction. Two cashiers
+  pressing Save in the same second issue the same receipt number. The bill
+  number two lines below is allocated the same way.
+- **The date is discarded.** Line 266 builds `TransDate` as the string
+  `"N'dd/MM/yyyy 10:10:10'"` — day-first, with a fabricated time — and the
+  `INSERT` at :379-382 does not list a `TransDate` column at all. The date
+  picker on that form changes nothing; the ledger date is whenever the row
+  was written. The approvals form ([:957](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmApprovingVouchers.vb#L957))
+  builds the same literal as `MM/dd/yyyy`. Two screens in one application,
+  and they cannot both be right; for days below the thirteenth, neither
+  complains.
+- **The accounts are English strings.** `AddWithValue("@Acc4", "Cash on Hand")`
+  ([:424-434](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmStudantReceiptVoucher.vb#L424-L434)),
+  written into a chart whose commented-out predecessor in the same handler
+  used the Arabic branch — `"الاصول"`, `"مدينون(الطلاب)"` (:309-312).
+- **Every cashier shares one safe**, because that literal is the same for
+  everybody. "Who is short today" therefore had to be reconstructed by the
+  `IncomeListByCollecter` report from a `UserName` column holding whatever
+  had been typed at the login box.
+- **The grid is two hardcoded rows**, tuition and registration
+  ([:105-106](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmStudantReceiptVoucher.vb#L99-L116)),
+  bearing no relation to what the student was billed — because nothing billed
+  them. There was no charge, so there was nothing to allocate against, which
+  is why the balance lived in a `Remain` column.
+- **Money is a `Double`** parsed out of a string already formatted to two
+  places: `CDbl(row.Cells(5).Value)`.
+- **The receipt number is typed by the cashier** and checked with
+  `"… Where ReceiptNo=N'" & RecNo & "'"` (:69) — concatenated, and a
+  check-then-use race besides.
+
+**The cheque.** `frmCheqClearingSystem.vb` is 123 lines and contains the whole
+of the institution's cheque handling:
+
+```vb
+If CInt(Reader.Item("CheqClear")) = 0 Then
+    Status = "Rejected"
+ElseIf CInt(Reader.Item("CheqClear")) = 1 Then
+    Status = "Cleared"
+End If
+```
+([:29-34](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmCheqClearingSystem.vb#L29-L34))
+
+One boolean, two meanings. There is no third value, so **every cheque sitting
+in the drawer waiting for its due date is shown to staff as "Rejected"** —
+the same word as one the bank actually refused. The filter labelled *Pending*
+selects `CheqClear=0`, which is to say both. And the transition is a cell
+click running `Update Transactions Set CheqClear=1 Where TransNo=` (:77) and
+nothing else: no posting, no date, no reason, no actor. Clearing never moved
+the bank balance; bouncing never reinstated the debt. Both cells stay live on
+every row, so clicking *Rejected* on a cleared cheque silently un-clears it.
+A toggle, not a state machine.
+
+**The voucher.** `frmMakeVoucher.vb` computes its own balance and then tests
+the display:
+
+```vb
+Me.txtCrd.Text = Format(Crd, "##,###.##")
+...
+ElseIf CDbl(Me.txtCrd.Text - Me.txtDep.Text) <> 0 Then
+```
+([:24, 126](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmMakeVoucher.vb#L123-L128))
+
+The balance check subtracts one **text box** from another, and those boxes
+have already been through `Format(…, "##,###.##")`. A voucher whose two sides
+differ by a fraction of a piastre displays as balanced, passes, and is stored
+out of balance. `Crd` accumulates cell 9 — the column the `INSERT` writes to
+`TotalValueOut` — so the two totals are also labelled the wrong way round.
+
+And the narrative is lost outright:
+
+```vb
+cmd.Parameters.AddWithValue("@Descr",    Me.GridVouchers.Rows(i).Cells(6).Value)
+cmd.Parameters.AddWithValue("@StudName", Me.GridVouchers.Rows(i).Cells(6).Value)
+```
+([:154, 161](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmMakeVoucher.vb#L148-L168))
+
+The same cell twice. Cell 6 is the student name; the description the clerk
+typed is cell 8 and is never stored. **Every hand-typed voucher in that
+database has a student's name where its narrative should be.**
+
+**The approval.** `frmApprovingVouchers.vb` inserts the lines and then:
+
+```vb
+'Delete from Temp. Vouchers
+cmd.CommandText = "Delete From TempVouchers WHERE MoveNo=" &
+    Me.ListVouchers.SelectedItems(0).Text
+```
+([:989-991](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmApprovingVouchers.vb#L941-L991))
+
+No reviewer stage, no reject path, no comment, no record of who approved
+what — and the delete destroys the only evidence the voucher was ever
+reviewed. Anyone who could open the screen could approve their own work,
+because `Priv` was read at login and never consulted.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| **The cashier desk, price → allocate → take** | The allocation grid lists what the student actually owes, oldest due first, with a box per charge. Pressing *Price it* creates nothing |
+| **The split shown before the money is recorded** | This much settles charges, this much becomes a credit balance the institution owes back. The distinction the legacy chart could not express, having no overpayment liability and no control account |
+| **Preview and commit are the same code** | `previewAllocation` calls the same `outstandingCharges`, `fifoAllocation` and `explicitAllocation` that `takeReceipt` calls, in the same file. Proved by test as an equality between what the preview says and what the receipt does |
+| Nothing priced crosses the wire | The form carries the amount the cashier typed and the allocations they typed. Both are inputs; the server works out the rest again |
+| **The idempotency key is minted in the browser** | Once per receipt, held in state, resent unchanged on every retry until a receipt comes back. A cashier on a bad link presses Save, sees nothing, presses again — the ordinary condition at these campuses |
+| Apply a credit balance | No receipt and no number, because nothing entered the institution: the money was already here, in the overpayment liability |
+| **The day sheet, on the desk** | What this cashier has taken today by channel, the till account named, and the cash figure to count the drawer against. Underneath the desk rather than on a screen of its own — a cashier who has to navigate to see it does not look |
+| The receipt register | Cancelled and dishonoured receipts stay in the list, marked. Cancellation offered only inside the window `cancelReceipt` accepts, so the screen does not present a button the module will refuse |
+| **The cheque portfolio, one status at a time** | Because the status decides what may be done. In hand → to the bank. With the bank → cleared, or returned. There is no cell that means two things |
+| Deposits as batches | One slip, one voucher, matching `depositCheques` — the bank credits a deposit slip as a single item, and a ledger that cannot be tied back to the slip cannot be reconciled against the statement |
+| The bank's reason, verbatim and mandatory | Without it, repeat-drawer reporting is guesswork and the student has nothing to take back to their bank |
+| Both halves of a bounce shown | Debt reinstated **and** credit withdrawn. A bounce splits its debit the way the original receipt split its credit; showing one half leaves the two figures unreconcilable |
+| Repeat drawers (REQ-CHQ-03) | Grouped on the normalised drawer key, so a name spelled two ways in Arabic is one drawer |
+| **One cheque, every movement it made** | With the voucher each transition posted. No legacy counterpart exists, because there was nothing to show |
+| **The voucher grid's balance comes from the server** | `summariseLines` computes it, `updateDraft` returns it, `submitForReview` refuses on the same figures. One implementation — a grid that says *balanced* against a server that says *out by 0.01* is the worst available outcome |
+| Every line resubmitted on every change | Matching `updateDraft`, which replaces the set rather than patching it — which is what lets the document be frozen wholesale at submission |
+| Journal vouchers only | No type dropdown. Every other voucher type is produced by the module that owns the document it records; offering the choice would let a clerk file a hand-typed entry as something cashiering is supposed to have created |
+| Drafts are never removed from the list | Abandoned and rejected included. Enforced by trigger, not by this screen |
+| **The lines are on the approval queue** | Not behind a click. A reviewer who must open each voucher approves without looking, and the stage becomes a signature. Everything in the queue can already post, so *does this say what it should* is the only question left — and it cannot be answered from a description and a total |
+| The full transition history beside each one | Actor, comment, and both rejections and approvals |
+| Missing second factor answered with a link | Not a red box. The step-up is two fields away, and turning a control into an error message is how people learn to route around it |
+| **Till assignment** | New declaration: `finance/tills`, gated on `coa.manage` — the permission `assignTill` itself demands, rather than one that happens to overlap. It exists because the refusal it prevents happens at the counter with a student waiting |
+
+#### Two corrections to code already shipped
+
+**The section index disagreed with the sidebar.** `section-index.tsx` decided
+whether a screen was built with `item.phase === 'D1'`, hardcoded, while the
+navigation used `BUILT_PHASES`. So since D3 landed, all seven registry
+screens have been working links in the menu and greyed-out names on the
+Registry section page. Exactly the disagreement between two renderings of one
+declaration that `CONSOLE_ROUTES` exists to make impossible — and it slipped
+through because the structural tests check the *route table* against disk,
+not two consumers against each other. Fixed to read the same set.
+
+**`registrations[0]?.currency ?? 'SDG'`.** D3's lifecycle screen resolved the
+currency to format amounts in from the first registration it happened to
+have, falling back to a hardcoded Sudanese pound. Correct at both pilot
+institutions and silently wrong at the first one that banks in anything else —
+and the fallback fires whenever the list is empty, which is precisely when a
+student has no registrations. Replaced with `tenantCurrency()`, ungated
+because every screen that shows money needs it and the number of decimal
+places in a currency is not a secret.
+
+#### Findings taken back, not fixed here
+
+- **`cheque.cancel` is not a declared SoD conflict.** `cancelCheque`'s own
+  docstring said it was *"barred by the segregation matrix from being held
+  with `receipt.create`"*. It is not: the declared pair is
+  `receipt.create` × `cheque.manage`. No shipped role is affected —
+  `Cashier Supervisor` is the only holder of `cheque.cancel` and holds
+  `cheque.manage` with it, so the declared pair catches it — but a
+  hand-written role carrying `receipt.create` and `cheque.cancel` and nothing
+  else would be accepted today. **Against A2.** The docstring has been
+  corrected to say what is true and a test pins the current behaviour, so the
+  gap is visible rather than believed closed. Adding a conflict is a rule, and
+  §8 says Track D does not write those.
+- **The shift close does not exist, and §8 promised it.** D2's paragraph
+  above lists *"till assignment and end-of-shift close"* — but §14 defers
+  *"cashier shift open/close with denomination count and Z-report"* by
+  decision. The plan contradicted itself and this phase is where it surfaced.
+  D2 ships the **day sheet**: a running figure to count the drawer against,
+  computed from receipts, signed by nobody and stored nowhere. A close that
+  is counted, asserted, retained and compared is a business rule with an
+  entity behind it. **Against A3**, if §14's deferral is ever revisited.
+  §8's D2 paragraph has been corrected to say *day sheet*.
+- **`finance/payments` was declared D2 and is D4's.** It sits in the finance
+  menu and was phased by where it sits. §8 gives procure-to-pay *through
+  payment* to D4. Re-declared, with a test.
+
+#### Deferred, and why
+
+- **Voucher attachments.** `attachToDraft` and `MAX_ATTACHMENT_BYTES` exist
+  and are tested; the grid does not offer an upload, for the same reason D3
+  shipped without photograph capture — the object-storage endpoint does not
+  exist. One piece of work serving A2, B3 and D3, and it is now blocking
+  three phases rather than two.
+- **Replacing a bounced cheque.** `takeReceipt` accepts `replacesChequeId`
+  and the pipeline enforces that the cheque being replaced actually came
+  back. Offering it at the desk needs the student's returned cheques, and
+  reading the portfolio needs `cheque.manage` — which the segregation matrix
+  forbids a cashier from holding. It belongs on the cheques screen, beside
+  the bounce that created the gap, and lands with D4's back office.
+- **The printed receipt.** Prints from the browser today. Letterhead, page
+  setup and the signature block are D5's, alongside the voucher and the
+  registration card.
+- **Gateway settlement reconciliation** (REQ-CSH-05). A gateway receipt posts
+  to a bank account like a transfer; matching it against the provider's
+  settlement report waits on the provider adapters, which no phase owns yet.
+
 
 ---
 

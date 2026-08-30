@@ -258,3 +258,40 @@ export async function cashAccountOptions(principal: Principal): Promise<AccountO
     });
   });
 }
+
+export interface FeeItemOption {
+  id: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  /** Empty when the catalogue has no price for it — the fee matrix does. */
+  defaultAmount: string;
+}
+
+/**
+ * Fee items, for the one place D2 raises a charge: the returned-cheque fee.
+ *
+ * Gated on `charge.create`, which is what `bounceCheque` demands before it
+ * will raise the penalty — recording the bounce itself needs only
+ * `cheque.manage`. So the fee fields appear on the form for the people who
+ * may actually raise one, and the bounce is recordable by everybody who
+ * handles cheques whether or not the institution charges for it.
+ */
+export async function feeItemOptions(principal: Principal): Promise<FeeItemOption[]> {
+  requirePermission(principal, 'charge.create');
+
+  return withTenant(principal.tenantId, async (tx) => {
+    const rows = await tx.feeItem.findMany({
+      where: { tenantId: principal.tenantId, isActive: true },
+      orderBy: { code: 'asc' },
+      select: { id: true, code: true, nameAr: true, nameEn: true, defaultAmount: true },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      code: r.code,
+      nameAr: r.nameAr,
+      nameEn: r.nameEn,
+      defaultAmount: r.defaultAmount?.toFixed(4) ?? '',
+    }));
+  });
+}

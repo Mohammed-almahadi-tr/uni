@@ -19,6 +19,7 @@ import { login, resolvePrincipal } from '@/lib/auth/login';
 import { provisionTenant, syncPermissions } from '@/lib/auth/provisioning';
 import {
   DEFAULT_ROLES,
+  findSodViolations,
   isPermissionKey,
   PERMISSION_KEYS,
   type PermissionKey,
@@ -485,5 +486,129 @@ describe('the registry screens are declared and reachable', () => {
         'medical',
       ]),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D2: the finance desks
+// ---------------------------------------------------------------------------
+
+describe('the finance screens are declared and separated', () => {
+  it('gives the cashier the desk and the register, and nothing that checks work', () => {
+    // The shipped Cashier holds `receipt.create` and `voucher.read`. The
+    // segregation matrix forbids `receipt.cancel` alongside `receipt.create`,
+    // so a cashier reaches the register to see what they took and cannot
+    // cancel from it; and they see the voucher list without the queue that
+    // approves one.
+    const nav = navigationFor(new Set(DEFAULT_ROLES.Cashier.permissions));
+    const finance = nav.find((s) => s.key === 'finance')!;
+    const keys = finance.items.map((i) => i.key);
+
+    expect(keys).toContain('cashierDesk');
+    expect(keys).toContain('receipts');
+    expect(keys).toContain('vouchers');
+    expect(keys).not.toContain('approvals');
+    expect(keys).not.toContain('cheques');
+    expect(keys).not.toContain('tills');
+  });
+
+  it('keeps the till assignment on the permission `assignTill` actually demands', () => {
+    // The menu and the module name the same permission rather than two that
+    // happen to overlap today. A cashier assigning their own till would make
+    // the per-cashier safe meaningless.
+    expect(ruleFor('finance/tills')!.anyOf).toEqual(['coa.manage']);
+
+    const cashier = new Set<PermissionKey>(['receipt.create', 'student.read']);
+    expect(satisfies(cashier, ruleFor('finance/tills')!.anyOf)).toBe(false);
+
+    const accountant = new Set(DEFAULT_ROLES['Senior Accountant'].permissions);
+    expect(satisfies(accountant, ruleFor('finance/tills')!.anyOf)).toBe(true);
+  });
+
+  it('separates preparing a voucher from checking one, all the way to the menu', () => {
+    // The legacy build could not: `Priv` was read at login and never
+    // consulted, so anybody who opened frmApprovingVouchers could approve
+    // their own work.
+    const maker = navigationFor(new Set(DEFAULT_ROLES['Senior Accountant'].permissions))
+      .flatMap((s) => s.items.map((i) => i.key));
+    const reviewer = navigationFor(new Set(DEFAULT_ROLES['Financial Auditor'].permissions))
+      .flatMap((s) => s.items.map((i) => i.key));
+    const approver = navigationFor(new Set(DEFAULT_ROLES['Financial Controller'].permissions))
+      .flatMap((s) => s.items.map((i) => i.key));
+
+    expect(maker).toContain('vouchers');
+    expect(maker).not.toContain('approvals');
+    expect(reviewer).toContain('approvals');
+    expect(approver).toContain('approvals');
+    expect(approver).not.toContain('cashierDesk');
+  });
+
+  it('never lets one person hold both halves of a check', () => {
+    // The menu separation above is only presentation. This is the control:
+    // the matrix refuses the pair when the role is saved, not when it is used.
+    expect(findSodViolations(['voucher.create', 'voucher.approve']).length).toBeGreaterThan(0);
+    expect(findSodViolations(['receipt.create', 'receipt.cancel']).length).toBeGreaterThan(0);
+    expect(findSodViolations(['receipt.create', 'cheque.manage']).length).toBeGreaterThan(0);
+  });
+
+  it('bars taking a cheque and handing it back only by way of `cheque.manage`', () => {
+    // Written down because building the cheque screen turned up a comment in
+    // `pipeline.ts` claiming the matrix barred `receipt.create` with
+    // `cheque.cancel`. It does not — the declared pair is `cheque.manage`.
+    //
+    // No shipped role is affected: `Cashier Supervisor` is the only holder of
+    // `cheque.cancel` and holds `cheque.manage` with it, so the declared pair
+    // catches it. But a hand-written role carrying `receipt.create` and
+    // `cheque.cancel` and nothing else would be accepted today. Recorded as a
+    // finding against A2 rather than fixed here: adding a conflict is a rule,
+    // and Track D does not write those.
+    expect(findSodViolations(['receipt.create', 'cheque.cancel'])).toEqual([]);
+    expect(
+      findSodViolations(DEFAULT_ROLES['Cashier Supervisor'].permissions),
+    ).toEqual([]);
+    expect(DEFAULT_ROLES['Cashier Supervisor'].permissions).toContain('cheque.manage');
+  });
+
+  it('gives the cheque and voucher detail routes their list’s own permissions', () => {
+    for (const path of ['finance/cheques/[id]', 'finance/vouchers/[id]']) {
+      const detail = ruleFor(path);
+      const list = ruleFor(path.replace('/[id]', ''));
+      expect(detail, path).not.toBeNull();
+      expect(new Set(detail!.anyOf)).toEqual(new Set(list!.anyOf));
+    }
+  });
+
+  it('leaves supplier payments to the phase that builds procure-to-pay', () => {
+    // `finance/payments` sits in the finance menu and was declared D2 for
+    // that reason alone. §8 gives procure-to-pay *through payment* to D4, so
+    // the row now says what actually builds it — and the screen renders as a
+    // name with a phase against it rather than a link to nothing.
+    const item = CONSOLE_SECTIONS.find((s) => s.key === 'finance')!.items.find(
+      (i) => i.key === 'payments',
+    )!;
+    expect(item.phase).toBe('D4');
+    expect(BUILT_PHASES.has(item.phase)).toBe(false);
+  });
+
+  it('lets every finance screen D2 built be reached by somebody the roles ship', () => {
+    // A screen no shipped role can open is a screen nobody will find.
+    const built = CONSOLE_SECTIONS.find((s) => s.key === 'finance')!.items.filter((i) =>
+      BUILT_PHASES.has(i.phase),
+    );
+    expect(built.map((i) => i.key).sort()).toEqual([
+      'approvals',
+      'cashierDesk',
+      'cheques',
+      'receipts',
+      'tills',
+      'vouchers',
+    ]);
+
+    for (const item of built) {
+      const reachable = Object.values(DEFAULT_ROLES).some((role) =>
+        satisfies(new Set(role.permissions), item.anyOf),
+      );
+      expect(reachable, `${item.path} is unreachable by every shipped role`).toBe(true);
+    }
   });
 });

@@ -497,9 +497,15 @@ export async function bounceCheque(
  * Hand an unpresented cheque back to its drawer.
  *
  * Discretionary — the bank has not refused anything — so it demands a second
- * factor and is barred by the segregation matrix from being held with
- * `receipt.create`. Otherwise one person could take a cheque, hand it back,
- * and leave the student's account looking settled.
+ * factor, and it belongs with a supervisor rather than with whoever took the
+ * paper: one person who can both accept a cheque and withdraw it by their own
+ * decision controls the recognition and the un-recognition of the same
+ * payment.
+ *
+ * That separation is currently carried by `cheque.manage`, which the matrix
+ * *does* bar against `receipt.create`, and which every shipped holder of
+ * `cheque.cancel` also holds. `cheque.cancel` itself is not a declared
+ * conflict — see the finding recorded in plan §8.1 against A2.
  */
 export async function cancelCheque(
   principal: Principal,
