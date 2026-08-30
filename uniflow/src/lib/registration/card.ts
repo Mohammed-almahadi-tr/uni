@@ -101,9 +101,11 @@ export async function registrationCard(
       throw new RegistrationError('That registration does not belong to this university.');
     }
 
+    // The logo comes from tenant_branding (C1), not from a second column on
+    // the tenant row. One logo, one place it is set, one place it is read.
     const tenant = await tx.tenant.findUniqueOrThrow({
       where: { id: principal.tenantId },
-      select: { nameAr: true, nameEn: true, logoUrl: true },
+      select: { nameAr: true, nameEn: true, branding: { select: { logoUrl: true } } },
     });
 
     const lines = await tx.registrationLine.findMany({
@@ -119,7 +121,11 @@ export async function registrationCard(
       registrationNo: reg.registrationNo,
       status: reg.status,
       issuedOn: reg.registrationDate.toISOString().slice(0, 10),
-      university: tenant,
+      university: {
+        nameAr: tenant.nameAr,
+        nameEn: tenant.nameEn,
+        logoUrl: tenant.branding?.logoUrl ?? null,
+      },
       student: {
         studentNo: reg.student.studentNo,
         nameAr: reg.student.fullNameAr,

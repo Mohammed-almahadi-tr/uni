@@ -1,75 +1,148 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LedgerAmount, Money } from '@/components/ui/money';
-import { Button } from '@/components/ui/button';
-import { Link } from '@/i18n/navigation';
-import { directionOf } from '@/i18n/routing';
-import { spellMoney } from '@/lib/i18n/spell';
-import { formatDual } from '@/lib/i18n/calendar';
+import { headers } from 'next/headers';
+import { currentSite } from '@/lib/cms/request';
+import {
+  localeOf,
+  NoSiteConfigured,
+  pick,
+  SectionShell,
+  SiteFooter,
+  SiteHeader,
+} from '@/components/site/chrome';
+import {
+  CalendarSection,
+  CampusSection,
+  FacultiesSection,
+  Hero,
+  NewsSection,
+} from '@/components/site/sections';
 
 /**
- * Phase 0 shell.
+ * The landing page (SRS REQ-LP-02 to REQ-LP-06, Track C1).
  *
- * Not a product screen — a demonstration that the localisation layer works
- * end to end: RTL mirroring, Arabic typography, تفقيط, the dual calendar and
- * the ledger colour semantics. Track C replaces it with the real landing page.
+ * Replaces the Phase 0 localisation demonstration that stood here.
+ *
+ * The page is assembled from `landing_sections`: which sections appear, in
+ * what order, and under what headings is the tenant's, not this file's. What
+ * this file decides is how each section looks — and that is the same for
+ * every tenant, which is the point of a white-label product as opposed to a
+ * copy of the source tree per customer.
  */
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale } = await params;
-  setRequestLocale(locale);
-  const t = await getTranslations();
-  const dir = directionOf(locale);
-  const other = locale === 'ar' ? 'en' : 'ar';
-  const spellLocale = locale === 'ar' ? 'ar' : 'en';
+  const { locale: raw } = await params;
+  setRequestLocale(raw);
+  const locale = localeOf(raw);
 
-  const amount = '1234.56';
-  const currency = 'SDG';
-  const today = new Date();
+  const t = await getTranslations('site.sections');
+  const site = await currentSite();
+  if (!site) {
+    const h = await headers();
+    return <NoSiteConfigured host={h.get('x-forwarded-host') ?? h.get('host')} />;
+  }
+
+  const enabled = site.sections
+    .filter((s) => s.isEnabled)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  // A section's heading is the tenant's when they have set one, and the
+  // application's own translated default when they have not.
+  const headingFor = (
+    kind: string,
+    fallback: string,
+  ): { heading: string; blurb: string | null } => {
+    const s = site.sections.find((x) => x.kind === kind);
+    return {
+      heading: pick(locale, s?.headingAr, s?.headingEn) ?? fallback,
+      blurb: pick(locale, s?.blurbAr, s?.blurbEn) ?? null,
+    };
+  };
 
   return (
-    <main className="mx-auto w-full max-w-3xl p-6 md:p-10 space-y-6">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{t('app.name')}</h1>
-          <p className="text-sm text-muted-foreground">{t('app.tagline')}</p>
-        </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/" locale={other}>
-            {t('common.language')}: {other.toUpperCase()}
-          </Link>
-        </Button>
-      </header>
+    <>
+      <SiteHeader site={site} locale={locale} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('ledger.amountInWords')}</CardTitle>
-          <CardDescription>
-            dir=<code>{dir}</code> · {formatDual(today, { locale: spellLocale })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-baseline justify-between gap-4">
-            <span className="text-sm text-muted-foreground">{t('ledger.balance')}</span>
-            <Money amount={amount} currency={currency} showCode className="text-xl font-semibold" />
-          </div>
+      <main className="flex-1">
+        {enabled.map((section) => {
+          switch (section.kind) {
+            case 'HERO':
+              return <Hero key={section.kind} site={site} locale={locale} />;
 
-          {/* The control that stops a figure being altered after signature. */}
-          <p className="rounded-md bg-muted p-3 text-sm leading-relaxed">
-            {spellMoney(amount, currency, spellLocale)}
-          </p>
+            case 'ABOUT': {
+              const { heading, blurb } = headingFor(
+                'ABOUT',
+                t('about', { university: pick(locale, site.tenant.nameAr, site.tenant.nameEn) }),
+              );
+              if (!blurb) return null;
+              return (
+                <SectionShell key={section.kind} heading={heading}>
+                  <p className="max-w-3xl leading-relaxed text-muted-foreground">{blurb}</p>
+                </SectionShell>
+              );
+            }
 
-          <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
-            <div className="space-y-1">
-              <div className="text-xs text-muted-foreground">{t('ledger.totalDebit')}</div>
-              <LedgerAmount amount={amount} currency={currency} side="debit" className="font-semibold" />
-            </div>
-            <div className="space-y-1">
-              <div className="text-xs text-muted-foreground">{t('ledger.totalCredit')}</div>
-              <LedgerAmount amount={amount} currency={currency} side="credit" className="font-semibold" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </main>
+            case 'FACULTIES': {
+              const { heading, blurb } = headingFor('FACULTIES', t('faculties'));
+              return (
+                <FacultiesSection
+                  key={section.kind}
+                  faculties={site.faculties}
+                  locale={locale}
+                  heading={heading}
+                  blurb={blurb}
+                />
+              );
+            }
+
+            case 'NEWS': {
+              const { heading, blurb } = headingFor('NEWS', t('news'));
+              return (
+                <NewsSection
+                  key={section.kind}
+                  news={site.news}
+                  locale={locale}
+                  heading={heading}
+                  blurb={blurb}
+                />
+              );
+            }
+
+            case 'CALENDAR': {
+              const { heading, blurb } = headingFor('CALENDAR', t('calendar'));
+              return (
+                <CalendarSection
+                  key={section.kind}
+                  entries={site.calendar}
+                  locale={locale}
+                  heading={heading}
+                  blurb={blurb}
+                  limit={6}
+                />
+              );
+            }
+
+            case 'CAMPUS': {
+              const { heading, blurb } = headingFor('CAMPUS', t('campuses'));
+              return (
+                <CampusSection
+                  key={section.kind}
+                  site={site}
+                  locale={locale}
+                  heading={heading}
+                  blurb={blurb}
+                />
+              );
+            }
+
+            // CONTACT is a page of its own rather than a form embedded here:
+            // the enquiry form is the only public write path in the system and
+            // it gets its own route, its own server action and its own bounds.
+            default:
+              return null;
+          }
+        })}
+      </main>
+
+      <SiteFooter site={site} locale={locale} />
+    </>
   );
 }

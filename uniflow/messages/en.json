@@ -51,5 +51,72 @@
     "loading": "Loading…",
     "noResults": "No results",
     "language": "Language"
+  },
+  "site": {
+    "nav": {
+      "programmes": "Programmes",
+      "news": "News",
+      "calendar": "Calendar",
+      "contact": "Contact"
+    },
+    "sections": {
+      "about": "About {university}",
+      "faculties": "Faculties and programmes",
+      "news": "News and announcements",
+      "calendar": "Academic calendar",
+      "campuses": "Campuses"
+    },
+    "duration": {
+      "years": "{count, plural, one {# year} other {# years}}",
+      "terms": "{count, plural, one {# term} other {# terms}}"
+    },
+    "news": {
+      "news": "News",
+      "announcement": "Announcement",
+      "empty": "Nothing has been published yet.",
+      "archived": "This notice is out of date and is kept for reference."
+    },
+    "calendar": {
+      "blurb": "Semester dates and registration deadlines are read from the calendar the registration system itself enforces.",
+      "SEMESTER_START": "Semester start",
+      "SEMESTER_END": "Semester end",
+      "REGISTRATION_DEADLINE": "Registration deadline",
+      "EXAM": "Examinations",
+      "HOLIDAY": "Holiday",
+      "EVENT": "Event"
+    },
+    "programmes": {
+      "blurb": "Fees shown are the approved schedule for the current intake.",
+      "empty": "No programmes have been published yet.",
+      "overview": "Overview",
+      "career": "Career prospects",
+      "fees": "Fees",
+      "tuitionPerTerm": "Tuition per term",
+      "feesUnpublished": "Fees are not published for this intake — please contact the admissions office.",
+      "intake": "Intake {batch} · in force from"
+    },
+    "campus": {
+      "phone": "Phone",
+      "email": "Email",
+      "map": "View on map"
+    },
+    "contact": {
+      "title": "Contact us",
+      "name": "Name",
+      "email": "Email",
+      "phone": "Telephone",
+      "subject": "Subject",
+      "message": "Your message",
+      "reach": "Give an email address or a telephone number so we can reply.",
+      "send": "Send",
+      "sending": "Sending…",
+      "thanks": "Your message has reached us. We will reply shortly.",
+      "failed": "Your message could not be sent. Please try again."
+    },
+    "noSite": {
+      "title": "No site is configured at this address",
+      "body": "Nothing is published on {host}.",
+      "noHost": "This request did not carry a host we recognise."
+    }
   }
 }

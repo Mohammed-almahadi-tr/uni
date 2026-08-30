@@ -422,8 +422,6 @@ model Tenant {
   slug                         String   @unique
   nameEn                       String   @map("name_en")
   nameAr                       String   @map("name_ar")
-  logoUrl                      String?  @map("logo_url")
-  themeConfig                  Json?    @map("theme_config")
   /// The currency the books are kept in. Every balance check and every
   /// statement is expressed in this currency.
   functionalCurrency           String   @default("SDG") @map("functional_currency") @db.Char(3)
@@ -539,6 +537,17 @@ model Tenant {
   scholarshipSchemes ScholarshipScheme[]
   scholarshipAwards  ScholarshipAward[]
 
+  domains         TenantDomain[]
+  branding        TenantBranding?
+  socialLinks     TenantSocialLink[]
+  landingSections LandingSection[]
+  hero            HeroContent?
+  heroCtas        HeroCta[]
+  newsPosts       NewsPost[]
+  calendarEvents  CalendarEvent[]
+  campuses        Campus[]
+  inquiries       Inquiry[]
+
   @@map("tenants")
 }
 
@@ -636,6 +645,13 @@ model User {
   invoicesApproved    VendorInvoice[]       @relation("InvoiceApprover")
   paymentsDrafted     PaymentVoucher[]      @relation("PaymentCreator")
   paymentsApproved    PaymentVoucher[]      @relation("PaymentApprover")
+
+  brandingEdited   TenantBranding[] @relation("BrandingEditor")
+  heroEdited       HeroContent[]    @relation("HeroEditor")
+  postsAuthored    NewsPost[]       @relation("PostAuthor")
+  postsPublished   NewsPost[]       @relation("PostPublisher")
+  calendarAuthored CalendarEvent[]  @relation("CalendarAuthor")
+  inquiriesHandled Inquiry[]        @relation("InquiryHandler")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -1366,13 +1382,13 @@ model StudentCharge {
   dueDate   DateTime? @map("due_date") @db.Date
 
   /// Catalogue price before any discount.
-  grossAmount    Decimal @map("gross_amount") @db.Decimal(19, 4)
+  grossAmount     Decimal @map("gross_amount") @db.Decimal(19, 4)
   /// Scholarship or staff-child discount. Held as an expense, not netted off
   /// revenue, so discount exposure is reportable on its own line.
-  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(19, 4)
+  discountAmount  Decimal @default(0) @map("discount_amount") @db.Decimal(19, 4)
   /// What was billed: gross − discount. NOT what the student personally owes
   /// once a sponsor is involved — see `sponsoredAmount`.
-  netAmount      Decimal @map("net_amount") @db.Decimal(19, 4)
+  netAmount       Decimal @map("net_amount") @db.Decimal(19, 4)
   /// The part a sponsor is carrying (REQ-SPN-02, B6). Debited to Sponsor AR
   /// rather than Student AR, so the student's own debt on this charge is
   /// `netAmount - sponsoredAmount` and their statement shows only that.
@@ -1382,7 +1398,7 @@ model StudentCharge {
   sponsoredAmount Decimal @default(0) @map("sponsored_amount") @db.Decimal(19, 4)
   /// Maintained as receipts allocate against it. Never exceeds the student's
   /// own portion.
-  settledAmount  Decimal @default(0) @map("settled_amount") @db.Decimal(19, 4)
+  settledAmount   Decimal @default(0) @map("settled_amount") @db.Decimal(19, 4)
 
   /// True when billing credited unearned income rather than revenue.
   isDeferred       Boolean @default(false) @map("is_deferred")
@@ -1400,17 +1416,17 @@ model StudentCharge {
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student            Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  feeItem            FeeItem               @relation(fields: [feeItemId], references: [id])
-  posting            TransactionHeader     @relation("ChargePosting", fields: [postedHeaderId], references: [id])
-  reversal           TransactionHeader?    @relation("ChargeReversalPosting", fields: [reversalHeaderId], references: [id])
-  createdBy          User                  @relation("ChargeCreator", fields: [createdById], references: [id])
-  allocations        ReceiptAllocation[]
-  recognitions       RecognitionEntry[]
-  registration       SemesterRegistration? @relation(fields: [registrationId], references: [id])
-  registrationLine   RegistrationLine?     @relation("ChargeRegistrationLine")
-  sponsorships       ChargeSponsorship[]
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student          Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeItem          FeeItem               @relation(fields: [feeItemId], references: [id])
+  posting          TransactionHeader     @relation("ChargePosting", fields: [postedHeaderId], references: [id])
+  reversal         TransactionHeader?    @relation("ChargeReversalPosting", fields: [reversalHeaderId], references: [id])
+  createdBy        User                  @relation("ChargeCreator", fields: [createdById], references: [id])
+  allocations      ReceiptAllocation[]
+  recognitions     RecognitionEntry[]
+  registration     SemesterRegistration? @relation(fields: [registrationId], references: [id])
+  registrationLine RegistrationLine?     @relation("ChargeRegistrationLine")
+  sponsorships     ChargeSponsorship[]
 
   @@index([tenantId, studentId, reversedAt])
   @@index([tenantId, dueDate])
@@ -2586,6 +2602,17 @@ model Programme {
   creditsRequired Int?        @map("credits_required")
   isActive        Boolean     @default(true) @map("is_active")
 
+  /// Public catalogue (REQ-LP-03, C1). Defaults to false: a programme is not
+  /// published to prospective students merely because somebody created it,
+  /// and a half-configured programme on the public site is a commitment the
+  /// institution has not made. Publishing it requires both languages —
+  /// `chk_programme_public_bilingual`.
+  isPubliclyListed  Boolean @default(false) @map("is_publicly_listed")
+  overviewAr        String? @map("overview_ar")
+  overviewEn        String? @map("overview_en")
+  careerProspectsAr String? @map("career_prospects_ar")
+  careerProspectsEn String? @map("career_prospects_en")
+
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   faculty      Faculty       @relation(fields: [facultyId], references: [id])
   department   Department?   @relation(fields: [departmentId], references: [id])
@@ -2627,6 +2654,7 @@ model AcademicYear {
   registrations      SemesterRegistration[]
   scholarshipSchemes ScholarshipScheme[]
   scholarshipAwards  ScholarshipAward[]
+  calendarEvents     CalendarEvent[]
 
   @@unique([tenantId, code])
   @@index([tenantId, startDate])
@@ -3458,24 +3486,24 @@ model SemesterRegistration {
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  tenant              Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student             Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  programme           Programme                @relation(fields: [programmeId], references: [id])
-  batch               Batch                    @relation(fields: [batchId], references: [id])
-  admissionCategory   AdmissionCategory        @relation(fields: [admissionCategoryId], references: [id])
-  academicYear        AcademicYear             @relation(fields: [academicYearId], references: [id])
-  academicTerm        AcademicTerm             @relation(fields: [academicTermId], references: [id])
-  feeSchedule         FeeSchedule              @relation(fields: [feeScheduleId], references: [id])
-  discountScheme      ScholarshipScheme?       @relation(fields: [discountSchemeId], references: [id])
-  posting             TransactionHeader?       @relation("RegistrationPosting", fields: [postedHeaderId], references: [id])
-  reversal            TransactionHeader?       @relation("RegistrationReversal", fields: [reversalHeaderId], references: [id])
-  createdBy           User                     @relation("RegistrationCreator", fields: [createdById], references: [id])
-  discountApprovedBy  User?                    @relation("RegistrationDiscountApprover", fields: [discountApprovedById], references: [id])
-  cancelledBy         User?                    @relation("RegistrationCanceller", fields: [cancelledById], references: [id])
-  lines               RegistrationLine[]
-  charges             StudentCharge[]
-  transferReversedBy  StudentProgrammeHistory? @relation("TransferReversed")
-  transferRaisedBy    StudentProgrammeHistory? @relation("TransferRaised")
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student            Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  programme          Programme                @relation(fields: [programmeId], references: [id])
+  batch              Batch                    @relation(fields: [batchId], references: [id])
+  admissionCategory  AdmissionCategory        @relation(fields: [admissionCategoryId], references: [id])
+  academicYear       AcademicYear             @relation(fields: [academicYearId], references: [id])
+  academicTerm       AcademicTerm             @relation(fields: [academicTermId], references: [id])
+  feeSchedule        FeeSchedule              @relation(fields: [feeScheduleId], references: [id])
+  discountScheme     ScholarshipScheme?       @relation(fields: [discountSchemeId], references: [id])
+  posting            TransactionHeader?       @relation("RegistrationPosting", fields: [postedHeaderId], references: [id])
+  reversal           TransactionHeader?       @relation("RegistrationReversal", fields: [reversalHeaderId], references: [id])
+  createdBy          User                     @relation("RegistrationCreator", fields: [createdById], references: [id])
+  discountApprovedBy User?                    @relation("RegistrationDiscountApprover", fields: [discountApprovedById], references: [id])
+  cancelledBy        User?                    @relation("RegistrationCanceller", fields: [cancelledById], references: [id])
+  lines              RegistrationLine[]
+  charges            StudentCharge[]
+  transferReversedBy StudentProgrammeHistory? @relation("TransferReversed")
+  transferRaisedBy   StudentProgrammeHistory? @relation("TransferRaised")
 
   @@unique([tenantId, registrationNo])
   @@unique([tenantId, verifyToken])
@@ -4166,4 +4194,355 @@ model ScholarshipAward {
   @@index([tenantId, schemeId, status])
   @@index([tenantId, studentId, status])
   @@map("scholarship_awards")
+}
+
+// ===========================================================================
+// Track C1 — Theme engine, tenant hosts and the landing CMS
+// (SRS Module 1, REQ-LP-01, REQ-LP-02, REQ-LP-03, REQ-LP-05, REQ-LP-06)
+//
+// The legacy answer to white-labelling was to copy the source tree and swap
+// the bitmaps. Two copies survive in this repository and both still carry the
+// previous customer's identity: the Ribat build's main window is titled
+// "Oasis Computer Systems" (the vendor), and the Nile build's is titled
+// "الكلية التكنلوجية" — a third institution entirely. Branding that lives in
+// a compiled resource cannot be wrong per tenant, because there is only ever
+// one tenant per binary; it can only be wrong for everybody.
+// ===========================================================================
+
+/// A hostname that serves one tenant's public site.
+///
+/// `host` is globally unique, and that single constraint is what makes it
+/// impossible to serve one university's branding on another's address — the
+/// property the compiled-in approach could not even express.
+model TenantDomain {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  /// Lowercased, port stripped, trailing dot removed. Normalised on the way
+  /// in so the lookup is an equality test rather than a scan.
+  host     String @unique
+
+  /// The address to redirect to when a request arrives on one of the others.
+  /// One per tenant, by partial unique index.
+  isCanonical Boolean  @default(false) @map("is_canonical")
+  /// Set once the DNS record has been seen. An unverified host resolves
+  /// nothing — otherwise claiming a domain would be enough to be served on it.
+  isVerified  Boolean  @default(false) @map("is_verified")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_domains")
+}
+
+/// Where an institution's identity lives now: a row, not a resource compiled
+/// into an executable (REQ-LP-01).
+///
+/// Colours are stored as HSL *channels* rather than as hex strings, because
+/// the design system's tokens are channels and because a channel can be
+/// range-checked by the database while a free-text colour string cannot.
+model TenantBranding {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @unique @map("tenant_id") @db.Uuid
+
+  /// Short code as it appears on a certificate or an ID card — NC, RU.
+  shortCode String  @map("short_code")
+  mottoAr   String? @map("motto_ar")
+  mottoEn   String? @map("motto_en")
+
+  logoUrl     String? @map("logo_url")
+  /// Optional second logo for dark backgrounds. A single logo on a dark hero
+  /// is the most common white-label complaint there is.
+  logoDarkUrl String? @map("logo_dark_url")
+  faviconUrl  String? @map("favicon_url")
+
+  primaryH   Int @map("primary_h")
+  primaryS   Int @map("primary_s")
+  primaryL   Int @map("primary_l")
+  secondaryH Int @map("secondary_h")
+  secondaryS Int @map("secondary_s")
+  secondaryL Int @map("secondary_l")
+  accentH    Int @map("accent_h")
+  accentS    Int @map("accent_s")
+  accentL    Int @map("accent_l")
+
+  /// Typography. Named faces resolved against a shipped allow-list — a
+  /// free-text font name is a way to get arbitrary CSS onto the page.
+  headingFont String @default("Cairo") @map("heading_font")
+  bodyFont    String @default("Cairo") @map("body_font")
+
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedBy User?  @relation("BrandingEditor", fields: [updatedById], references: [id])
+
+  @@map("tenant_branding")
+}
+
+enum SocialPlatform {
+  FACEBOOK
+  X
+  INSTAGRAM
+  YOUTUBE
+  LINKEDIN
+  TELEGRAM
+  WHATSAPP
+  TIKTOK
+}
+
+model TenantSocialLink {
+  id        String         @id @default(uuid()) @db.Uuid
+  tenantId  String         @map("tenant_id") @db.Uuid
+  platform  SocialPlatform
+  url       String
+  sortOrder Int            @default(0) @map("sort_order")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, platform])
+  @@map("tenant_social_links")
+}
+
+/// The sections of the landing page, in order, each switchable off.
+enum LandingSectionKind {
+  HERO
+  ABOUT
+  FACULTIES
+  NEWS
+  CALENDAR
+  CAMPUS
+  CONTACT
+}
+
+model LandingSection {
+  id        String             @id @default(uuid()) @db.Uuid
+  tenantId  String             @map("tenant_id") @db.Uuid
+  kind      LandingSectionKind
+  isEnabled Boolean            @default(true) @map("is_enabled")
+  sortOrder Int                @map("sort_order")
+
+  headingAr String? @map("heading_ar")
+  headingEn String? @map("heading_en")
+  blurbAr   String? @map("blurb_ar")
+  blurbEn   String? @map("blurb_en")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, kind])
+  @@index([tenantId, sortOrder])
+  @@map("landing_sections")
+}
+
+enum HeroMediaKind {
+  NONE
+  IMAGE
+  VIDEO
+}
+
+model HeroContent {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @unique @map("tenant_id") @db.Uuid
+
+  headlineAr    String  @map("headline_ar")
+  headlineEn    String  @map("headline_en")
+  subheadlineAr String? @map("subheadline_ar")
+  subheadlineEn String? @map("subheadline_en")
+
+  mediaKind  HeroMediaKind @default(NONE) @map("media_kind")
+  mediaUrl   String?       @map("media_url")
+  /// Still frame shown while a video loads, and the fallback where video is
+  /// blocked. A hero that is blank until a 4MB file arrives is a blank page
+  /// on the connections these students actually have.
+  posterUrl  String?       @map("poster_url")
+  /// Percentage of dark overlay laid over the media so the headline stays
+  /// legible against a photograph nobody vetted for contrast.
+  overlayPct Int           @default(45) @map("overlay_pct")
+
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedBy User?     @relation("HeroEditor", fields: [updatedById], references: [id])
+  ctas      HeroCta[]
+
+  @@map("hero_content")
+}
+
+enum HeroCtaVariant {
+  PRIMARY
+  SECONDARY
+}
+
+/// Apply for admission, student portal, staff portal — REQ-LP-02.
+model HeroCta {
+  id        String         @id @default(uuid()) @db.Uuid
+  tenantId  String         @map("tenant_id") @db.Uuid
+  heroId    String         @map("hero_id") @db.Uuid
+  labelAr   String         @map("label_ar")
+  labelEn   String         @map("label_en")
+  /// Relative path or absolute http(s) URL, constrained — a call to action is
+  /// the one link on the page every visitor is invited to click.
+  href      String
+  variant   HeroCtaVariant @default(PRIMARY)
+  sortOrder Int            @default(0) @map("sort_order")
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  hero   HeroContent @relation(fields: [heroId], references: [id], onDelete: Cascade)
+
+  @@index([heroId, sortOrder])
+  @@map("hero_ctas")
+}
+
+enum PostKind {
+  NEWS
+  ANNOUNCEMENT
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+/// News and announcements (REQ-LP-05).
+model NewsPost {
+  id       String   @id @default(uuid()) @db.Uuid
+  tenantId String   @map("tenant_id") @db.Uuid
+  slug     String
+  kind     PostKind @default(NEWS)
+
+  titleAr   String  @map("title_ar")
+  titleEn   String  @map("title_en")
+  excerptAr String? @map("excerpt_ar")
+  excerptEn String? @map("excerpt_en")
+  bodyAr    String  @map("body_ar")
+  bodyEn    String  @map("body_en")
+
+  coverImageUrl String? @map("cover_image_url")
+
+  status      PublishStatus @default(DRAFT)
+  publishedAt DateTime?     @map("published_at") @db.Timestamptz(6)
+  isPinned    Boolean       @default(false) @map("is_pinned")
+
+  authorId      String   @map("author_id") @db.Uuid
+  publishedById String?  @map("published_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  author      User   @relation("PostAuthor", fields: [authorId], references: [id])
+  publishedBy User?  @relation("PostPublisher", fields: [publishedById], references: [id])
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status, publishedAt])
+  @@map("news_posts")
+}
+
+/// What kind of dated entry the published calendar carries (REQ-LP-05).
+///
+/// The first three are derived from `academic_terms` and cannot be stored
+/// here — see `chk_calendar_event_not_derived`. A published registration
+/// deadline that disagrees with the one the registration engine enforces is
+/// worse than publishing no deadline at all.
+enum CalendarEventKind {
+  SEMESTER_START
+  SEMESTER_END
+  REGISTRATION_DEADLINE
+  EXAM
+  HOLIDAY
+  EVENT
+}
+
+model CalendarEvent {
+  id       String            @id @default(uuid()) @db.Uuid
+  tenantId String            @map("tenant_id") @db.Uuid
+  kind     CalendarEventKind
+
+  titleAr       String  @map("title_ar")
+  titleEn       String  @map("title_en")
+  descriptionAr String? @map("description_ar")
+  descriptionEn String? @map("description_en")
+
+  startDate DateTime  @map("start_date") @db.Date
+  /// Null is a single-day entry.
+  endDate   DateTime? @map("end_date") @db.Date
+
+  academicYearId String? @map("academic_year_id") @db.Uuid
+
+  status      PublishStatus @default(DRAFT)
+  createdById String        @map("created_by_id") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+  createdBy    User          @relation("CalendarAuthor", fields: [createdById], references: [id])
+
+  @@index([tenantId, status, startDate])
+  @@map("calendar_events")
+}
+
+/// Campus contact and location (REQ-LP-06).
+model Campus {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  code     String
+  nameAr   String @map("name_ar")
+  nameEn   String @map("name_en")
+
+  addressAr String? @map("address_ar")
+  addressEn String? @map("address_en")
+  city      String?
+  phone     String?
+  email     String?
+
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+
+  /// The one shown in the header and on the contact card. One per tenant, by
+  /// partial unique index.
+  isPrimary Boolean @default(false) @map("is_primary")
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive, sortOrder])
+  @@map("campuses")
+}
+
+enum InquiryStatus {
+  NEW
+  ACKNOWLEDGED
+  CLOSED
+}
+
+/// The public enquiry form (REQ-LP-06).
+///
+/// The only table in this system that a request carrying no session may INSERT
+/// into, which is why it holds nothing but what the sender typed.
+model Inquiry {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  senderName String  @map("sender_name")
+  email      String?
+  phone      String?
+  subject    String
+  message    String
+
+  status       InquiryStatus @default(NEW)
+  handledById  String?       @map("handled_by_id") @db.Uuid
+  handledAt    DateTime?     @map("handled_at") @db.Timestamptz(6)
+  responseNote String?       @map("response_note")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  handledBy User?  @relation("InquiryHandler", fields: [handledById], references: [id])
+
+  @@index([tenantId, status, createdAt])
+  @@map("inquiries")
 }

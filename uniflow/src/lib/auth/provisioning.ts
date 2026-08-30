@@ -1,6 +1,8 @@
 import 'server-only';
 import { withSystem, withTenant, type Tx } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
+import { DEFAULT_BRANDING } from '@/lib/cms/branding';
+import { installLandingDefaults } from '@/lib/cms/content';
 import { hashPassword } from './password';
 import {
   DEFAULT_ROLES,
@@ -118,6 +120,27 @@ export async function provisionTenant(
     await tx.userRole.create({
       data: { userId: admin.id, roleId: roleIds['University Admin'] },
     });
+
+    // Identity and a landing page from minute one (C1). A tenant with no
+    // branding row renders the shipped default anyway, but giving it a real
+    // row means the admin can edit rather than invent — and it keeps the
+    // "which palette is live" question unaskable.
+    await tx.tenantBranding.create({
+      data: {
+        tenantId: tenant.id,
+        shortCode: input.slug.slice(0, 12).toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'UNI',
+        primaryH: DEFAULT_BRANDING.primary.h,
+        primaryS: DEFAULT_BRANDING.primary.s,
+        primaryL: DEFAULT_BRANDING.primary.l,
+        secondaryH: DEFAULT_BRANDING.secondary.h,
+        secondaryS: DEFAULT_BRANDING.secondary.s,
+        secondaryL: DEFAULT_BRANDING.secondary.l,
+        accentH: DEFAULT_BRANDING.accent.h,
+        accentS: DEFAULT_BRANDING.accent.s,
+        accentL: DEFAULT_BRANDING.accent.l,
+      },
+    });
+    await installLandingDefaults(tenant.id, tx);
 
     await audit(tx, tenant.id, {
       actorId: admin.id,

@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**779 tests pass across 23 suites; typecheck, lint and production build are all
+**846 tests pass across 24 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -64,9 +64,21 @@ refund apportions back to the sponsor, because the term's reversal releases
 the sponsor's share and the retained portion re-splits under the same
 contract.
 
-**Tracks A and B are both closed. Track C — the public surface — is the
-remaining work**, together with the two Phase 7-8 academic-records phases that
-were deliberately scoped out of v1.
+**Tracks A and B are both closed**, and closing them exposed a gap in this
+plan: thirteen phases deferred *"the screens"* to Track C, and Track C is the
+**public** surface — landing page, applicant form, student portal. The
+staff-facing screens those deferrals meant had no owner. **§8 Track D — Staff
+Console** now owns them, and the deferral notes throughout §0.2 and §6.1 have
+been corrected to point at it.
+
+**Track C has started. C1 is complete** — the theme engine, the tenant-host
+resolver and the landing CMS, with the first pages this application has ever
+served to somebody who is not logged in. See §7.1.
+
+That leaves, in order: **C2** (the public admissions application flow) and
+**C3** (the student and guardian portal); **Track D**, the staff console that
+turns the tested library into an application; the release phases §11-§13; and
+the two Phase 7-8 academic-records phases deliberately scoped out of v1.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -154,7 +166,7 @@ keys by length then bytewise. A payload written as
 `JSON.stringify` at write time and again at verify time, so the two digests
 differed for byte-identical data.
 
-**Impact had it shipped.** The scheduled chain verifier (plan §11) would have
+**Impact had it shipped.** The scheduled chain verifier (plan §12) would have
 raised a P1 tampering alert on essentially every real change, since almost
 every audited change carries a multi-key before/after payload. The alert that
 exists to detect a genuine breach would have been permanently crying wolf —
@@ -938,14 +950,21 @@ gantt
     Sponsors, scholarships & discount governance    :b6, after b5, 8d
 
     section Track C — Public Surface
-    Theme engine & white-label landing CMS          :c1, after p0c, 9d
+    Theme engine & white-label landing CMS          :done, c1, after p0c, 9d
     Public admissions application flow              :c2, after c1, 7d
     Student & guardian self-service portal          :c3, after c2, 8d
+
+    section Track D — Staff Console
+    Console shell, session & permission navigation  :d1, after c1 b6, 6d
+    Finance desk — cashier, cheques, vouchers       :d2, after d1, 10d
+    Registration desk, holds, withdrawal & transfer :crit, d3, after d1, 9d
+    Back office — academic, admissions, P2P, sponsors :d4, after d1, 12d
+    Reports & the print surface                     :d5, after d1, 8d
 
     section Convergence & Release
     Registration-posts-to-GL integration            :crit, milestone, m1, after a3 b4, 0d
     Onboarding, opening balances & import tooling   :r1, after a7, 8d
-    Hardening, NFR, security & UAT                  :r2, after r1, 10d
+    Hardening, NFR, security & UAT                  :r2, after r1 d3 d5, 10d
     Pilot faculty parallel run                      :r3, after r2, 10d
 
     section Roadmap — Not v1
@@ -953,9 +972,9 @@ gantt
     Phase 8 — Attendance, grades, exams & transcripts :f2, after f1, 20d
 ```
 
-**Capacity assumption.** The durations above assume roughly **two engineers on Track A, two on Track B, one on Track C**, plus a shared lead across Phase 0 and convergence. State the actual figure before committing to dates — the v1.0.0 Gantt implied one developer working strictly serially, which is why its total looked achievable.
+**Capacity assumption.** The durations above assume roughly **two engineers on Track A, two on Track B, one on Track C**, plus a shared lead across Phase 0 and convergence. Track D is drawn as though the Track A and B engineers move onto it once their engines are closed, which is what actually happened. State the actual figure before committing to dates — the v1.0.0 Gantt implied one developer working strictly serially, which is why its total looked achievable.
 
-**Track dependencies.** Track C depends only on Phase 0 and can run start-to-finish in parallel. Track A `a3` (cashiering) and Track B `b4` (registration) must both complete before the convergence milestone; they are the two halves of the posting path the legacy system never joined.
+**Track dependencies.** Track C depends only on Phase 0 and can run start-to-finish in parallel. Track A `a3` (cashiering) and Track B `b4` (registration) must both complete before the convergence milestone; they are the two halves of the posting path the legacy system never joined. **Track D was added at the close of Track B** — see §8 for why it was missing — and depends on `c1` for the theme tokens it renders and on the A and B engines it is a surface over. Release phase `r2` cannot start before `d3` and `d5`: there is nothing to run a UAT against until a registrar can register and a controller can print.
 
 ---
 
@@ -1003,7 +1022,7 @@ RLS needs `app.tenant_id` set on the *connection* for the duration of the transa
 - **Transaction-scoped session variable.** Wrap every request in `prisma.$transaction`, issuing `SET LOCAL app.tenant_id = $1` as its first statement. `SET LOCAL` is scoped to the transaction, so it cannot leak across pooled connections. Costs a transaction on read paths.
 - **Application guard with RLS as a backstop.** A Prisma client extension injects `tenant_id` into every `where`, `create` and `update`; RLS policies remain enabled and are verified by test rather than relied on at runtime.
 
-Whichever is chosen, the cross-tenant isolation test (§8.3) asserts it at the database layer, not the API layer.
+Whichever is chosen, the cross-tenant isolation test (§9.3) asserts it at the database layer, not the API layer.
 
 ### 4.7 Audit log
 - Append-only, hash-chained: each entry carries a hash of its predecessor, so deletion or alteration anywhere in the chain is detectable.
@@ -1300,8 +1319,8 @@ programme, an override with no approver, and a paid deposit with no receipt
 behind it. All four are refused by the database, not by application code.
 
 **Deferred:** bilingual offer-letter PDFs (the print path exists from A7; the
-letter template is a Track C document), and online seat-deposit payment, which
-needs the public portal C2. The deposit itself is wired — an offer names the
+letter template is a **Track D** document — D5), and online seat-deposit
+payment, which needs the public portal C2. The deposit itself is wired — an offer names the
 cashier's receipt that paid it, and a CHECK refuses a paid deposit without one.
 
 ---
@@ -1517,8 +1536,9 @@ refused by the database rather than by application code.
 **Deferred:** webcam photo capture and the object-storage upload endpoint
 itself — the metadata, digest and supersession model are complete and the
 bytes land in the same store as voucher attachments (A2), but the browser
-capture surface is a Track C screen. Bilingual profile printing uses the A7
-print path; the profile card template is a Track C document.
+capture surface is a **Track D** screen — D3, at the registration desk, since
+that is where the photograph is actually taken. Bilingual profile printing
+uses the A7 print path; the profile card template is D5.
 
 ---
 
@@ -1695,10 +1715,10 @@ the status lifecycle. Programme transfer (REQ-REG-04) is B5 for the same
 reason — it is a reversal of this registration plus a new one, and the
 reversal path it needs now exists.
 
-**Deferred to Track C:** the printed card itself. `registrationCard` returns
-the bilingual data and the verification path; rendering it to PDF uses the A7
-print path, and the public `/verify/registration/<token>` page is a Track C
-screen.
+**Deferred to the console:** the printed card itself. `registrationCard`
+returns the bilingual data and the verification path; rendering it uses the A7
+print path and the template belongs to **D5**, while the sessionless
+`/verify/registration/<token>` page is genuinely public and stays in Track C.
 
 ---
 
@@ -1899,9 +1919,9 @@ split belongs with the sponsorship contract terms that B6 introduces. Flagged
 here rather than approximated, because getting it wrong refunds an embassy's
 money to a student.
 
-**Deferred to Track C:** the screens. The withdrawal wizard, the hold banner on
-the registration desk and the status timeline on the student profile are all
-Track C surfaces over the functions above.
+**Deferred to the console:** the screens. The withdrawal wizard, the hold
+banner on the registration desk and the status timeline on the student profile
+are all **D3** surfaces over the functions above.
 
 ---
 
@@ -2035,9 +2055,13 @@ deleting a sponsor that has contracts, a scheme whose awarded total exceeds
 its budget, a share settled beyond what is owed, and a charge whose sponsored
 amount disagrees with its sponsor sub-ledger rows.
 
-**Deferred to Track C:** the screens — the sponsor portal, the invoice PDF and
-the exposure dashboard are all Track C surfaces over the functions above.
-Sponsor invoice rendering uses the A7 print path.
+**Deferred to the console:** the screens — sponsor contracts, invoicing and
+settlement are **D4**, the invoice document and the exposure dashboard are
+**D5**, and invoice rendering uses the A7 print path. A sponsor-facing login
+of their own — a ministry checking what it owes without telephoning the
+finance office — is a third external audience alongside applicants and
+students, and is **not** in C1-C3. It is named here rather than assumed into
+one of them.
 
 **Not built, and named rather than assumed:** a sponsor paying more than they
 owe leaves an unallocated balance on the sponsor receipt, exactly as a student
@@ -2051,7 +2075,7 @@ actually see the credit.
 
 ## 7. Track C — Public Surface
 
-**C1 · Theme Engine & Landing CMS** — Per-tenant branding tokens (names, logo, favicon, motto, HSL palette, typography, social links) driving both the public site and the admin portals. Hero with configurable media and CTAs; faculties and programmes explorer; news, announcements and academic calendar; campus contact and map. A live-preview editor in the admin panel for text, colours, banners and section toggles.
+**C1 · Theme Engine & Landing CMS** *(built — see §7.1)* — Per-tenant branding tokens (names, logo, favicon, motto, HSL palette, typography, social links) driving both the public site and the admin portals. Hero with configurable media and CTAs; faculties and programmes explorer; news, announcements and academic calendar; campus contact and map. A live-preview editor in the admin panel for text, colours, banners and section toggles.
 
 **C2 · Public Admissions Application Flow** — Multi-step public application: personal details, secondary certificate scores, ranked programme choices, document uploads. Optional application fee payable online. Tracking number and downloadable PDF slip. Feeds directly into the B2 committee queue.
 
@@ -2059,11 +2083,235 @@ actually see the credit.
 
 ---
 
-## 8. Verification
+## 7.1 Track C progress
+
+### C1 — Theme Engine & Landing CMS · complete
+
+#### White-labelling was a folder copy, and the evidence is still in the tree
+
+```vb
+Me.Text = "Oasis Computer Systems"      ' frmMain.designer.vb:233
+Me.BackgroundImage = Global.Rebat_University.My.Resources.Resources.BG1  ' :225
+```
+([frmMain.designer.vb](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Form/frmMain.designer.vb#L225-L233))
+
+```vb
+Me.Text = "الكلية التكنلوجية"            ' frmMainPanal.Designer.vb:56
+```
+([frmMainPanal.Designer.vb](Nile%20College%20E-University%20System/Oasis%20-%20E-University/frmMainPanal.Designer.vb#L56))
+
+The Ribat University build titles its main window with the **vendor's** name.
+The Nile College build titles its main window with a **third institution's**
+name — the Technological College — left behind by whoever copied the folder to
+start the project, and it ships that institution's icon,
+`KCT_Logo_A-2.ico`, as `<Content>` in its `.vbproj`. Backgrounds and logos are
+`My.Resources` entries compiled into the executable.
+
+Two customers, two wrong identities, and no test could have found either:
+there was no per-tenant behaviour to test. Branding that lives in a compiled
+resource cannot be wrong *for one tenant*, because there is only one tenant per
+binary. It can only be wrong for everybody.
+
+Of the public surface itself there is nothing to compare against. No landing
+page, no programme catalogue, no news, no calendar, no enquiry form — the
+SRS's own legacy table marks the whole of Module 1 **New**. A prospective
+student learned the fee schedule by coming to the campus and asking.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| **A hostname resolves to exactly one university** | `tenant_domains.host` is unique **globally**, not per tenant. That single constraint is the whole cross-tenant guarantee for the public surface: there is no ambiguity for application code to resolve, so there is no bug to write there |
+| Unverified hosts serve nothing; one canonical host per tenant | Claiming a domain must not be enough to be served on it, and a canonical host — the one every other address redirects to — must be verified (`chk_canonical_is_verified`). One canonical per tenant, by partial unique index |
+| Attaching a host is a **platform** act | `tenant.manage`, which is deliberately absent from every default tenant role. The hostname namespace is shared with every other university on the platform, so a university cannot claim into it unilaterally. Asserted |
+| **An unknown host resolves to nothing, and nothing is served** | Never a fallback to "the only tenant", never a query-string override. Guessing is exactly how one university's branding ends up on another's domain. The page says no site is configured, names no institution, and lists nothing |
+| **Identity is a row** (REQ-LP-01) | Name, short code, motto, logo, dark logo, favicon, three HSL palettes and two typefaces, per tenant. `Tenant.logoUrl` and the unused `theme_config` JSON are gone: one logo, one place it is set, one place it is read — the registration card now reads it from branding like everything else |
+| Colours are **channels**, range-checked | `chk_branding_hsl`. A hue of 400 does not fail loudly — it emits an invalid CSS declaration, the property falls back to its initial value, and the site renders in a colour nobody chose, on a page the vendor never loads. Refused in the application and again by the database |
+| Typography from a **shipped allow-list** | `chk_branding_fonts`. The value is interpolated into a `font-family`; and a face without full Arabic coverage falls back mid-word with different metrics, which is the "reads as a defect to whoever signs it" failure the layout comments already describe |
+| The **ink is derived, not configured** | A university picks a pale brand colour and then finds its buttons unreadable. `inkFor()` chooses the foreground from the surface's lightness, so the one token a tenant would most reliably get wrong is not theirs to set |
+| One theme path, not two | `themeStyle()` writes the same custom properties `globals.css` already declares, inlined into `<head>` — the palette differs per host so it cannot be a cached file, and a separate request means the page paints twice. Track D's console renders the same tokens |
+| **Sections are data** (REQ-LP-02) | Which sections appear, in what order, under what heading — a row per section, installed at onboarding in the standard order. The page decides how a section *looks*; the tenant decides whether it exists |
+| Hero with media, overlay and calls to action | A video hero must carry a poster (`chk_hero_media`): without one the headline sits on an empty rectangle until several megabytes have arrived, which on these connections is most of the visit. A CTA href is a path or an https URL — `chk_hero_cta_href` — never `javascript:`, on the one link every visitor is invited to click |
+| **Publishing is bilingual or it does not happen** (REQ-LP-05) | `chk_post_published_complete`. A post published in one language renders as a blank page to half the audience *and returns 200*, so nothing reports it. Refused in the application, and refused again when written straight to the database |
+| Published content cannot be deleted, only archived | `trg_post_not_deleted`. A URL that was public and is now a 404 destroys the record of what the institution said; an archived post still resolves and is marked out of date. A draft, never public, deletes freely |
+| Drafting and publishing are **separate permissions** | `cms.manage` and `cms.publish`. Deliberately **not** an SoD pair — unlike a payment, a wrong notice is withdrawn in seconds, and a two-person rule on a news item is a control nobody would follow, which is worse than none |
+| **The calendar publishes what the engine enforces** (REQ-LP-05) | Semester start, semester end and the registration deadline are read from `academic_terms` — the same `registration_closes_on` B4's `assert_registration_term_open` refuses a late registration against. `chk_calendar_event_not_derived` refuses to store those kinds at all. Move the deadline in the registrar's screen and the website follows, with no edit and no possibility of disagreement |
+| **The catalogue quotes the fee the cashier will charge** (REQ-LP-03) | Resolved from the approved, effective-dated schedule the registration engine bills from. Revise the schedule and the published figure follows; where none is in force the page says to contact admissions rather than quoting a price the cashier will not honour |
+| A programme is listed **deliberately, completely and in both languages** | `is_publicly_listed` defaults false, requires an overview in both languages (`chk_programme_public_bilingual`) and requires the programme to still be active (`chk_programme_public_active`) — a withdrawn programme advertising intake is a commitment the institution has not made. A faculty appears because it has a listed programme, so it leaves the catalogue on its own |
+| Campuses and the map (REQ-LP-06) | Bilingual names and addresses, telephone, email, coordinates bounded to the planet, and both-or-neither on latitude and longitude — half a pin is no pin. One primary campus per tenant, by partial unique index |
+| **The enquiry form, and nothing else** (REQ-LP-06) | The only path by which a request carrying no session writes a row. It writes one table, holding only what the sender typed; its bounds are `chk_inquiry_bounds` rather than only the form component, which is not what an attacker uses; and it requires a way to reply (`chk_inquiry_reachable`) — an enquiry nobody can answer is a queue that only grows. It still runs as the app role under RLS: a public write is not a privileged one |
+| Interface copy lives in the message catalogue | Not inline in components. The catalogue-parity test is the thing that catches an English string added without its Arabic, and a public page is the last place that rot should be invisible. Tenant *content* stays where it belongs — a pair of columns on a row |
+
+#### Two things settled during the build
+
+**Why one lookup runs as the owner role.** Every other read in this
+application runs under `withTenant`, which sets `app.tenant_id` and lets RLS
+confine the query. The host lookup is what *produces* that tenant id, so at
+the moment it runs there is nothing to confine it to. It therefore runs under
+`withSystem`, exactly as B4's sessionless registration-card verification does,
+and is written to be safe in that position: one equality read on a normalised
+host, returning the tenant's public identity and nothing else, with no
+caller-supplied predicate reaching the database. Everything after it —
+branding, sections, catalogue, news, calendar, campuses, the enquiry — runs
+under `withTenant` as the app role. The public site is not privileged; it
+simply has no user.
+
+**`localhost` is a domain like any other.** There is no development bypass,
+no `?tenant=` override and no "if only one tenant exists, use it". Those are
+the mechanisms by which a convenience reaches production and serves the wrong
+university. A local environment registers `localhost` as a host for its tenant
+and is then indistinguishable from a real deployment, which is the point.
+
+#### Verification
+
+67 tests. The ones that carry the most weight:
+
+- `never serves one university on another university's host`, and
+  `refuses a host that already belongs to another university` — the negation of
+  the two window titles above, asserted from both directions.
+- `resolves nothing for an unknown host, rather than guessing`.
+- `follows the registrar when they move the deadline, with no website edit` —
+  the registration deadline is changed on the *term*, and the published
+  calendar changes. Then `refuses to let a deadline be typed into the CMS at
+  all`, in the application and by the check constraint.
+- `quotes the approved schedule's mandatory total, not a retyped figure`, and
+  `follows a fee revision with no change to the website` — the same property
+  for money.
+- `says nothing rather than a stale figure when no schedule is in force`.
+- `refuses to publish a post with one language missing`, then
+  `refuses the same state written straight to the database`.
+- `still serves an archived post, marked out of date`, beside
+  `refuses to delete a post that has been public`.
+- `refuses an enquiry nobody could reply to`, and
+  `lands in the university it was sent to and nowhere else`.
+- `derives the ink rather than letting a tenant choose it wrongly`.
+
+Eleven constraints are exercised by writing directly as the **owner role**,
+which bypasses RLS: a duplicate host, an unverified canonical host, a second
+canonical host, a hue of 400, a saturation of 120, a font outside the
+allow-list, a `javascript:` call to action, a one-language publication, a
+publication with no publisher, a derived calendar kind, a programme listed
+with no overview, a half-set map pin, an unreachable enquiry and an enquiry
+closed by nobody. All are refused by the database rather than by application
+code.
+
+The RLS coverage test in §9.3 — which enumerates every table in the schema
+rather than a list somebody maintains — picks up all ten new tables without
+being edited, which is what it was written for.
+
+**Deferred to D4, deliberately:** the live-preview editor. C1 delivers the
+theme engine, the content model and the public pages; the editing chrome needs
+D1's authenticated console shell, and building a second shell here is exactly
+the duplication §8 was written to stop. The functions the editor calls —
+`setBranding`, `setHero`, `setSection`, `createPost`, `publishPost`,
+`upsertCampus`, `setProgrammePublication` — are complete and tested, so D4
+adds forms over them and nothing else.
+
+**Not built, and named rather than assumed:** media upload. Logos, hero images
+and cover photographs are stored as URLs, and the bytes are expected in the
+same object store as voucher attachments (A2) and student documents (B3) —
+none of which has its upload endpoint yet either. It is one piece of work
+serving three phases and it belongs with whichever of them is scheduled first.
+Rich text in a post body is stored and rendered as plain paragraphs for the
+same reason the editor is deferred: HTML from an editor must be sanitised
+before it reaches a public page, and shipping the storage before the
+sanitiser is how a CMS becomes an XSS delivery mechanism.
+
+---
+
+## 8. Track D — Staff Console
+
+Added at the close of Track B, and it should have been here from the start.
+Thirteen completed phases each end with some form of *"deferred to Track C:
+the screens"* — and Track C does not contain them. Track C is the **public**
+surface: a landing page, an applicant form, a student portal. The screens
+those deferrals meant are the ones staff use — the cashier desk, the voucher
+grid, the registration desk, the committee queue, the procurement workbench,
+the statement viewer. No phase owned them. §2's own architecture diagram names
+`AdminApp[University Admin / Staff Portal]` as a first-class client, and then
+no track builds it.
+
+The omission was not harmless. Tracks A and B were correctly built
+engine-first — every invariant in the database, every posting path proven by
+test — but the reachable surface of this application is still the Phase 0
+demonstration page, and *"Tracks A and B are closed"* reads as two-thirds done
+when the institution cannot yet register a student without a developer at a
+REPL.
+
+**Track D turns the library into an application, and adds no business rules.**
+Every screen below is a surface over a function that already exists and is
+already tested. Where a screen appears to need a rule that is not there, that
+is a finding to take back to the phase that owns it — not something to
+implement inside a component, which is exactly how the legacy build ended up
+with its fee arithmetic in a button handler.
+
+**D1 · Console Shell, Session & Navigation** — The authenticated layout every
+other screen mounts into: login, TOTP step-up, session expiry and rotation,
+tenant theme injection from C1's tokens, the locale and direction switch, and
+a navigation tree generated from the user's permission set. Generated, not
+hidden by CSS: a user holding neither `voucher.post` nor `voucher.approve`
+does not see a Finance menu, and the route refuses them if they type the URL,
+because `requirePermission()` runs in the data access layer and the menu is
+only a convenience over it.
+
+**D2 · Finance Desk** — Cashier receipt capture with live allocation against
+outstanding charges, till assignment and end-of-shift close; the cheque
+pipeline's state transitions with their deposit and clearance dates; the
+journal voucher grid with running debit/credit balancing, attachments and
+draft save; and the maker-checker queue with rejection comments and MFA
+step-up at approval. These are the two screens the legacy system's cashiers
+spent the working day in — with the arithmetic no longer done in the
+operator's head, which is where A3 found it.
+
+**D3 · Registration Desk** — Student search across both keyboards; the
+registration wizard as **preview → discount → save**, showing the quote and
+its instalment schedule before anything is committed; the hold banner that
+stops it, naming which hold and who may clear it; the registration card and
+its QR; the withdrawal and transfer wizards, each stating its financial
+consequence before confirmation rather than after; and the status timeline on
+the student profile. This is where B4's *"the registration and its posting are
+one transaction"* becomes something a registrar can watch happen.
+
+**D4 · Back Office** — Academic structure and the fee matrix editor with
+version comparison; the admissions committee queue, eligibility screening and
+offer issue; the procure-to-pay workbench from requisition to payment; budget
+maintenance with encumbrance consumption visible against each line; sponsor
+contracts, invoicing and settlement; scholarship schemes and the award
+register. Screens used monthly rather than hourly, and therefore allowed to be
+denser than D2 or D3.
+
+**D5 · Reports & the Print Surface** — Trial balance, balance sheet, income
+statement, aged receivables, sub-ledger reconciliation, discount exposure and
+the student statement of account, each over A7's single figure source and each
+with the XLSX export it already has. Plus the print stylesheets themselves:
+receipt, voucher, registration card, offer letter, profile card, sponsor
+invoice. A7 settled that **PDF is produced by printing the HTML sheet**, since
+a generator that shapes Arabic incorrectly produces documents that look right,
+print, get signed, and are wrong in a way an English-reading developer cannot
+see. D5 is where that decision is cashed in — and where the two pieces A7 and
+B2 deferred land: the pre-close checklist gate of REQ-PER-02, and the
+bilingual offer-letter template.
+
+**Sequencing.** D1 depends on C1, because the console renders the same tenant
+branding tokens the public site does and there is no reason to build a second
+theme path. D2-D5 depend only on D1 and on their own already-complete engines,
+so they parallelise across whatever staff the project actually has. D3 is the
+one to schedule first if the pilot faculty is to run a real registration
+period, since D2 without D3 collects money against charges nobody can raise.
+
+**What Track D must not become.** A screen that writes to the database
+directly, bypassing the module that owns the rule. Every mutation goes through
+the exported function — `takeReceipt`, `registerStudent`, `postVoucher` — with
+its idempotency key, its permission check and its transaction. The console is
+a caller, and if it ever needs to be more than that, the module is wrong.
+
+---
+
+## 9. Verification
 
 Replaces the five manual scenarios in v1.0.0, none of which would have detected any of the defects the legacy audit found.
 
-### 8.1 Ledger property tests
+### 9.1 Ledger property tests
 Run against every posting path — registration, cashiering, cheque transitions, depreciation, revenue recognition, procurement:
 - Posting leaves $\sum\text{debit} = \sum\text{credit}$ for the header, in functional currency.
 - No posting lands in a period that is not `Open`.
@@ -2072,66 +2320,66 @@ Run against every posting path — registration, cashiering, cheque transitions,
 - A posting to a non-postable (level 1-4) account is rejected.
 - Attempting to UPDATE or DELETE a posted transaction fails at the database, not merely in application code.
 
-### 8.2 Concurrency
+### 9.2 Concurrency
 - N parallel receipt postings across the same tenant and fiscal year yield N distinct voucher numbers with no gaps and no collisions. Run at N = 500 to satisfy REQ-NFR-03.
 - Concurrent registrations for the same student produce exactly one registration.
 - Concurrent offers against a quota with one remaining seat produce exactly one confirmed allocation.
 
-### 8.3 Tenant isolation
+### 9.3 Tenant isolation
 - An authenticated Tenant A principal cannot read or write any Tenant B row — asserted **at the database layer** by attempting the query with A's session context, not by checking that the API returns 403.
 - A pooled connection that served Tenant A and is reused for Tenant B carries no residual context.
 
-### 8.4 Reconciliation
+### 9.4 Reconciliation
 - After a scripted term of activity (registrations, receipts, discounts, cheques including a bounce, a transfer, a withdrawal with refund, sponsor settlement), the student sub-ledger total equals the AR control account balance **to the cent**. Same for sponsor AR and vendor AP.
 - Trial balance totals: debits equal credits; assets equal liabilities plus equity.
 - Opening balances plus period movements equal closing balances for every account.
 
-### 8.5 Business logic
+### 9.5 Business logic
 - Fee calculation and per-item discount application across the discountable-flag matrix.
 - Straight-line depreciation with first- and final-period proration; the batch is a no-op on a second run.
 - Revenue recognition schedules sum exactly to the amount billed, with no rounding residue.
 - Refund policy boundaries — the day before, the day of, and the day after each schedule threshold.
 - Maker-checker state transitions, including every rejection path and the approver-≠-maker rule.
 
-### 8.6 Non-functional
+### 9.6 Non-functional
 - Seed 100,000 students and 1,000,000 journal lines, then measure the latencies REQ-NFR-01 and REQ-NFR-02 promise. If trial balance is being computed by scanning the ledger rather than reading `account_period_balances`, this is where it surfaces.
 - Load test 500 concurrent cashier sessions.
 - Audit chain verification over a large log.
 
-### 8.7 Localization
+### 9.7 Localization
 - RTL visual snapshots of every screen, in both themes.
 - Arabic amount-in-words fixtures, including the cases the legacy speller gets wrong.
 - Hijri ↔ Gregorian conversion across month and year boundaries.
 - Arabic name search: `أحمد` / `احمد` / `آحمد` all match one another; `فاطمة` matches `فاطمه`.
 - Arabic PDF output visually verified for shaping and right-alignment — this cannot be asserted by text comparison.
 
-### 8.8 Security
+### 9.8 Security
 - Automated dependency and container scanning in CI.
 - Authorization tests per role against every endpoint, including the segregation-of-duties combinations.
 - A penetration test as a gate before go-live.
 
-### 8.9 User acceptance
+### 9.9 User acceptance
 Run with **actual cashiers and registrars, in Arabic, on the hardware and connection quality they have**. The single most likely production failure is a duplicate receipt created by a double-press on a slow link; that must be exercised deliberately in UAT, not discovered live.
 
 ---
 
-## 9. Risk Register
+## 10. Risk Register
 
 | Risk | Impact | Likelihood | Mitigation |
 | :--- | :--- | :--- | :--- |
-| Opening balances wrong at go-live | Every subsequent statement is wrong; unwinding requires a re-implementation of the tenant | Medium | The §10 gate: debits = credits and every control account equals its sub-ledger, exported and signed off by the tenant's Financial Controller before go-live |
-| Voucher number collision under concurrency | Duplicate or overwritten vouchers; statutory numbering broken | Medium without Phase 0 | Sequence allocator + unique constraint + the §8.2 concurrency test. This is a *realised* defect in the legacy system, not a hypothetical |
+| Opening balances wrong at go-live | Every subsequent statement is wrong; unwinding requires a re-implementation of the tenant | Medium | The §11 gate: debits = credits and every control account equals its sub-ledger, exported and signed off by the tenant's Financial Controller before go-live |
+| Voucher number collision under concurrency | Duplicate or overwritten vouchers; statutory numbering broken | Medium without Phase 0 | Sequence allocator + unique constraint + the §9.2 concurrency test. This is a *realised* defect in the legacy system, not a hypothetical |
 | Duplicate receipts from operator retry on a flaky link | Student overcharged or double-credited; cash reconciliation fails | **High** | Idempotency keys on every financial mutation (§4.5), exercised in UAT |
 | Arabic PDF shaping fails in production | Every official document is unusable | Medium | Font embedding and visual snapshot tests in CI from Phase 0, not at the end |
 | Scope creep from Academic Records | v1 never ships | High | Specified in the SRS, scheduled at Phases 7-8, and gated by the Phase 0 data-model review — but not built in v1 |
-| Cross-tenant data leak via pooled connections | Catastrophic and contractually terminal | Low with §4.6, high without | One uniform tenancy pattern, plus the §8.3 database-layer isolation test |
+| Cross-tenant data leak via pooled connections | Catastrophic and contractually terminal | Low with §4.6, high without | One uniform tenancy pattern, plus the §9.3 database-layer isolation test |
 | Sub-ledger diverges from control account | Silent, compounding, and exactly the legacy failure mode | Medium | Control-account postings only via sub-ledger; REQ-RPT-06 reconciliation report alerting on any variance |
 | Connectivity or power loss at the cashier desk | Collections stop | High at these campuses | Offline-tolerant cashier PWA is in SRS §7 (unscheduled). Until then, document the manual fallback and the reconciliation procedure |
 | Two-track integration lands late | Registration and cashiering ship but do not post correctly together | Medium | The convergence milestone is dated and treated as a hard gate, not as an integration to be discovered |
 
 ---
 
-## 10. Tenant Onboarding & Opening Balances
+## 11. Tenant Onboarding & Opening Balances
 
 Historical transactions are **not** migrated. Legacy databases remain available read-only for historical enquiry. Rationale in SRS §6.
 
@@ -2143,11 +2391,11 @@ Historical transactions are **not** migrated. Legacy databases remain available 
 
 ---
 
-## 11. Environments, CI/CD & Operations
+## 12. Environments, CI/CD & Operations
 
 **Environments** — local, dev, staging (production-shaped, with a scrubbed dataset), production. Schema changes ship as reviewed Prisma migrations, forward-only, never edited after merge.
 
-**CI** — typecheck, lint (including the monetary-arithmetic rule), unit and property suites, integration suite against an ephemeral PostgreSQL, RTL visual snapshots, dependency scan. The §8.1 ledger property tests and §8.3 isolation tests are **blocking**.
+**CI** — typecheck, lint (including the monetary-arithmetic rule), unit and property suites, integration suite against an ephemeral PostgreSQL, RTL visual snapshots, dependency scan. The §9.1 ledger property tests and §9.3 isolation tests are **blocking**.
 
 **Preview deployments** per pull request with a seeded tenant, so a reviewer can exercise a change in Arabic before approving it.
 
@@ -2159,7 +2407,7 @@ Historical transactions are **not** migrated. Legacy databases remain available 
 
 ---
 
-## 12. Cutover
+## 13. Cutover
 
 1. **Pilot faculty.** One faculty operates fully in the new system for a term while the rest continue as they are. Chosen for size, not for enthusiasm — a faculty large enough to exercise concurrency at the cashier desk.
 2. **Parallel run.** Daily reconciliation of collections and registrations between old and new for the pilot period, with variances investigated rather than tolerated.
@@ -2168,7 +2416,7 @@ Historical transactions are **not** migrated. Legacy databases remain available 
 
 ---
 
-## 13. Recommended, Not Scheduled
+## 14. Recommended, Not Scheduled
 
 Deferred by decision, listed so the choice stays visible and revisitable. Full detail in SRS §7.
 

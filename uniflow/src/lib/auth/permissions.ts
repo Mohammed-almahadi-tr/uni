@@ -116,6 +116,15 @@ export const PERMISSIONS = [
   { key: 'asset.dispose', description: 'Sell, scrap or write off a fixed asset' },
   { key: 'report.financial', description: 'Run financial statements' },
   { key: 'report.student', description: 'Run student and registration reports' },
+
+  // ---- Public site and CMS (Track C1) -----------------------------------
+  // `cms.manage` drafts; `cms.publish` puts something in front of the world.
+  // They are separate permissions but deliberately NOT an SoD pair: unlike a
+  // payment, a wrong notice is withdrawn in seconds, and a two-person rule on
+  // a news item is a control nobody would follow — which is worse than none.
+  { key: 'cms.manage', description: 'Edit branding, landing content, news drafts and campuses' },
+  { key: 'cms.publish', description: 'Publish and archive public content' },
+  { key: 'inquiry.handle', description: 'Read and answer public enquiries' },
 ] as const;
 
 export const PERMISSION_KEYS: readonly PermissionKey[] = PERMISSIONS.map((p) => p.key);
@@ -394,6 +403,7 @@ export const DEFAULT_ROLES: Record<
       'user.read', 'user.manage', 'role.read', 'role.manage', 'audit.read',
       'academic.read', 'academic.manage', 'coa.read', 'period.read',
       'document.verify', 'report.financial', 'report.student',
+      'cms.manage', 'cms.publish', 'inquiry.handle',
     ],
   },
   Registrar: {

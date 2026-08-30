@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { directionOf, routing } from '@/i18n/routing';
+import { themeStyle } from '@/lib/cms/branding';
+import { currentSite } from '@/lib/cms/request';
 import '../globals.css';
 
 /**
@@ -30,16 +32,38 @@ const mono = JetBrains_Mono({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: 'UniFlow',
-  description: 'University management and finance',
-};
-
-/** Pre-render both locales rather than resolving them per request. */
-export function generateStaticParams() {
-  return routing.locales.map((locale) => ({ locale }));
+/**
+ * Title, description and favicon come from the tenant the host resolves to
+ * (C1, REQ-LP-01).
+ *
+ * The legacy equivalent was `Me.Text = "Oasis Computer Systems"` on the Ribat
+ * build's main window and `Me.Text = "الكلية التكنلوجية"` on Nile's — the
+ * vendor's name on one customer's screen and a third institution's on the
+ * other's, because the title was a literal in a compiled resource. Here it is
+ * a row, and the row belongs to a tenant.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const site = await currentSite();
+  if (!site) return { title: 'UniFlow' };
+  return {
+    title: {
+      default: site.tenant.nameEn,
+      template: `%s · ${site.tenant.nameEn}`,
+    },
+    description: site.branding.mottoEn ?? site.tenant.nameEn,
+    ...(site.branding.faviconUrl ? { icons: { icon: site.branding.faviconUrl } } : {}),
+  };
 }
 
+/**
+ * No `generateStaticParams`.
+ *
+ * The response depends on the `Host` header, so there is no prerenderable
+ * version of any page under this layout — every tenant's palette, name and
+ * content differ. Reading the host through `currentSite()` opts these routes
+ * into dynamic rendering, which is the correct behaviour and not a
+ * regression from the Phase 0 shell.
+ */
 export default async function LocaleLayout({
   children,
   params,
@@ -52,6 +76,7 @@ export default async function LocaleLayout({
 
   setRequestLocale(locale);
   const dir = directionOf(locale);
+  const site = await currentSite();
 
   return (
     // dir on <html> is what mirrors the entire layout. Tailwind's logical
@@ -62,6 +87,18 @@ export default async function LocaleLayout({
       dir={dir}
       className={`${arabic.variable} ${latin.variable} ${mono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Inlined rather than fetched: the palette differs per host, so it
+            cannot be a cached static file, and a separate request for it means
+            the page paints once in the default teal and again in the tenant's
+            colours. Every value is a number or a member of ALLOWED_FONTS. */}
+        {site && (
+          <style
+            id="tenant-theme"
+            dangerouslySetInnerHTML={{ __html: themeStyle(site.branding) }}
+          />
+        )}
+      </head>
       <body className="min-h-full flex flex-col">
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>
