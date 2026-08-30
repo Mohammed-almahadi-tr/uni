@@ -54,7 +54,7 @@ export type ConsolePhase = 'D1' | 'D2' | 'D3' | 'D4' | 'D5';
 
 /** Phases whose screens exist. An item outside this set renders as a name and
  *  a phase rather than a link to a 404. */
-export const BUILT_PHASES: ReadonlySet<ConsolePhase> = new Set<ConsolePhase>(['D1', 'D3']);
+export const BUILT_PHASES: ReadonlySet<ConsolePhase> = new Set<ConsolePhase>(['D1', 'D2', 'D3']);
 
 export interface ConsoleItem {
   /** Message key under `console.items`. */
@@ -95,10 +95,18 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
     items: [
       { key: 'cashierDesk', path: 'finance/cashier', anyOf: ['receipt.create'], phase: 'D2' },
       { key: 'receipts', path: 'finance/receipts', anyOf: ['receipt.create', 'receipt.cancel'], phase: 'D2' },
-      { key: 'cheques', path: 'finance/cheques', anyOf: ['cheque.manage', 'cheque.cancel'], phase: 'D2' },
-      { key: 'vouchers', path: 'finance/vouchers', anyOf: ['voucher.read', 'voucher.create'], phase: 'D2' },
+      { key: 'cheques', path: 'finance/cheques', anyOf: ['cheque.manage', 'cheque.cancel'], phase: 'D2', detail: 'finance/cheques/[id]' },
+      { key: 'vouchers', path: 'finance/vouchers', anyOf: ['voucher.read', 'voucher.create'], phase: 'D2', detail: 'finance/vouchers/[id]' },
       { key: 'approvals', path: 'finance/approvals', anyOf: ['voucher.review', 'voucher.approve'], phase: 'D2' },
-      { key: 'payments', path: 'finance/payments', anyOf: ['payment.create', 'payment.approve'], phase: 'D2' },
+      // The till a cashier's cash posts to. `assignTill` demands `coa.manage`,
+      // so the screen does too — the menu and the module name the same
+      // permission rather than two that happen to overlap today.
+      { key: 'tills', path: 'finance/tills', anyOf: ['coa.manage'], phase: 'D2' },
+      // Paying suppliers, not collecting from students. D2's own description
+      // covers the cashier, the cheque pipeline and the voucher workflow;
+      // §8 gives procure-to-pay *through payment* to D4, and this row said
+      // D2 only because it sits in the finance menu.
+      { key: 'payments', path: 'finance/payments', anyOf: ['payment.create', 'payment.approve'], phase: 'D4' },
       { key: 'periods', path: 'finance/periods', anyOf: ['period.read', 'period.close'], phase: 'D4' },
     ],
   },

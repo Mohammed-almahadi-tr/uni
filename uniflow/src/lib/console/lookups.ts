@@ -215,3 +215,26 @@ export async function optionalItems(
     }));
   });
 }
+
+/**
+ * The tenant's functional currency, for formatting amounts on screen.
+ *
+ * Deliberately ungated. Every stored amount is already in this currency and
+ * every console screen that shows money needs to know how many decimal places
+ * that currency has — a Kuwaiti dinar has three and a yen has none, and
+ * getting it wrong renders the wrong number rather than failing. It carries
+ * no information about the tenant that the page's own branding does not.
+ *
+ * It exists because the alternative in use was `registrations[0]?.currency ??
+ * 'SDG'`: correct at both pilot institutions and silently wrong at the first
+ * one that banks in anything else.
+ */
+export async function tenantCurrency(principal: Principal): Promise<string> {
+  return withTenant(principal.tenantId, async (tx) => {
+    const t = await tx.tenant.findUniqueOrThrow({
+      where: { id: principal.tenantId },
+      select: { functionalCurrency: true },
+    });
+    return t.functionalCurrency.trim();
+  });
+}

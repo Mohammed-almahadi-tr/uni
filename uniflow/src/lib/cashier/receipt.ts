@@ -360,6 +360,17 @@ async function resolveDebitAccount(
 interface OutstandingCharge {
   id: string;
   outstanding: Money;
+  // Carried so the desk can name what a payment is about to settle. The
+  // allocation itself uses only `id` and `outstanding`; these ride along so
+  // that the list a cashier reads and the list the engine allocates over are
+  // the same list in the same order, rather than two queries that could
+  // diverge.
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  termLabel: string | null;
+  docDate: Date;
+  dueDate: Date | null;
 }
 
 async function outstandingCharges(
@@ -376,7 +387,16 @@ async function outstandingCharges(
       { docDate: 'asc' },
       { createdAt: 'asc' },
     ],
-    select: { id: true, netAmount: true, sponsoredAmount: true, settledAmount: true },
+    select: {
+      id: true,
+      netAmount: true,
+      sponsoredAmount: true,
+      settledAmount: true,
+      termLabel: true,
+      docDate: true,
+      dueDate: true,
+      feeItem: { select: { code: true, nameAr: true, nameEn: true } },
+    },
   });
 
   // A student's money settles the student's portion. The sponsored part of a
@@ -386,6 +406,12 @@ async function outstandingCharges(
     .map((r) => ({
       id: r.id,
       outstanding: r.netAmount.minus(r.sponsoredAmount).minus(r.settledAmount),
+      code: r.feeItem.code,
+      nameAr: r.feeItem.nameAr,
+      nameEn: r.feeItem.nameEn,
+      termLabel: r.termLabel,
+      docDate: r.docDate,
+      dueDate: r.dueDate,
     }))
     .filter((r) => r.outstanding.greaterThan(0));
 }
@@ -714,5 +740,321 @@ export async function assignTill(
       resourceId: userId,
       after: { cashAccountCode: account.code },
     });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Reads for the desk (Track D2)
+//
+// No rule lives here that is not already above. `previewAllocation` calls the
+// same `outstandingCharges`, `fifoAllocation` and `explicitAllocation` that
+// `takeReceipt` calls, so what the cashier is shown before saving is produced
+// by the code that will do the saving — not by a second implementation that
+// agrees with it today.
+//
+// The legacy desk showed a grid of two hardcoded rows:
+//
+//     Me.GridVouchers.Rows.Add(New String() {"Current Assets", "Debtors",
+//         "Students Fees", "Students Fees", "Tuition Fees", tutfee})
+//     Me.GridVouchers.Rows.Add(New String() {..., "Registration Fees", RegFees})
+//
+// (frmStudantReceiptVoucher.vb:105-106). Two fee kinds, English literals in an
+// Arabic chart, and no relationship to what this student had actually been
+// billed — because nothing had billed them. There was no charge to allocate
+// against, which is why the balance lived in a `Remain` column that whichever
+// screen touched it last would rewrite.
+// ---------------------------------------------------------------------------
+
+/** One outstanding charge, as the desk lists it. */
+export interface OutstandingChargeLine {
+  chargeId: string;
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  termLabel: string | null;
+  docDate: Date;
+  dueDate: Date | null;
+  outstanding: string;
+}
+
+export interface AllocationPreview {
+  /** Every charge the money could go against, oldest due first. */
+  charges: OutstandingChargeLine[];
+  /** What this amount would settle, and against what. */
+  plan: Array<{ chargeId: string; code: string; nameAr: string; nameEn: string; amount: string }>;
+  allocated: string;
+  /** Left over, and therefore a credit balance the institution owes back. */
+  unallocated: string;
+}
+
+/**
+ * What a payment of this size would settle, without taking it.
+ *
+ * The cashier sees the split before the money is recorded: how much lands on
+ * the receivable and how much becomes a credit balance. That distinction is
+ * the one the legacy chart could not express — every receipt was credited
+ * whole against a student *name*, in a tree with no control account, so an
+ * overpayment read as a negative asset.
+ */
+export async function previewAllocation(
+  principal: Principal,
+  studentId: string,
+  amount: MoneyInput,
+  allocations?: Array<{ chargeId: string; amount: MoneyInput }>,
+): Promise<AllocationPreview> {
+  requirePermission(principal, 'student.read');
+
+  const total = toStorage(amount);
+
+  return withTenant(principal.tenantId, async (tx) => {
+    const outstanding = await outstandingCharges(tx, principal.tenantId, studentId);
+
+    const listed: OutstandingChargeLine[] = outstanding.map((c) => ({
+      chargeId: c.id,
+      code: c.code,
+      nameAr: c.nameAr,
+      nameEn: c.nameEn,
+      termLabel: c.termLabel,
+      docDate: c.docDate,
+      dueDate: c.dueDate,
+      outstanding: c.outstanding.toFixed(4),
+    }));
+
+    if (total.lessThanOrEqualTo(0)) {
+      return {
+        charges: listed,
+        plan: [],
+        allocated: ZERO.toFixed(4),
+        unallocated: ZERO.toFixed(4),
+      };
+    }
+
+    const plan =
+      allocations && allocations.length > 0
+        ? explicitAllocation(allocations, outstanding)
+        : fifoAllocation(total, outstanding);
+
+    const byId = new Map(outstanding.map((c) => [c.id, c]));
+    const allocated = sum(plan.map((p) => p.amount));
+
+    return {
+      charges: listed,
+      plan: plan.map((p) => {
+        const c = byId.get(p.chargeId);
+        return {
+          chargeId: p.chargeId,
+          code: c?.code ?? '',
+          nameAr: c?.nameAr ?? '',
+          nameEn: c?.nameEn ?? '',
+          amount: p.amount.toFixed(4),
+        };
+      }),
+      allocated: allocated.toFixed(4),
+      unallocated: total.minus(allocated).toFixed(4),
+    };
+  });
+}
+
+export interface ReceiptRow {
+  id: string;
+  receiptNo: string;
+  docDate: Date;
+  channel: PaymentChannel;
+  amount: string;
+  allocated: string;
+  reference: string | null;
+  chequeNo: string | null;
+  studentId: string;
+  studentNo: string;
+  fullNameAr: string;
+  fullNameEn: string;
+  cashierName: string;
+  cancelledAt: Date | null;
+  dishonouredAt: Date | null;
+  /** True when the receipt still sits inside the day-of-issue window that
+   *  `cancelReceipt` will accept. Shown so the register does not offer a
+   *  button the module is going to refuse. */
+  cancellableToday: boolean;
+}
+
+/**
+ * The receipt register.
+ *
+ * `mine` is the default view for a cashier, because the question they ask of
+ * this screen is "what did I take". Nothing here decides who may cancel what:
+ * that is `cancelReceipt`, which refuses anything but the day of issue and
+ * demands `receipt.cancel` — a permission the SoD matrix forbids anyone
+ * holding `receipt.create` from also holding.
+ */
+export async function receiptRegister(
+  principal: Principal,
+  filter: {
+    from?: Date;
+    to?: Date;
+    studentId?: string;
+    channel?: PaymentChannel;
+    mine?: boolean;
+    /** Substring of the receipt number, the bank reference or the cheque number. */
+    q?: string;
+    take?: number;
+  } = {},
+): Promise<ReceiptRow[]> {
+  requirePermission(principal, 'student.read');
+
+  const today = toDateOnly(new Date()).getTime();
+  const q = filter.q?.trim();
+
+  return withTenant(principal.tenantId, async (tx) => {
+    const rows = await tx.studentReceipt.findMany({
+      where: {
+        tenantId: principal.tenantId,
+        ...(filter.studentId ? { studentId: filter.studentId } : {}),
+        ...(filter.channel ? { channel: filter.channel } : {}),
+        ...(filter.mine ? { createdById: principal.userId } : {}),
+        ...(filter.from || filter.to
+          ? {
+              docDate: {
+                ...(filter.from ? { gte: toDateOnly(filter.from) } : {}),
+                ...(filter.to ? { lte: toDateOnly(filter.to) } : {}),
+              },
+            }
+          : {}),
+        ...(q
+          ? {
+              OR: [
+                { receiptNo: { contains: q, mode: 'insensitive' as const } },
+                { reference: { contains: q, mode: 'insensitive' as const } },
+                { chequeNo: { contains: q, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ docDate: 'desc' }, { createdAt: 'desc' }],
+      take: filter.take ?? 100,
+      select: {
+        id: true,
+        receiptNo: true,
+        docDate: true,
+        channel: true,
+        amount: true,
+        allocatedAmount: true,
+        reference: true,
+        chequeNo: true,
+        cancelledAt: true,
+        dishonouredAt: true,
+        student: { select: { id: true, studentNo: true, fullNameAr: true, fullNameEn: true } },
+        cashier: { select: { fullName: true } },
+      },
+    });
+
+    return rows.map((r) => ({
+      id: r.id,
+      receiptNo: r.receiptNo,
+      docDate: r.docDate,
+      channel: r.channel,
+      amount: r.amount.toFixed(4),
+      allocated: r.allocatedAmount.toFixed(4),
+      reference: r.reference,
+      chequeNo: r.chequeNo,
+      studentId: r.student.id,
+      studentNo: r.student.studentNo,
+      fullNameAr: r.student.fullNameAr,
+      fullNameEn: r.student.fullNameEn,
+      cashierName: r.cashier.fullName,
+      cancelledAt: r.cancelledAt,
+      dishonouredAt: r.dishonouredAt,
+      cancellableToday:
+        r.cancelledAt === null && r.dishonouredAt === null && r.docDate.getTime() === today,
+    }));
+  });
+}
+
+export interface DaySheet {
+  date: Date;
+  cashierName: string;
+  /** Null when no till has been assigned — which is also why cash cannot be
+   *  taken at all; see `resolveDebitAccount`. */
+  till: { accountCode: string; accountNameAr: string; accountNameEn: string } | null;
+  byChannel: Array<{ channel: PaymentChannel; count: number; total: string }>;
+  /** Cash only: the figure to count the drawer against. */
+  cashTotal: string;
+  total: string;
+  cancelledCount: number;
+  cancelledTotal: string;
+}
+
+/**
+ * What one cashier took on one day (SRS REQ-CSH-04).
+ *
+ * Reads the receipts rather than the ledger, and reads one cashier's, because
+ * "who is short today" is the question — and it is the question the legacy
+ * `IncomeListByCollecter` report had to answer by grouping on a **name
+ * column**, since every cashier's cash was posted to one account literally
+ * called `"Cash on Hand"` (frmStudantReceiptVoucher.vb:430).
+ *
+ * This is a day sheet, not a shift close. Nothing here is counted, asserted,
+ * signed or retained — see §8.1, where the declared close is recorded as a
+ * finding held open against A3, because a cash count that is stored and
+ * compared is a business rule and Track D does not write those.
+ */
+export async function cashierDaySheet(
+  principal: Principal,
+  opts: { on?: Date; userId?: string } = {},
+): Promise<DaySheet> {
+  requirePermission(principal, 'student.read');
+
+  // Reading another cashier's day is a supervisor's act, not a peer's.
+  const userId = opts.userId ?? principal.userId;
+  if (userId !== principal.userId) requirePermission(principal, 'report.financial');
+
+  const date = toDateOnly(opts.on ?? new Date());
+
+  return withTenant(principal.tenantId, async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true },
+    });
+    const till = await tx.cashierTill.findUnique({
+      where: { userId },
+      select: {
+        isActive: true,
+        cashAccount: { select: { code: true, nameAr: true, nameEn: true } },
+      },
+    });
+    const rows = await tx.studentReceipt.findMany({
+      where: { tenantId: principal.tenantId, docDate: date, createdById: userId },
+      select: { channel: true, amount: true, cancelledAt: true },
+    });
+
+    const live = rows.filter((r) => r.cancelledAt === null);
+    const cancelled = rows.filter((r) => r.cancelledAt !== null);
+
+    const byChannel = new Map<PaymentChannel, { count: number; total: Money }>();
+    for (const r of live) {
+      const entry = byChannel.get(r.channel) ?? { count: 0, total: ZERO };
+      byChannel.set(r.channel, { count: entry.count + 1, total: entry.total.plus(r.amount) });
+    }
+
+    return {
+      date,
+      cashierName: user?.fullName ?? '',
+      till:
+        till && till.isActive
+          ? {
+              accountCode: till.cashAccount.code,
+              accountNameAr: till.cashAccount.nameAr,
+              accountNameEn: till.cashAccount.nameEn,
+            }
+          : null,
+      byChannel: [...byChannel.entries()].map(([channel, v]) => ({
+        channel,
+        count: v.count,
+        total: v.total.toFixed(4),
+      })),
+      cashTotal: (byChannel.get('CASH')?.total ?? ZERO).toFixed(4),
+      total: sum(live.map((r) => r.amount)).toFixed(4),
+      cancelledCount: cancelled.length,
+      cancelledTotal: sum(cancelled.map((r) => r.amount)).toFixed(4),
+    };
   });
 }
