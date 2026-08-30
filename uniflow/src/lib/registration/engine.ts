@@ -16,6 +16,7 @@ import {
 import { raiseChargesInTx, reverseChargesInTx } from '@/lib/billing/charge';
 import { assertRegistrationAllowed } from '@/lib/students/holds';
 import { activateOnFirstRegistration } from '@/lib/students/status';
+import { assertAwardCovers } from '@/lib/sponsors/scholarships';
 import { toDateOnly } from '@/lib/ledger/period';
 import { idempotent } from '@/lib/idempotency';
 import { money, sum, toStorage, ZERO, type Money, type MoneyInput } from '@/lib/money';
@@ -151,6 +152,13 @@ export interface RegisterStudentInput {
   discounts?: DiscountInput[];
   /** Required as soon as any discount is applied. */
   discountReason?: string;
+  /**
+   * The scholarship scheme this discount is awarded under (B6, REQ-SPN-04).
+   * Checked against the student's approved awards, so exposure reporting by
+   * scheme is a sum rather than a guess. Omit for a negotiated reduction —
+   * which then shows up under "No scheme named", where it belongs.
+   */
+  discountSchemeId?: string | null;
   /** Optional instalment plan over the term, e.g. `[50, 25, 25]` on 3 dates. */
   instalments?: { dueDates: Date[]; weights?: MoneyInput[] };
 }
@@ -195,6 +203,8 @@ export interface RegistrationQuote {
   /** Above the tenant threshold: the registration will not post until signed. */
   requiresApproval: boolean;
   approvalThresholdPct: string;
+  /** The scholarship scheme the discount is booked to, if one was named. */
+  discountSchemeId: string | null;
 }
 
 export interface RegisteredResult extends RegistrationQuote {
@@ -407,6 +417,16 @@ async function quote(
     );
   }
 
+  // A scheme named on a discount is checked, not decorative: the student must
+  // hold an approved award under it, for at least what is being given away.
+  if (input.discountSchemeId && !discount.isZero()) {
+    await assertAwardCovers(tx, tenantId, {
+      schemeId: input.discountSchemeId,
+      studentId: student.id,
+      discount,
+    });
+  }
+
   const discountPct = gross.isZero()
     ? ZERO
     : discount.dividedBy(gross).times(100).toDecimalPlaces(4);
@@ -441,6 +461,7 @@ async function quote(
     discountPct: discountPct.toFixed(4),
     requiresApproval: discountPct.greaterThan(tenant.discountApprovalThresholdPct),
     approvalThresholdPct: tenant.discountApprovalThresholdPct.toFixed(4),
+    discountSchemeId: input.discountSchemeId ?? null,
   };
 }
 
@@ -613,6 +634,7 @@ async function registerInTx(
       netAmount: q.net,
       discountPct: q.discountPct,
       discountReason: input.discountReason?.trim() || null,
+      discountSchemeId: input.discountSchemeId ?? null,
       // Nothing posts while a discount is awaiting its second signature.
       status: q.requiresApproval ? 'PENDING_APPROVAL' : 'REGISTERED',
       verifyToken: newVerifyToken(),

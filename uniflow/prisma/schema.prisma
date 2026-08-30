@@ -529,6 +529,16 @@ model Tenant {
   refundPolicies    RefundPolicy[]
   refundPolicyBands RefundPolicyBand[]
 
+  sponsors           Sponsor[]
+  sponsorships       Sponsorship[]
+  sponsorshipLines   SponsorshipLine[]
+  chargeSponsorships ChargeSponsorship[]
+  sponsorInvoices    SponsorInvoice[]
+  sponsorReceipts    SponsorReceipt[]
+  sponsorAllocations SponsorReceiptAllocation[]
+  scholarshipSchemes ScholarshipScheme[]
+  scholarshipAwards  ScholarshipAward[]
+
   @@map("tenants")
 }
 
@@ -591,6 +601,15 @@ model User {
   documentsUploaded StudentDocument[] @relation("DocumentUploader")
   documentsVerified StudentDocument[] @relation("DocumentVerifier")
   medicalRecorded   MedicalRecord[]   @relation("MedicalRecorder")
+
+  sponsorsCreated       Sponsor[]           @relation("SponsorCreator")
+  sponsorshipsCreated   Sponsorship[]       @relation("SponsorshipCreator")
+  sponsorshipsApproved  Sponsorship[]       @relation("SponsorshipApprover")
+  sponsorInvoicesRaised SponsorInvoice[]    @relation("SponsorInvoiceCreator")
+  sponsorReceiptsTaken  SponsorReceipt[]    @relation("SponsorReceiptCreator")
+  schemesCreated        ScholarshipScheme[] @relation("SchemeCreator")
+  awardsProposed        ScholarshipAward[]  @relation("AwardProposer")
+  awardsDecided         ScholarshipAward[]  @relation("AwardDecider")
 
   statusRecorded    StudentStatusHistory[]    @relation("StatusRecorder")
   statusApproved    StudentStatusHistory[]    @relation("StatusApprover")
@@ -1044,20 +1063,22 @@ model TransactionHeader {
   lines        TransactionLine[]
   draft        VoucherDraft?
 
-  chargesRaised         StudentCharge[]        @relation("ChargePosting")
-  chargesReversed       StudentCharge[]        @relation("ChargeReversalPosting")
-  studentReceipt        StudentReceipt?        @relation("ReceiptPosting")
-  receiptCancellation   StudentReceipt?        @relation("ReceiptCancellationPosting")
-  recognitions          RecognitionEntry[]     @relation("RecognitionPosting")
-  chequeEvents          ChequeEvent[]          @relation("ChequeEventPosting")
-  receiptDishonours     StudentReceipt[]       @relation("ReceiptDishonourPosting")
-  assetCapitalisations  FixedAsset[]           @relation("AssetCapitalisation")
-  assetDisposal         FixedAsset?            @relation("AssetDisposal")
-  depreciationEntries   DepreciationEntry[]    @relation("DepreciationPosting")
-  registrationsBilled   SemesterRegistration[] @relation("RegistrationPosting")
-  registrationsReversed SemesterRegistration[] @relation("RegistrationReversal")
-  statusReversals       StudentStatusHistory[] @relation("StatusReversal")
-  statusRetentions      StudentStatusHistory[] @relation("StatusRetention")
+  chargesRaised           StudentCharge[]        @relation("ChargePosting")
+  chargesReversed         StudentCharge[]        @relation("ChargeReversalPosting")
+  studentReceipt          StudentReceipt?        @relation("ReceiptPosting")
+  receiptCancellation     StudentReceipt?        @relation("ReceiptCancellationPosting")
+  recognitions            RecognitionEntry[]     @relation("RecognitionPosting")
+  chequeEvents            ChequeEvent[]          @relation("ChequeEventPosting")
+  receiptDishonours       StudentReceipt[]       @relation("ReceiptDishonourPosting")
+  assetCapitalisations    FixedAsset[]           @relation("AssetCapitalisation")
+  assetDisposal           FixedAsset?            @relation("AssetDisposal")
+  depreciationEntries     DepreciationEntry[]    @relation("DepreciationPosting")
+  registrationsBilled     SemesterRegistration[] @relation("RegistrationPosting")
+  registrationsReversed   SemesterRegistration[] @relation("RegistrationReversal")
+  sponsorReceipts         SponsorReceipt[]       @relation("SponsorReceiptPosting")
+  sponsorReceiptReversals SponsorReceipt[]       @relation("SponsorReceiptReversal")
+  statusReversals         StudentStatusHistory[] @relation("StatusReversal")
+  statusRetentions        StudentStatusHistory[] @relation("StatusRetention")
 
   goodsReceipt        GoodsReceipt?   @relation("GoodsReceiptPosting")
   vendorInvoice       VendorInvoice?  @relation("InvoicePosting")
@@ -1230,6 +1251,7 @@ model FeeItem {
   charges           StudentCharge[]
   scheduleLines     FeeScheduleLine[]
   registrationLines RegistrationLine[]
+  sponsorshipLines  SponsorshipLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId, isActive, sortOrder])
@@ -1306,6 +1328,8 @@ model Student {
   statusHistory     StudentStatusHistory[]
   holds             Hold[]
   programmeHistory  StudentProgrammeHistory[]
+  sponsorships      Sponsorship[]
+  awards            ScholarshipAward[]
 
   @@unique([tenantId, studentNo])
   @@index([tenantId, searchKey])
@@ -1346,9 +1370,18 @@ model StudentCharge {
   /// Scholarship or staff-child discount. Held as an expense, not netted off
   /// revenue, so discount exposure is reportable on its own line.
   discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(19, 4)
-  /// What the student owes: gross − discount.
+  /// What was billed: gross − discount. NOT what the student personally owes
+  /// once a sponsor is involved — see `sponsoredAmount`.
   netAmount      Decimal @map("net_amount") @db.Decimal(19, 4)
-  /// Maintained as receipts allocate against it. Never exceeds netAmount.
+  /// The part a sponsor is carrying (REQ-SPN-02, B6). Debited to Sponsor AR
+  /// rather than Student AR, so the student's own debt on this charge is
+  /// `netAmount - sponsoredAmount` and their statement shows only that.
+  /// Maintained from the `ChargeSponsorship` rows, which are the sponsor
+  /// sub-ledger; reduced when a sponsor defaults and the balance is written
+  /// back to the student.
+  sponsoredAmount Decimal @default(0) @map("sponsored_amount") @db.Decimal(19, 4)
+  /// Maintained as receipts allocate against it. Never exceeds the student's
+  /// own portion.
   settledAmount  Decimal @default(0) @map("settled_amount") @db.Decimal(19, 4)
 
   /// True when billing credited unearned income rather than revenue.
@@ -1367,16 +1400,17 @@ model StudentCharge {
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student          Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  feeItem          FeeItem               @relation(fields: [feeItemId], references: [id])
-  posting          TransactionHeader     @relation("ChargePosting", fields: [postedHeaderId], references: [id])
-  reversal         TransactionHeader?    @relation("ChargeReversalPosting", fields: [reversalHeaderId], references: [id])
-  createdBy        User                  @relation("ChargeCreator", fields: [createdById], references: [id])
-  allocations      ReceiptAllocation[]
-  recognitions     RecognitionEntry[]
-  registration     SemesterRegistration? @relation(fields: [registrationId], references: [id])
-  registrationLine RegistrationLine?     @relation("ChargeRegistrationLine")
+  tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student            Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeItem            FeeItem               @relation(fields: [feeItemId], references: [id])
+  posting            TransactionHeader     @relation("ChargePosting", fields: [postedHeaderId], references: [id])
+  reversal           TransactionHeader?    @relation("ChargeReversalPosting", fields: [reversalHeaderId], references: [id])
+  createdBy          User                  @relation("ChargeCreator", fields: [createdById], references: [id])
+  allocations        ReceiptAllocation[]
+  recognitions       RecognitionEntry[]
+  registration       SemesterRegistration? @relation(fields: [registrationId], references: [id])
+  registrationLine   RegistrationLine?     @relation("ChargeRegistrationLine")
+  sponsorships       ChargeSponsorship[]
 
   @@index([tenantId, studentId, reversedAt])
   @@index([tenantId, dueDate])
@@ -2588,9 +2622,11 @@ model AcademicYear {
   endDate   DateTime             @map("end_date") @db.Date
   status    AcademicPeriodStatus @default(PLANNED)
 
-  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  terms         AcademicTerm[]
-  registrations SemesterRegistration[]
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  terms              AcademicTerm[]
+  registrations      SemesterRegistration[]
+  scholarshipSchemes ScholarshipScheme[]
+  scholarshipAwards  ScholarshipAward[]
 
   @@unique([tenantId, code])
   @@index([tenantId, startDate])
@@ -3391,6 +3427,11 @@ model SemesterRegistration {
   discountPct    Decimal @default(0) @map("discount_pct") @db.Decimal(7, 4)
   discountReason String? @map("discount_reason")
 
+  /// The scholarship scheme this registration's discount was awarded under
+  /// (SRS REQ-SPN-04). Null for an ad-hoc or negotiated reduction, which is
+  /// what makes the two distinguishable in the exposure report — the legacy
+  /// `DiscDescr` was free text and could not tell a scheme from a note.
+  discountSchemeId     String?   @map("discount_scheme_id") @db.Uuid
   discountApprovedById String?   @map("discount_approved_by_id") @db.Uuid
   discountApprovedAt   DateTime? @map("discount_approved_at") @db.Timestamptz(6)
 
@@ -3417,23 +3458,24 @@ model SemesterRegistration {
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  student            Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  programme          Programme                @relation(fields: [programmeId], references: [id])
-  batch              Batch                    @relation(fields: [batchId], references: [id])
-  admissionCategory  AdmissionCategory        @relation(fields: [admissionCategoryId], references: [id])
-  academicYear       AcademicYear             @relation(fields: [academicYearId], references: [id])
-  academicTerm       AcademicTerm             @relation(fields: [academicTermId], references: [id])
-  feeSchedule        FeeSchedule              @relation(fields: [feeScheduleId], references: [id])
-  posting            TransactionHeader?       @relation("RegistrationPosting", fields: [postedHeaderId], references: [id])
-  reversal           TransactionHeader?       @relation("RegistrationReversal", fields: [reversalHeaderId], references: [id])
-  createdBy          User                     @relation("RegistrationCreator", fields: [createdById], references: [id])
-  discountApprovedBy User?                    @relation("RegistrationDiscountApprover", fields: [discountApprovedById], references: [id])
-  cancelledBy        User?                    @relation("RegistrationCanceller", fields: [cancelledById], references: [id])
-  lines              RegistrationLine[]
-  charges            StudentCharge[]
-  transferReversedBy StudentProgrammeHistory? @relation("TransferReversed")
-  transferRaisedBy   StudentProgrammeHistory? @relation("TransferRaised")
+  tenant              Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student             Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  programme           Programme                @relation(fields: [programmeId], references: [id])
+  batch               Batch                    @relation(fields: [batchId], references: [id])
+  admissionCategory   AdmissionCategory        @relation(fields: [admissionCategoryId], references: [id])
+  academicYear        AcademicYear             @relation(fields: [academicYearId], references: [id])
+  academicTerm        AcademicTerm             @relation(fields: [academicTermId], references: [id])
+  feeSchedule         FeeSchedule              @relation(fields: [feeScheduleId], references: [id])
+  discountScheme      ScholarshipScheme?       @relation(fields: [discountSchemeId], references: [id])
+  posting             TransactionHeader?       @relation("RegistrationPosting", fields: [postedHeaderId], references: [id])
+  reversal            TransactionHeader?       @relation("RegistrationReversal", fields: [reversalHeaderId], references: [id])
+  createdBy           User                     @relation("RegistrationCreator", fields: [createdById], references: [id])
+  discountApprovedBy  User?                    @relation("RegistrationDiscountApprover", fields: [discountApprovedById], references: [id])
+  cancelledBy         User?                    @relation("RegistrationCanceller", fields: [cancelledById], references: [id])
+  lines               RegistrationLine[]
+  charges             StudentCharge[]
+  transferReversedBy  StudentProgrammeHistory? @relation("TransferReversed")
+  transferRaisedBy    StudentProgrammeHistory? @relation("TransferRaised")
 
   @@unique([tenantId, registrationNo])
   @@unique([tenantId, verifyToken])
@@ -3738,4 +3780,390 @@ model RefundPolicyBand {
   @@unique([policyId, withinDays])
   @@index([tenantId, policyId])
   @@map("refund_policy_bands")
+}
+
+// ---------------------------------------------------------------------------
+// Sponsors, scholarships and discount governance (SRS Module 15 — Track B6)
+//
+// Neither legacy build has a sponsor. A ministry, an embassy or a company
+// paying a student's fees is recorded as a **string in a combo box** on the
+// registration form:
+//
+//     Me.CombAccType.Items.AddRange(New Object() { _
+//         "النفقة الخاصة", "أشقاء", "أبناء عاملين", "منحة مجانية", "أبناء شرطة"})
+//
+// (frmRegisteration.designer.vb:587) — self-funded, siblings, staff children,
+// free scholarship, police children. The chosen literal is concatenated into
+// an `AcceptType` column on the student row
+// (frmRegisteration.vb:205). There is no scheme, no budget, no cap, no
+// approval, no award record and no counterparty: a sponsored student is a
+// student whose text column happens to contain a particular Arabic phrase,
+// and the money is billed to the student either way.
+//
+// Discount exposure exists only as two SQL views the reports read —
+// `viewDiscount` and `viewDiscountSummary` — which reconstruct what was given
+// away as `CollegeFees.TuitionFees - Transactions.TuitionFees`, a subtraction
+// between two tables that B4 showed do not agree. The number they produce is
+// the difference between the published fee and a posting that was itself
+// wrong.
+// ---------------------------------------------------------------------------
+
+enum SponsorType {
+  GOVERNMENT_MINISTRY
+  EMBASSY
+  CORPORATE
+  FOUNDATION
+  INDIVIDUAL
+}
+
+/// How often a sponsor is invoiced for what has accrued against them.
+enum SponsorBillingCycle {
+  PER_TERM
+  PER_YEAR
+  MONTHLY
+}
+
+enum SponsorshipStatus {
+  DRAFT
+  ACTIVE
+  ENDED
+}
+
+enum SponsorInvoiceStatus {
+  ISSUED
+  PARTIALLY_SETTLED
+  SETTLED
+  CANCELLED
+}
+
+enum ScholarshipAwardStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// An organisation that pays some or all of a student's fees.
+///
+/// A counterparty with its own sub-ledger identity, not a phrase on a student
+/// record. The whole point is that "how much does the Ministry of Higher
+/// Education owe us" is a question with an answer.
+model Sponsor {
+  id          String      @id @default(uuid()) @db.Uuid
+  tenantId    String      @map("tenant_id") @db.Uuid
+  code        String
+  nameAr      String      @map("name_ar")
+  nameEn      String      @map("name_en")
+  sponsorType SponsorType @map("sponsor_type")
+
+  contactName     String?             @map("contact_name")
+  email           String?
+  phone           String?
+  billingAddress  String?             @map("billing_address")
+  billingCycle    SponsorBillingCycle @default(PER_TERM) @map("billing_cycle")
+  /// Days from invoice date to due date. Feeds the aging report.
+  paymentTermDays Int                 @default(30) @map("payment_term_days")
+
+  isActive Boolean @default(true) @map("is_active")
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy    User                @relation("SponsorCreator", fields: [createdById], references: [id])
+  sponsorships Sponsorship[]
+  splits       ChargeSponsorship[]
+  invoices     SponsorInvoice[]
+  receipts     SponsorReceipt[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("sponsors")
+}
+
+/// One sponsor's undertaking to pay for one student, over a date range.
+///
+/// Effective-dated for the same reason a fee schedule is: what a term was
+/// billed under has to stay answerable after the contract is renewed or ends.
+model Sponsorship {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  sponsorId String @map("sponsor_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  /// The sponsor's own contract or letter number. What they will quote back.
+  reference String?
+
+  validFrom DateTime  @map("valid_from") @db.Date
+  /// Null is open-ended.
+  validTo   DateTime? @map("valid_to") @db.Date
+
+  /// Ceiling across the whole contract, in the tenant's functional currency.
+  /// Null is uncapped. `consumedAmount` is maintained as charges are split,
+  /// so the cap is a control rather than a figure somebody checks afterwards.
+  capAmount      Decimal? @map("cap_amount") @db.Decimal(19, 4)
+  consumedAmount Decimal  @default(0) @map("consumed_amount") @db.Decimal(19, 4)
+
+  status SponsorshipStatus @default(DRAFT)
+
+  /// Two signatures, as with a fee schedule: whoever writes the contract terms
+  /// does not also activate them.
+  createdById  String    @map("created_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  approvedById String?   @map("approved_by_id") @db.Uuid
+  approvedAt   DateTime? @map("approved_at") @db.Timestamptz(6)
+  endedAt      DateTime? @map("ended_at") @db.Timestamptz(6)
+  endedReason  String?   @map("ended_reason")
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sponsor    Sponsor             @relation(fields: [sponsorId], references: [id])
+  student    Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy  User                @relation("SponsorshipCreator", fields: [createdById], references: [id])
+  approvedBy User?               @relation("SponsorshipApprover", fields: [approvedById], references: [id])
+  lines      SponsorshipLine[]
+  splits     ChargeSponsorship[]
+
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, sponsorId, status])
+  @@map("sponsorships")
+}
+
+/// What the contract covers, per fee item.
+///
+/// `feeItemId` null is the fallback that covers any item — the same shape as
+/// the fee matrix's nationality fallback, and for the same reason: most
+/// contracts say "tuition only" or "everything", and forcing one row per
+/// catalogue item to say so guarantees one of them is eventually forgotten.
+model SponsorshipLine {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  sponsorshipId String  @map("sponsorship_id") @db.Uuid
+  feeItemId     String? @map("fee_item_id") @db.Uuid
+
+  coveragePct Decimal  @map("coverage_pct") @db.Decimal(7, 4)
+  /// Per-charge ceiling. A contract may cover 100% of tuition "up to 800,000".
+  capAmount   Decimal? @map("cap_amount") @db.Decimal(19, 4)
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sponsorship Sponsorship @relation(fields: [sponsorshipId], references: [id], onDelete: Cascade)
+  feeItem     FeeItem?    @relation(fields: [feeItemId], references: [id])
+
+  @@unique([sponsorshipId, feeItemId])
+  @@index([tenantId, feeItemId])
+  @@map("sponsorship_lines")
+}
+
+/// The sponsor's share of one billed charge — the sponsor sub-ledger.
+///
+/// Written at billing time (REQ-SPN-02), which is what keeps the student's
+/// statement showing only what the student personally owes. The student's own
+/// debt on a charge is `net_amount - sponsored_amount`; this row is the other
+/// side of that subtraction, and it carries SPONSOR identity into the control
+/// account exactly as a `StudentCharge` carries STUDENT identity.
+model ChargeSponsorship {
+  id            String @id @default(uuid()) @db.Uuid
+  tenantId      String @map("tenant_id") @db.Uuid
+  chargeId      String @map("charge_id") @db.Uuid
+  sponsorshipId String @map("sponsorship_id") @db.Uuid
+  sponsorId     String @map("sponsor_id") @db.Uuid
+
+  amount            Decimal @db.Decimal(19, 4)
+  /// Maintained as sponsor receipts allocate against it.
+  settledAmount     Decimal @default(0) @map("settled_amount") @db.Decimal(19, 4)
+  /// Moved back to the student when the sponsor defaults (REQ-SPN-03).
+  writtenBackAmount Decimal @default(0) @map("written_back_amount") @db.Decimal(19, 4)
+
+  /// Set when this share is consolidated onto a sponsor invoice. A share is
+  /// invoiced once — unique index, not a convention.
+  invoiceId String? @map("invoice_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant      Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  charge      StudentCharge              @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  sponsorship Sponsorship                @relation(fields: [sponsorshipId], references: [id])
+  sponsor     Sponsor                    @relation(fields: [sponsorId], references: [id])
+  invoice     SponsorInvoice?            @relation(fields: [invoiceId], references: [id])
+  allocations SponsorReceiptAllocation[]
+
+  @@unique([chargeId, sponsorshipId])
+  @@index([tenantId, sponsorId, settledAmount])
+  @@index([tenantId, invoiceId])
+  @@map("charge_sponsorships")
+}
+
+/// A consolidated bill to a sponsor for a period (REQ-SPN-03).
+///
+/// **It posts nothing.** The Sponsor AR was debited when each charge was
+/// split at billing time, so an invoice that posted again would bill the
+/// sponsor twice for the same students. It is a statement over shares that
+/// already exist, and it exists so that a sponsor has one document to pay
+/// against and the aging report has a due date to age from.
+model SponsorInvoice {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  sponsorId String @map("sponsor_id") @db.Uuid
+  invoiceNo String @map("invoice_no")
+
+  periodFrom DateTime @map("period_from") @db.Date
+  periodTo   DateTime @map("period_to") @db.Date
+  docDate    DateTime @map("doc_date") @db.Date
+  dueDate    DateTime @map("due_date") @db.Date
+
+  currency      String  @db.Char(3)
+  totalAmount   Decimal @map("total_amount") @db.Decimal(19, 4)
+  settledAmount Decimal @default(0) @map("settled_amount") @db.Decimal(19, 4)
+
+  status SponsorInvoiceStatus @default(ISSUED)
+
+  cancelledAt     DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelledReason String?   @map("cancelled_reason")
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sponsor   Sponsor             @relation(fields: [sponsorId], references: [id])
+  createdBy User                @relation("SponsorInvoiceCreator", fields: [createdById], references: [id])
+  shares    ChargeSponsorship[]
+
+  @@unique([tenantId, invoiceNo])
+  @@index([tenantId, sponsorId, status])
+  @@index([tenantId, dueDate])
+  @@map("sponsor_invoices")
+}
+
+/// Money from a sponsor.
+///
+/// Mirrors `StudentReceipt` deliberately, down to the idempotency key: it is
+/// the same act against a different counterparty, and two different shapes for
+/// one act is how a system ends up with two reconciliations.
+model SponsorReceipt {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  sponsorId String @map("sponsor_id") @db.Uuid
+  receiptNo String @map("receipt_no")
+
+  docDate         DateTime       @map("doc_date") @db.Date
+  channel         PaymentChannel
+  amount          Decimal        @db.Decimal(19, 4)
+  /// Matched against sponsor shares. Never exceeds `amount`.
+  allocatedAmount Decimal        @default(0) @map("allocated_amount") @db.Decimal(19, 4)
+  currency        String         @db.Char(3)
+
+  /// Transfer reference, bank slip, cheque number.
+  reference String?
+  note      String?
+
+  postedHeaderId   String    @map("posted_header_id") @db.Uuid
+  cancelledAt      DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelReason     String?   @map("cancel_reason")
+  reversalHeaderId String?   @map("reversal_header_id") @db.Uuid
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant      Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sponsor     Sponsor                    @relation(fields: [sponsorId], references: [id])
+  posting     TransactionHeader          @relation("SponsorReceiptPosting", fields: [postedHeaderId], references: [id])
+  reversal    TransactionHeader?         @relation("SponsorReceiptReversal", fields: [reversalHeaderId], references: [id])
+  createdBy   User                       @relation("SponsorReceiptCreator", fields: [createdById], references: [id])
+  allocations SponsorReceiptAllocation[]
+
+  @@unique([tenantId, receiptNo])
+  @@index([tenantId, sponsorId, docDate])
+  @@map("sponsor_receipts")
+}
+
+model SponsorReceiptAllocation {
+  id                  String @id @default(uuid()) @db.Uuid
+  tenantId            String @map("tenant_id") @db.Uuid
+  receiptId           String @map("receipt_id") @db.Uuid
+  chargeSponsorshipId String @map("charge_sponsorship_id") @db.Uuid
+
+  amount Decimal @db.Decimal(19, 4)
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  receipt           SponsorReceipt    @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  chargeSponsorship ChargeSponsorship @relation(fields: [chargeSponsorshipId], references: [id], onDelete: Cascade)
+
+  @@unique([receiptId, chargeSponsorshipId])
+  @@index([tenantId, chargeSponsorshipId])
+  @@map("sponsor_receipt_allocations")
+}
+
+/// A named scholarship with a budget (REQ-SPN-04).
+///
+/// The legacy equivalent is the string "منحة مجانية" in a combo box. A scheme
+/// here has a cap that is **checked when an award is approved**, not reported
+/// afterwards — the same distinction B2 drew for seat quotas and A6 for
+/// budgets, and the same one the legacy build got wrong all three times.
+model ScholarshipScheme {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  code     String
+  nameAr   String @map("name_ar")
+  nameEn   String @map("name_en")
+
+  /// The budget is stated for an academic year, because that is how an
+  /// institution votes one. Null means the scheme is not year-bounded.
+  academicYearId String? @map("academic_year_id") @db.Uuid
+
+  /// Total the scheme may give away. Null is uncapped, which is a decision
+  /// somebody has to take deliberately rather than a default.
+  budgetCap     Decimal? @map("budget_cap") @db.Decimal(19, 4)
+  /// Maintained as awards are approved.
+  awardedAmount Decimal  @default(0) @map("awarded_amount") @db.Decimal(19, 4)
+
+  eligibilityNote String? @map("eligibility_note")
+  isActive        Boolean @default(true) @map("is_active")
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  academicYear  AcademicYear?          @relation(fields: [academicYearId], references: [id])
+  createdBy     User                   @relation("SchemeCreator", fields: [createdById], references: [id])
+  awards        ScholarshipAward[]
+  registrations SemesterRegistration[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("scholarship_schemes")
+}
+
+/// One award to one student under one scheme, and the register of them.
+///
+/// Two signatures: whoever proposes an award does not approve it. Only an
+/// APPROVED award consumes the scheme's budget, and only an approved award
+/// may be named on a registration's discount.
+model ScholarshipAward {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  schemeId  String @map("scheme_id") @db.Uuid
+  studentId String @map("student_id") @db.Uuid
+
+  academicYearId String? @map("academic_year_id") @db.Uuid
+
+  amount Decimal @db.Decimal(19, 4)
+  reason String
+
+  status ScholarshipAwardStatus @default(PROPOSED)
+
+  proposedById String    @map("proposed_by_id") @db.Uuid
+  proposedAt   DateTime  @default(now()) @map("proposed_at") @db.Timestamptz(6)
+  decidedById  String?   @map("decided_by_id") @db.Uuid
+  decidedAt    DateTime? @map("decided_at") @db.Timestamptz(6)
+  decisionNote String?   @map("decision_note")
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scheme       ScholarshipScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  student      Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear?     @relation(fields: [academicYearId], references: [id])
+  proposedBy   User              @relation("AwardProposer", fields: [proposedById], references: [id])
+  decidedBy    User?             @relation("AwardDecider", fields: [decidedById], references: [id])
+
+  @@index([tenantId, schemeId, status])
+  @@index([tenantId, studentId, status])
+  @@map("scholarship_awards")
 }

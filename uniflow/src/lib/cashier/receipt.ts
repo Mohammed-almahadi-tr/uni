@@ -376,11 +376,17 @@ async function outstandingCharges(
       { docDate: 'asc' },
       { createdAt: 'asc' },
     ],
-    select: { id: true, netAmount: true, settledAmount: true },
+    select: { id: true, netAmount: true, sponsoredAmount: true, settledAmount: true },
   });
 
+  // A student's money settles the student's portion. The sponsored part of a
+  // charge is the sponsor's debt, and letting a student's receipt clear it
+  // would leave the sponsor's sub-ledger saying it was still owed.
   return rows
-    .map((r) => ({ id: r.id, outstanding: r.netAmount.minus(r.settledAmount) }))
+    .map((r) => ({
+      id: r.id,
+      outstanding: r.netAmount.minus(r.sponsoredAmount).minus(r.settledAmount),
+    }))
     .filter((r) => r.outstanding.greaterThan(0));
 }
 

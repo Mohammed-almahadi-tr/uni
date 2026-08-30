@@ -440,6 +440,14 @@ async function applyConsequence(
       // Recognised now, not across the term: the student has left, and what
       // the institution keeps it has already earned.
       recognitionPeriodIds: [period.fiscalPeriodId],
+      // Coverage is resolved again on the retained lines, deliberately. The
+      // reversal a moment ago credited each sponsor back their whole share
+      // and handed the contract cap back, so re-splitting apportions the
+      // retention between student and sponsor in the contract's own
+      // proportions: a 60%-funded student who withdraws owing 500,000 owes
+      // 200,000 of it personally. Billing the retention wholly to the student
+      // would hand the sponsor a refund of money the institution kept — the
+      // deferral B5 recorded, closed here (B6, REQ-SPN-03).
       lines: retainedLines,
     });
     retentionHeaderId = raised.headerId;

@@ -201,13 +201,18 @@ export async function overdueInstalments(
 
     const charges = await tx.studentCharge.findMany({
       where: { tenantId: principal.tenantId, studentId: { in: studentIds }, reversedAt: null },
-      select: { studentId: true, netAmount: true, settledAmount: true },
+      select: {
+        studentId: true,
+        netAmount: true,
+        sponsoredAmount: true,
+        settledAmount: true,
+      },
     });
 
     const owed = new Map<string, ReturnType<typeof toStorage>>();
     for (const c of charges) {
       const cur = owed.get(c.studentId);
-      const delta = c.netAmount.minus(c.settledAmount);
+      const delta = c.netAmount.minus(c.sponsoredAmount).minus(c.settledAmount);
       owed.set(c.studentId, cur ? cur.plus(delta) : delta);
     }
 

@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**745 tests pass across 22 suites; typecheck, lint and production build are all
+**779 tests pass across 23 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -44,12 +44,12 @@ income statement, sub-ledger reconciliation and their exports — together with
 the two Module 12 requirements the statements depend on, opening balances and
 the year-end close. See §0.2.
 
-**Track B is five-sixths complete, and the convergence milestone is passed.**
-B1 — academic structure and the effective-dated, versioned fee matrix — B2 —
-admissions capacity, eligibility screening and the committee workflow — B3 —
-the student profile, per-programme document checklists and medical records —
-**B4, the semester registration engine** — and **B5, the status lifecycle,
-programme transfer and holds** — are all complete; see §6.1.
+**Track B is complete, B1-B6**: academic structure and the effective-dated,
+versioned fee matrix; admissions capacity, eligibility screening and the
+committee workflow; the student profile, per-programme document checklists and
+medical records; the semester registration engine; the status lifecycle,
+programme transfer and holds; and sponsors, scholarships and discount
+governance. See §6.1.
 
 B4 closed milestone `m1`: a registration and its balanced double entry are one
 database transaction. In the legacy build they were two systems reconciled by
@@ -59,10 +59,14 @@ system"*.
 
 B5 closed the seam B4 left open — a hold now blocks a registration, and
 arrears are a control rather than the four reports the legacy build computed
-and never consulted. **B6 — sponsors, scholarships and discount governance —
-is the last of Track B**, and it inherits one deferral named in §6.1: a
-withdrawal currently refunds to the student's own credit balance, and where a
-sponsor paid the fees the refund is owed to the sponsor.
+and never consulted. B6 closed the deferral B5 recorded: a sponsored student's
+refund apportions back to the sponsor, because the term's reversal releases
+the sponsor's share and the retained portion re-splits under the same
+contract.
+
+**Tracks A and B are both closed. Track C — the public surface — is the
+remaining work**, together with the two Phase 7-8 academic-records phases that
+were deliberately scoped out of v1.
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -1049,7 +1053,7 @@ Even though Phases 7-8 are out of v1 scope, the Phase 0 schema must not preclude
 
 **B5 · Status Lifecycle, Transfer & Holds** *(built — see §6.1)* — The full status state machine with effective-dated history, each transition declaring its financial consequence. Programme transfer reversing the prior programme's billing by linked reversal and posting the new. Holds (financial, academic, disciplinary, documentary) that block registration, with placement and clearance authority.
 
-**B6 · Sponsors, Scholarships & Discount Governance** — Sponsor master with contract terms. Split funding apportioning charges across self-pay and sponsors at billing time, so a student's statement shows only what the student owes. Sponsor invoicing, settlement and aging; sponsor-default transfer back to the student. Scholarship schemes with budget caps and award approval. Discount exposure reporting by faculty, programme, batch, scheme and year.
+**B6 · Sponsors, Scholarships & Discount Governance** *(built — see §6.1)* — Sponsor master with contract terms. Split funding apportioning charges across self-pay and sponsors at billing time, so a student's statement shows only what the student owes. Sponsor invoicing, settlement and aging; sponsor-default transfer back to the student. Scholarship schemes with budget caps and award approval. Discount exposure reporting by faculty, programme, batch, scheme and year.
 
 ---
 
@@ -1898,6 +1902,149 @@ money to a student.
 **Deferred to Track C:** the screens. The withdrawal wizard, the hold banner on
 the registration desk and the status timeline on the student profile are all
 Track C surfaces over the functions above.
+
+---
+
+### B6 — Sponsors, Scholarships & Discount Governance · complete · **Track B closed**
+
+#### A sponsor is a string in a combo box
+
+```vb
+Me.CombAccType.Items.AddRange(New Object() {"النفقة الخاصة", "أشقاء", _
+    "أبناء عاملين", "منحة مجانية", "أبناء شرطة"})
+```
+([frmRegisteration.designer.vb:587](Nile College System - Ribat Univ/Rebat University Application/Forms/frmRegisteration.designer.vb#L587))
+
+Self-funded, siblings, staff children, free scholarship, police children. Five
+string literals compiled into the Ribat registration form. The selected one is
+concatenated into an `AcceptType` column on the student row
+([frmRegisteration.vb:205](Nile College System - Ribat Univ/Rebat University Application/Forms/frmRegisteration.vb#L205)),
+in the same 40-line unparameterised `INSERT` that writes everything else about
+the student.
+
+That is the entire sponsorship and scholarship model in both builds. There is
+no counterparty, no contract, no coverage percentage, no cap, no approval, no
+invoice and no award register. A ministry paying for forty students is five
+characters of Arabic repeated forty times. Nobody can answer *how much does the
+Ministry of Higher Education owe us*, because the fees were billed to the
+students; and nobody can answer *how many scholarships did we grant this year
+and what did they cost*, because a scholarship is a value in a text column.
+
+#### Discount exposure is reconstructed, not recorded
+
+Three Ribat reports read two SQL views, `viewDiscount` and
+`viewDiscountSummary`
+([frmRptDisc.vb:50](Nile College System - Ribat Univ/Rebat University Application/Form/frmRptDisc.vb#L50),
+[frmRptUnivDiscSummary.vb:33](Nile College System - Ribat Univ/Rebat University Application/Form/frmRptUnivDiscSummary.vb#L33)),
+which compute what the institution gave away as
+`CollegeFees.TuitionFees - Transactions.TuitionFees`.
+
+That subtraction cannot work. B4 established that `Transactions`/
+`Transactionees` is posted **gross** while the registration records **net**,
+so the difference between the published fee and the posting is not the
+discount — it is the discount plus whatever the posting got wrong. The
+institution's only view of its own scholarship exposure is the residue of a
+defect.
+
+#### Delivered
+
+| Delivered | Notes |
+| :--- | :--- |
+| **Sponsor master** (REQ-SPN-01) | A counterparty with a code, bilingual name, type, billing cycle, payment terms and its own sub-ledger identity — not a phrase on a student record. Deactivated, never deleted, once contracts refer to it |
+| **Contracts**, effective-dated and versionless | One sponsor, one student, a date range, coverage per fee item. `feeItemId` null is the fallback covering anything — the fee matrix's nationality shape, for the same reason: most contracts say "tuition only" or "everything" |
+| Two ceilings, both controls | A per-line cap ("100% of tuition, up to 800,000") and a contract cap maintained as charges are split. Neither is a figure somebody reconciles afterwards |
+| Two signatures | `sponsor.manage` drafts, `sponsor.approve` puts into force; the SoD matrix refuses one role holding both and the database refuses one person doing both. **A draft funds nothing** — asserted |
+| **One live contract per sponsor per student per day** | GiST exclusion constraint, the same mechanism as fee schedules and academic terms. Two overlapping contracts from one sponsor make "what does this sponsor cover" a question with two answers |
+| **Split funding at billing time** (REQ-SPN-02) | Sponsor share debits Sponsor AR with SPONSOR sub-ledger identity; the rest debits Student AR. One voucher, both counterparties, balanced. Asserted line by line on the registration posting |
+| The student's statement shows **only what the student owes** | `studentBalance`, `statementOfAccount`, aging, receipt allocation, instalment arrears and sub-ledger reconciliation all changed together — a student's money settles the student's portion, and a sponsored student is not in arrears for a ministry's lateness |
+| Two sponsors never cover more than the charge | 70% + 70% is 100%, taken in contract order. Asserted |
+| **Invoicing consolidates and posts nothing** (REQ-SPN-03) | The Sponsor AR was raised when the charge was split. An invoice that posted again would bill the sponsor twice, so `SponsorInvoice` has no `postedHeaderId` at all and a test counts vouchers before and after to prove it. A share is invoiced once, by unique key |
+| **Settlement mirrors the student side** | A sponsor receipt debits cash or bank, credits Sponsor AR, allocates FIFO across invoiced shares, and carries an idempotency key. `reconcileSponsorSubledger` is the A3 check on the other counterparty |
+| Aging from the **invoice due date**, not the charge date | Uninvoiced shares are current however old the charge — a sponsor is not late for a bill nobody sent them, and aging them from the charge date produces a dunning list of the institution's own backlog |
+| **Sponsor default transfers the debt, it does not forgive it** | DR Student AR / CR Sponsor AR, the charge's `sponsoredAmount` reduced so the student's statement starts showing it, and the contract cap handed back. Its own permission, in an SoD pair against `sponsor.invoice` |
+| **Scholarship schemes with a budget that is a control** | An award that would exceed the scheme's budget is refused by name and figures, under an advisory lock so two officers cannot each spend the last of it, and refused again by trigger at COMMIT |
+| Award workflow and register | Propose / approve / reject, approver ≠ proposer in the application and by CHECK, one live award per student per scheme per year, and a rejection that carries a reason the student can appeal |
+| A discount naming a scheme is **checked** | The student must hold an approved award under it, for at least what is being given away. A discount booked to a scheme nobody awarded is what makes exposure reporting fiction |
+| **Discount exposure** by faculty, programme, batch, scheme and year (REQ-SPN-04) | Summed from posted discount lines, not reconstructed by subtraction. Scheme rows carry the budget the exposure is measured against, and reductions with no scheme are grouped under **"No scheme named"** rather than dropped — an institution that has given away 9% of its tuition without naming a scheme needs that figure most of all |
+| Cancelled registrations excluded from exposure | A discount on a term that was reversed cost nothing |
+
+#### The B5 deferral, closed
+
+B5 recorded that a withdrawal returned the whole refundable amount to the
+student's own credit balance, and that where a sponsor had paid it, the refund
+was owed to the sponsor.
+
+It is closed, and by doing **less** rather than more. The withdrawal path
+already reverses the term in full — which credits each sponsor back their
+entire share and hands the contract cap back — and then re-bills the retained
+portion. Because the retention goes through `raiseChargesInTx` like any other
+billing, coverage simply resolves again, and the retained amount apportions in
+the contract's own proportions. A student funded 60% who withdraws owing
+525,000 owes 210,000 of it personally and their sponsor carries 315,000.
+Asserted, along with the sponsor sub-ledger still reconciling afterwards.
+
+The first implementation added a `skipSponsorSplit` flag to the withdrawal
+path on the reasoning that re-resolving would fund the retention twice. That
+was wrong: the reversal releases the whole share, so re-resolving is exactly
+right and the flag would have handed the sponsor a refund of money the
+institution kept. The flag is gone.
+
+#### Two design points worth stating
+
+**One control account, not one per sponsor.** REQ-SPN-01 lists "the sponsor's
+AR sub-ledger account" among the contract terms. Sponsors share a single
+Sponsor AR control account here and are distinguished by sub-ledger identity,
+because an account per sponsor is the legacy mistake — identity as a name — in
+a new place: a hundred embassies would be a hundred level-5 accounts nobody
+reconciles. Recorded as SRS correction 38.
+
+**An invoice to a sponsor posts nothing.** The obvious implementation — treat
+it as a sales document and post it — is how a system ends up with a receivable
+of twice the contracted amount. The receivable exists from the moment the
+charge was split, which is what REQ-SPN-02 requires; the invoice is a statement
+over shares that already exist, giving the sponsor one document to pay against
+and the aging report a due date to age from. `SponsorInvoice` therefore has no
+`posted_header_id` column, and the absence is written down in the migration so
+that a later reader does not "fix" it.
+
+#### Verification
+
+34 tests. The ones that carry the most weight:
+
+- `debits Sponsor AR for the sponsor and Student AR only for the student` —
+  one voucher, two counterparties, 600,000 and 450,000 of a 1,050,000 term.
+- `shows only the student's own debt on their statement and balance`, and
+  `is not arrears for the student when the sponsor is the one who has not
+  paid` — REQ-SPN-02's stated purpose, asserted from the two places a student
+  actually encounters it.
+- `consolidates a period into one invoice and posts nothing` — counts
+  vouchers before and after.
+- `moves the uncollected balance onto the student without forgiving it` —
+  student outstanding rises by exactly what the sponsor stopped carrying, and
+  both sub-ledgers still tie to their control accounts.
+- `apportions the retained portion between student and sponsor` — the B5
+  deferral, written down as arithmetic.
+- `refuses an award that would exceed the scheme budget` — the third time
+  this system has had to make a budget a control rather than a report, after
+  B2's seat quotas and A6's budget lines.
+- `reports exposure by scheme against its budget, and names the unschemed`.
+
+Five constraints are exercised by writing directly as the **owner role**,
+which bypasses RLS: two overlapping contracts for one sponsor and student,
+deleting a sponsor that has contracts, a scheme whose awarded total exceeds
+its budget, a share settled beyond what is owed, and a charge whose sponsored
+amount disagrees with its sponsor sub-ledger rows.
+
+**Deferred to Track C:** the screens — the sponsor portal, the invoice PDF and
+the exposure dashboard are all Track C surfaces over the functions above.
+Sponsor invoice rendering uses the A7 print path.
+
+**Not built, and named rather than assumed:** a sponsor paying more than they
+owe leaves an unallocated balance on the sponsor receipt, exactly as a student
+overpayment does, but there is no sponsor-side equivalent of
+`applyCreditBalance` to sweep it onto the next term's shares. It is a small
+piece of work and it belongs with the sponsor portal, where somebody would
+actually see the credit.
 
 ---
 

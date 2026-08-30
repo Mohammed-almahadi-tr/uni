@@ -3,6 +3,7 @@ import { withTenant, type Tx } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { requireAccounts } from '@/lib/coa/mapping';
+import { resolveCoverage, type CoverageShare } from '@/lib/sponsors/contracts';
 import { post, type PostingLine } from '@/lib/ledger/posting';
 import { resolvePeriod, toDateOnly } from '@/lib/ledger/period';
 import { idempotent } from '@/lib/idempotency';
@@ -83,6 +84,10 @@ export interface RaisedCharges {
   totalNet: string;
   totalGross: string;
   totalDiscount: string;
+  /** The part sponsors are carrying (REQ-SPN-02). */
+  totalSponsored: string;
+  /** What the student personally owes: net less the sponsored portion. */
+  totalStudentPortion: string;
 }
 
 /**
@@ -150,6 +155,7 @@ export async function raiseChargesInTx(
 
   const accounts = await requireAccounts(tx, tenantId, [
     'STUDENT_AR_CONTROL',
+    'SPONSOR_AR_CONTROL',
     'DEFAULT_DISCOUNT_EXPENSE',
   ] as const);
 
@@ -184,6 +190,9 @@ export async function raiseChargesInTx(
     net: Money;
     isDeferred: boolean;
     dueDate: Date | null;
+    /** Sponsor shares of this line (REQ-SPN-02, B6). */
+    shares: CoverageShare[];
+    sponsored: Money;
   }> = [];
 
   for (const [i, line] of input.lines.entries()) {
@@ -231,14 +240,38 @@ export async function raiseChargesInTx(
       ? item.unearnedAccountId ?? item.revenueAccountId
       : item.revenueAccountId;
 
-    // Debit the student for what they owe.
-    if (!net.isZero()) {
+    // Split funding (REQ-SPN-02). Whatever a sponsor carries is debited to
+    // Sponsor AR under the sponsor's own sub-ledger identity, so the
+    // student's statement shows only what the student personally owes. The
+    // legacy build had no counterparty at all: a sponsored student was billed
+    // in full and somebody chased the ministry by telephone.
+    const shares = await resolveCoverage(tx, tenantId, {
+      studentId: student.id,
+      feeItemId: item.id,
+      netAmount: net,
+      onDate: docDate,
+    });
+    const sponsored = sum(shares.map((sh) => sh.amount));
+    const studentPortion = net.minus(sponsored);
+
+    // Debit the student for what they personally owe.
+    if (!studentPortion.isZero()) {
       postingLines.push({
         accountId: accounts.STUDENT_AR_CONTROL,
         subledgerType: 'STUDENT',
         subledgerId: student.id,
-        debit: net,
+        debit: studentPortion,
         description: `${item.nameEn} — ${student.studentNo}`,
+      });
+    }
+    // Debit each sponsor for their share.
+    for (const share of shares) {
+      postingLines.push({
+        accountId: accounts.SPONSOR_AR_CONTROL,
+        subledgerType: 'SPONSOR',
+        subledgerId: share.sponsorId,
+        debit: share.amount,
+        description: `${item.nameEn} — ${student.studentNo} (${share.sponsorCode})`,
       });
     }
     // Debit the institution for what it gave away.
@@ -266,12 +299,15 @@ export async function raiseChargesInTx(
       net,
       isDeferred: item.isDeferrable,
       dueDate: line.dueDate ? toDateOnly(line.dueDate) : null,
+      shares,
+      sponsored,
     });
   }
 
   const totalGross = sum(prepared.map((p) => p.gross));
   const totalDiscount = sum(prepared.map((p) => p.discount));
   const totalNet = sum(prepared.map((p) => p.net));
+  const totalSponsored = sum(prepared.map((p) => p.sponsored));
 
   const description =
     input.description?.trim() ||
@@ -309,6 +345,7 @@ export async function raiseChargesInTx(
         grossAmount: p.gross,
         discountAmount: p.discount,
         netAmount: p.net,
+        sponsoredAmount: p.sponsored,
         isDeferred: p.isDeferred,
         currency,
         postedHeaderId: posted.headerId,
@@ -317,6 +354,27 @@ export async function raiseChargesInTx(
       select: { id: true },
     });
     chargeIds.push(charge.id);
+
+    // The sponsor sub-ledger detail behind `sponsoredAmount`. A deferred
+    // trigger checks the two agree at COMMIT, so the split cannot drift the
+    // way the legacy `Remain` column did.
+    for (const share of p.shares) {
+      await tx.chargeSponsorship.create({
+        data: {
+          tenantId,
+          chargeId: charge.id,
+          sponsorshipId: share.sponsorshipId,
+          sponsorId: share.sponsorId,
+          amount: share.amount,
+        },
+      });
+      // The contract cap is a control, so what it has funded is maintained as
+      // it funds it rather than totalled up afterwards.
+      await tx.sponsorship.update({
+        where: { id: share.sponsorshipId },
+        data: { consumedAmount: { increment: share.amount } },
+      });
+    }
 
     if (p.isDeferred) {
       const slices = allocate(p.gross, recognitionPeriods.length);
@@ -342,6 +400,7 @@ export async function raiseChargesInTx(
       totalGross: totalGross.toFixed(4),
       totalDiscount: totalDiscount.toFixed(4),
       totalNet: totalNet.toFixed(4),
+      totalSponsored: totalSponsored.toFixed(4),
     },
   });
 
@@ -352,6 +411,9 @@ export async function raiseChargesInTx(
     totalNet: totalNet.toFixed(4),
     totalGross: totalGross.toFixed(4),
     totalDiscount: totalDiscount.toFixed(4),
+    totalSponsored: totalSponsored.toFixed(4),
+    /** What the student personally owes: net less the sponsored portion. */
+    totalStudentPortion: totalNet.minus(totalSponsored).toFixed(4),
   };
 }
 
@@ -415,6 +477,18 @@ export async function reverseChargesInTx(
       isDeferred: true,
       reversedAt: true,
       docDate: true,
+      sponsoredAmount: true,
+      sponsorships: {
+        select: {
+          id: true,
+          sponsorId: true,
+          sponsorshipId: true,
+          amount: true,
+          settledAmount: true,
+          writtenBackAmount: true,
+          sponsor: { select: { code: true } },
+        },
+      },
       feeItem: {
         select: {
           code: true,
@@ -441,6 +515,7 @@ export async function reverseChargesInTx(
   const accounts = await requireAccounts(tx, tenantId, [
     'STUDENT_AR_CONTROL',
     'STUDENT_CREDIT_CONTROL',
+    'SPONSOR_AR_CONTROL',
     'DEFAULT_DISCOUNT_EXPENSE',
   ] as const);
 
@@ -487,13 +562,30 @@ export async function reverseChargesInTx(
         description: `Reversal — discount on ${charge.feeItem.nameEn}`,
       });
     }
-    if (!charge.netAmount.isZero()) {
+    // The receivable comes off both counterparties in the proportions it was
+    // raised in. Crediting the whole net to the student would hand them a
+    // credit for money a sponsor owed, and leave the sponsor owing it still.
+    const studentPortion = charge.netAmount.minus(charge.sponsoredAmount);
+    if (!studentPortion.isZero()) {
       lines.push({
         accountId: accounts.STUDENT_AR_CONTROL,
         subledgerType: 'STUDENT',
         subledgerId: charge.studentId,
-        credit: charge.netAmount,
+        credit: studentPortion,
         description: `Reversal — ${charge.feeItem.nameEn} — ${charge.student.studentNo}`,
+      });
+    }
+    for (const share of charge.sponsorships) {
+      const live = share.amount.minus(share.writtenBackAmount);
+      if (live.isZero()) continue;
+      lines.push({
+        accountId: accounts.SPONSOR_AR_CONTROL,
+        subledgerType: 'SPONSOR',
+        subledgerId: share.sponsorId,
+        credit: live,
+        description:
+          `Reversal — ${charge.feeItem.nameEn} — ${charge.student.studentNo} ` +
+          `(${share.sponsor.code})`,
       });
     }
 
@@ -548,6 +640,34 @@ export async function reverseChargesInTx(
       await tx.studentReceipt.update({
         where: { id: a.receiptId },
         data: { allocatedAmount: { decrement: a.amount } },
+      });
+    }
+
+    // Release the sponsor side too: any sponsor money matched to this charge
+    // becomes an unallocated sponsor receipt, the contract's consumed cap is
+    // handed back, and the share stops standing. A sponsor whose student's
+    // term was cancelled does not go on owing for it.
+    for (const share of charge.sponsorships) {
+      const sponsorAllocations = await tx.sponsorReceiptAllocation.findMany({
+        where: { chargeSponsorshipId: share.id },
+        select: { id: true, receiptId: true, amount: true },
+      });
+      for (const a of sponsorAllocations) {
+        await tx.sponsorReceiptAllocation.delete({ where: { id: a.id } });
+        await tx.sponsorReceipt.update({
+          where: { id: a.receiptId },
+          data: { allocatedAmount: { decrement: a.amount } },
+        });
+      }
+      await tx.chargeSponsorship.update({
+        where: { id: share.id },
+        data: { settledAmount: ZERO },
+      });
+      await tx.sponsorship.update({
+        where: { id: share.sponsorshipId },
+        data: {
+          consumedAmount: { decrement: share.amount.minus(share.writtenBackAmount) },
+        },
       });
     }
 

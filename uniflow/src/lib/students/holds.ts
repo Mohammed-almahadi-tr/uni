@@ -332,14 +332,17 @@ export async function arrearsInTx(
 
   const charges = await tx.studentCharge.findMany({
     where: { tenantId, studentId, reversedAt: null },
-    select: { netAmount: true, settledAmount: true },
+    select: { netAmount: true, sponsoredAmount: true, settledAmount: true },
   });
   const receipts = await tx.studentReceipt.findMany({
     where: { tenantId, studentId, cancelledAt: null, dishonouredAt: null },
     select: { amount: true, allocatedAmount: true },
   });
 
-  const outstanding = sum(charges.map((c) => c.netAmount)).minus(
+  // A student is not in arrears for money their sponsor owes. Blocking a
+  // sponsored student's registration because a ministry pays late is how a
+  // control gets switched off.
+  const outstanding = sum(charges.map((c) => c.netAmount.minus(c.sponsoredAmount))).minus(
     sum(charges.map((c) => c.settledAmount)),
   );
   const creditBalance = sum(receipts.map((r) => r.amount.minus(r.allocatedAmount)));

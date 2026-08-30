@@ -54,7 +54,7 @@ async function balanceInTx(
 
   const charges = await tx.studentCharge.findMany({
     where: { tenantId, studentId, reversedAt: null },
-    select: { netAmount: true, settledAmount: true },
+    select: { netAmount: true, sponsoredAmount: true, settledAmount: true },
   });
   const receipts = await tx.studentReceipt.findMany({
     // Cancelled receipts never counted; dishonoured ones stopped counting the
@@ -63,7 +63,11 @@ async function balanceInTx(
     select: { amount: true, allocatedAmount: true },
   });
 
-  const charged = sum(charges.map((c) => c.netAmount));
+  // What the student personally owes, not what was billed: a sponsored
+  // portion is the sponsor's debt and belongs on the sponsor's statement
+  // (REQ-SPN-02). The legacy build billed the student in full and chased the
+  // ministry by telephone.
+  const charged = sum(charges.map((c) => c.netAmount.minus(c.sponsoredAmount)));
   const settled = sum(charges.map((c) => c.settledAmount));
   const outstanding = charged.minus(settled);
   const creditBalance = sum(receipts.map((r) => r.amount.minus(r.allocatedAmount)));
@@ -142,6 +146,7 @@ export async function statementOfAccount(
         id: true,
         docDate: true,
         netAmount: true,
+        sponsoredAmount: true,
         reversedAt: true,
         termLabel: true,
         postedHeaderId: true,
@@ -186,6 +191,15 @@ export async function statementOfAccount(
     const events: Event[] = [];
 
     for (const c of charges) {
+      // A student's statement shows what the student personally owes
+      // (REQ-SPN-02). Where a sponsor carries part of a charge, the statement
+      // says so on the line rather than billing the student for it and
+      // leaving them to work out that somebody else is paying.
+      const studentPortion = c.netAmount.minus(c.sponsoredAmount);
+      const sponsorNote = c.sponsoredAmount.isZero()
+        ? ''
+        : ` (${c.sponsoredAmount.toFixed(2)} sponsored)`;
+
       events.push({
         date: c.docDate,
         order: 0,
@@ -193,8 +207,9 @@ export async function statementOfAccount(
           date: c.docDate,
           kind: 'CHARGE',
           reference: headerById.get(c.postedHeaderId)?.voucherRef ?? '',
-          description: `${c.feeItem.nameEn}${c.termLabel ? ` — ${c.termLabel}` : ''}`,
-          debit: c.netAmount.toFixed(4),
+          description:
+            `${c.feeItem.nameEn}${c.termLabel ? ` — ${c.termLabel}` : ''}${sponsorNote}`,
+          debit: studentPortion.toFixed(4),
           credit: '0.0000',
         },
       });
@@ -210,7 +225,7 @@ export async function statementOfAccount(
             reference: reversal.voucherRef,
             description: `Reversal of ${c.feeItem.nameEn}`,
             debit: '0.0000',
-            credit: c.netAmount.toFixed(4),
+            credit: studentPortion.toFixed(4),
           },
         });
       }
@@ -360,6 +375,7 @@ export async function agedReceivables(
         docDate: true,
         dueDate: true,
         netAmount: true,
+        sponsoredAmount: true,
         settledAmount: true,
         student: { select: { studentNo: true, fullNameEn: true } },
       },
@@ -372,7 +388,7 @@ export async function agedReceivables(
     >();
 
     for (const r of rows) {
-      const outstanding = r.netAmount.minus(r.settledAmount);
+      const outstanding = r.netAmount.minus(r.sponsoredAmount).minus(r.settledAmount);
       if (outstanding.lessThanOrEqualTo(0)) continue;
 
       const due = r.dueDate ?? r.docDate;
@@ -453,14 +469,16 @@ export async function reconcileStudentSubledger(
 
   const charges = await tx.studentCharge.findMany({
     where: { tenantId, reversedAt: null },
-    select: { netAmount: true, settledAmount: true },
+    select: { netAmount: true, sponsoredAmount: true, settledAmount: true },
   });
   const receipts = await tx.studentReceipt.findMany({
     where: { tenantId, cancelledAt: null, dishonouredAt: null },
     select: { amount: true, allocatedAmount: true },
   });
 
-  const subledgerReceivable = sum(charges.map((c) => c.netAmount.minus(c.settledAmount)));
+  const subledgerReceivable = sum(
+    charges.map((c) => c.netAmount.minus(c.sponsoredAmount).minus(c.settledAmount)),
+  );
   const subledgerCredit = sum(receipts.map((r) => r.amount.minus(r.allocatedAmount)));
 
   const controlReceivable = await accountBalance(

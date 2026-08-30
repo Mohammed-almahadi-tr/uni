@@ -65,7 +65,11 @@ export const PERMISSIONS = [
   { key: 'discount.apply', description: 'Apply a discount to a registration' },
   { key: 'discount.approve', description: 'Approve a discount above threshold' },
   { key: 'sponsor.manage', description: 'Maintain sponsors and sponsorship contracts' },
-  { key: 'sponsor.invoice', description: 'Raise and settle sponsor invoices' },
+  { key: 'sponsor.approve', description: 'Put a sponsorship contract into force' },
+  { key: 'sponsor.invoice', description: 'Raise sponsor invoices and take sponsor receipts' },
+  { key: 'sponsor.default', description: 'Write an uncollected sponsor balance back to the student' },
+  { key: 'scholarship.manage', description: 'Maintain scholarship schemes and propose awards' },
+  { key: 'scholarship.approve', description: 'Approve a scholarship award against its scheme budget' },
 
   // ---- Ledger -----------------------------------------------------------
   { key: 'coa.read', description: 'View the chart of accounts' },
@@ -190,6 +194,37 @@ export const SOD_CONFLICTS: readonly SodConflict[] = [
     a: 'discount.apply',
     b: 'discount.approve',
     reason: 'A discount must be approved by someone other than the person who applied it.',
+  },
+  {
+    a: 'sponsor.manage',
+    b: 'sponsor.approve',
+    reason:
+      'Whoever writes a sponsorship’s coverage terms must not also put them into force. ' +
+      'Together they let one person commit the institution to funding it never agreed, ' +
+      'and the legacy build recorded a sponsor as a phrase in a combo box with no ' +
+      'approval of any kind.',
+  },
+  {
+    a: 'sponsor.manage',
+    b: 'sponsor.invoice',
+    reason:
+      'Setting what a sponsor owes and collecting it are different jobs. One person ' +
+      'holding both can widen a contract, invoice against it, and settle the difference.',
+  },
+  {
+    a: 'sponsor.invoice',
+    b: 'sponsor.default',
+    reason:
+      'Whoever collects from a sponsor must not also be able to declare the debt ' +
+      'uncollectable and move it onto a student. That pair is how a receipt goes ' +
+      'missing and the shortfall lands on somebody who already paid.',
+  },
+  {
+    a: 'scholarship.manage',
+    b: 'scholarship.approve',
+    reason:
+      'A scholarship award spends a budget. Whoever proposes one must not also approve ' +
+      'it, or the budget is a number its own spender maintains.',
   },
   {
     a: 'vendor.manage',
@@ -370,7 +405,7 @@ export const DEFAULT_ROLES: Record<
       'document.verify',
       'registration.read', 'registration.create', 'registration.cancel',
       'registration.transfer', 'hold.manage', 'discount.apply', 'charge.create',
-      'report.student',
+      'sponsor.manage', 'scholarship.manage', 'report.student',
     ],
   },
   'Financial Controller': {
@@ -380,6 +415,7 @@ export const DEFAULT_ROLES: Record<
       'charge.reverse', 'period.read', 'period.close', 'budget.read',
       'budget.approve', 'discount.approve', 'po.approve', 'asset.dispose',
       'payment.approve', 'vendor.approve', 'apinvoice.approve', 'feematrix.approve',
+      'sponsor.approve', 'scholarship.approve', 'sponsor.default',
       'report.financial', 'audit.read',
     ],
   },
@@ -410,7 +446,8 @@ export const DEFAULT_ROLES: Record<
     nameAr: 'مشرف الصندوق',
     permissions: [
       'student.read', 'registration.read', 'receipt.cancel', 'voucher.read',
-      'cheque.manage', 'cheque.cancel', 'period.read', 'report.financial',
+      'cheque.manage', 'cheque.cancel', 'sponsor.invoice', 'period.read',
+      'report.financial',
     ],
   },
   Dean: {
