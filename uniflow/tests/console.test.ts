@@ -6,6 +6,7 @@ import {
   BUILT_PHASES,
   CONSOLE_ROUTES,
   CONSOLE_SECTIONS,
+  isBuilt,
   navigationFor,
   normaliseConsolePath,
   ruleFor,
@@ -226,7 +227,12 @@ describe('navigation is generated from the permission set', () => {
     // A screen is a link when the phase that builds it has landed, and a name
     // with a phase against it when it has not. `BUILT_PHASES` is the one place
     // that changes as Track D proceeds.
-    expect(items.every((i) => i.built === BUILT_PHASES.has(i.phase))).toBe(true);
+    // Compared against the *declaration*, not against the rendered item —
+    // `isBuilt(i)` on an already-resolved VisibleItem would be tautological.
+    const declared = new Map(
+      CONSOLE_SECTIONS.flatMap((s) => s.items).map((i) => [i.path, i]),
+    );
+    expect(items.every((i) => i.built === isBuilt(declared.get(i.path)!))).toBe(true);
     // …and there is still something waiting, or this test has stopped saying
     // anything.
     expect(items.some((i) => !i.built)).toBe(true);
@@ -406,9 +412,7 @@ describe('the registry screens are declared and reachable', () => {
     const root = resolve(__dirname, '..', 'src', 'app', '[locale]', 'console');
     const exists = (p: string) => existsSync(join(root, ...p.split('/'), 'page.tsx'));
 
-    const built = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) =>
-      BUILT_PHASES.has(i.phase),
-    );
+    const built = CONSOLE_SECTIONS.flatMap((s) => s.items).filter(isBuilt);
     expect(built.length).toBeGreaterThan(0);
 
     for (const item of built) {
@@ -592,9 +596,7 @@ describe('the finance screens are declared and separated', () => {
 
   it('lets every finance screen D2 built be reached by somebody the roles ship', () => {
     // A screen no shipped role can open is a screen nobody will find.
-    const built = CONSOLE_SECTIONS.find((s) => s.key === 'finance')!.items.filter((i) =>
-      BUILT_PHASES.has(i.phase),
-    );
+    const built = CONSOLE_SECTIONS.find((s) => s.key === 'finance')!.items.filter(isBuilt);
     expect(built.map((i) => i.key).sort()).toEqual([
       'approvals',
       'cashierDesk',
@@ -610,5 +612,46 @@ describe('the finance screens are declared and separated', () => {
       );
       expect(reachable, `${item.path} is unreachable by every shipped role`).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D4: a phase that lands in groups
+// ---------------------------------------------------------------------------
+
+describe('a screen may be built before its phase is', () => {
+  it('never says built:true on a screen whose whole phase has landed', () => {
+    // Two ways to say the same thing is the drift CONSOLE_ROUTES exists to
+    // prevent. `built` is for a phase in flight and nothing else.
+    for (const section of CONSOLE_SECTIONS) {
+      for (const item of section.items) {
+        if (BUILT_PHASES.has(item.phase)) {
+          expect(item.built, `${item.path}`).toBeUndefined();
+        }
+      }
+    }
+  });
+
+  it('resolves built from one predicate, whichever way it was said', () => {
+    for (const section of CONSOLE_SECTIONS) {
+      for (const item of section.items) {
+        expect(isBuilt(item)).toBe(item.built === true || BUILT_PHASES.has(item.phase));
+      }
+    }
+  });
+
+  it('has a page on disk for the D4 screens that claim to exist', () => {
+    const root = resolve(__dirname, '..', 'src', 'app', '[locale]', 'console');
+    const early = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) => i.built === true);
+    expect(early.length).toBeGreaterThan(0);
+    for (const item of early) {
+      expect(existsSync(join(root, ...item.path.split('/'), 'page.tsx')), item.path).toBe(true);
+      expect(BUILT_PHASES.has(item.phase), `${item.path} phase`).toBe(false);
+    }
+  });
+
+  it('still has D4 work outstanding, or this flag has outlived its purpose', () => {
+    const d4 = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) => i.phase === 'D4');
+    expect(d4.some((i) => !isBuilt(i))).toBe(true);
   });
 });

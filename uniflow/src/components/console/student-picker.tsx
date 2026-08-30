@@ -22,6 +22,7 @@ export async function StudentPicker({
   principal: Principal;
   locale: Locale;
   query: string;
+  /** May already carry a query — the sponsors screen keeps its tab in one. */
   basePath: string;
 }) {
   const t = await getTranslations('registry');
@@ -33,6 +34,10 @@ export async function StudentPicker({
   return (
     <Panel title={t('common.student')}>
       <form method="get" className="flex flex-wrap items-end gap-3">
+        {basePath.includes('?') &&
+          [...new URLSearchParams(basePath.split('?')[1]).entries()].map(([k, v]) => (
+            <input key={k} type="hidden" name={k} value={v} />
+          ))}
         <label className="block min-w-64 flex-1">
           <span className="mb-1 block text-sm font-medium">{t('register.student')}</span>
           <input
@@ -60,7 +65,7 @@ export async function StudentPicker({
           {results.rows.map((s) => (
             <li key={s.id} className="py-3">
               <Link
-                href={`${basePath}?student=${s.id}`}
+                href={`${basePath}${basePath.includes('?') ? '&' : '?'}student=${s.id}`}
                 className="flex flex-wrap items-baseline gap-3 hover:underline"
               >
                 <span className="numeric text-sm text-muted-foreground">{s.studentNo}</span>

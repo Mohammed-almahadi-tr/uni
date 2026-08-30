@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { guardConsole } from '@/lib/console/guard';
-import { BUILT_PHASES, CONSOLE_SECTIONS, satisfies } from '@/lib/console/navigation';
+import { CONSOLE_SECTIONS, isBuilt, satisfies } from '@/lib/console/navigation';
 import { ForbiddenScreen, PendingBadge } from './shell';
 
 /**
@@ -39,12 +39,12 @@ export async function ConsoleSectionPage({
 
       <ul className="mt-6 divide-y divide-border rounded-lg border border-border bg-card">
         {items.map((item) => {
-          // The same set the sidebar reads. This said `=== 'D1'` until D2,
-          // which meant a D3 screen was a working link in the navigation and
-          // a greyed-out name on its own section page — the exact
+          // The same predicate the sidebar reads. This said `=== 'D1'` until
+          // D2, which meant a D3 screen was a working link in the navigation
+          // and a greyed-out name on its own section page — the exact
           // disagreement between two renderings of one declaration that
           // CONSOLE_ROUTES exists to make impossible.
-          const built = BUILT_PHASES.has(item.phase);
+          const built = isBuilt(item);
           return (
             <li key={item.key} className="flex items-center justify-between gap-4 p-4">
               {built ? (

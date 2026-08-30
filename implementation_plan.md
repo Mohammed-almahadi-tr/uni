@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**902 tests pass across 25 suites; typecheck, lint and production build are all
+**906 tests pass across 25 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -992,7 +992,7 @@ gantt
     Console shell, session & permission navigation  :done, d1, after c1 b6, 6d
     Finance desk — cashier, cheques, vouchers       :done, d2, after d1, 10d
     Registration desk, holds, withdrawal & transfer :crit, done, d3, after d1, 9d
-    Back office — academic, admissions, P2P, sponsors :d4, after d1, 12d
+    Back office — academic, admissions, P2P, sponsors :active, d4, after d1, 12d
     Reports & the print surface                     :d5, after d1, 8d
 
     section Convergence & Release
@@ -2322,13 +2322,20 @@ consequence before confirmation rather than after; and the status timeline on
 the student profile. This is where B4's *"the registration and its posting are
 one transaction"* becomes something a registrar can watch happen.
 
-**D4 · Back Office** — Academic structure and the fee matrix editor with
-version comparison; the admissions committee queue, eligibility screening and
-offer issue; the procure-to-pay workbench from requisition to payment; budget
-maintenance with encumbrance consumption visible against each line; sponsor
-contracts, invoicing and settlement; scholarship schemes and the award
-register. Screens used monthly rather than hourly, and therefore allowed to be
-denser than D2 or D3.
+**D4 · Back Office** *(in progress — see §8.1)* — Academic structure and the fee matrix
+editor with version comparison; the admissions committee queue, eligibility
+screening and offer issue; the procure-to-pay workbench from requisition to
+payment; budget maintenance with encumbrance consumption visible against each
+line; sponsor contracts, invoicing and settlement; scholarship schemes and the
+award register. Screens used monthly rather than hourly, and therefore allowed
+to be denser than D2 or D3.
+
+*This paragraph names six areas. The route table assigns D4 **twenty**
+screens, and the fourteen it does not describe include the whole `settings`
+section — creating a user, granting a role, the branding, the landing content,
+the enquiry inbox, the audit log. That is **tenant administration**, it has a
+complete engine behind it, and no phase in this plan claims it. It wants a
+phase of its own; §8.1 sets out the case.*
 
 **D5 · Reports & the Print Surface** — Trial balance, balance sheet, income
 statement, aged receivables, sub-ledger reconciliation, discount exposure and
@@ -2815,6 +2822,157 @@ places in a currency is not a secret.
 - **Gateway settlement reconciliation** (REQ-CSH-05). A gateway receipt posts
   to a bank account like a transfer; matching it against the provider's
   settlement report waits on the provider adapters, which no phase owns yet.
+
+
+### D4 — Back Office · in progress
+
+**Six of twenty screens built.** D4 is not one phase's worth of work and
+this section records why, so the remainder can be scheduled honestly rather
+than discovered.
+
+#### D4 is twice the size §8 describes
+
+§8's paragraph names six areas — academic structure and the fee matrix, the
+admissions committee, procure-to-pay, budgets, sponsors, scholarships. The
+route table in `navigation.ts` assigns D4 **twenty** screens. The extra
+fourteen are real, their engines are complete and tested, and no paragraph in
+this plan describes who builds them:
+
+| Declared D4, not described by D4 | Whose engine |
+| :--- | :--- |
+| `settings/users`, `settings/roles` | Phase 0 — `provisioning.ts`, `rbac.ts` |
+| `settings/branding`, `settings/content` | C1 — the CMS |
+| `settings/enquiries` | C1 — `inquiries.ts` |
+| `settings/audit` | Phase 0 — `audit/log.ts` and its hash chain |
+| `procurement/assets` | A5 |
+| `finance/periods` | A7 |
+
+The six under `settings` are the same class of omission Track D was created to
+fix. They are **tenant administration** — creating a user, giving them a role,
+setting the branding, answering an enquiry, reading the audit log — and until
+they exist a university cannot be administered through this application at
+all: a new member of staff is added by a developer at a REPL, which is the
+condition §8 says two-thirds-done was hiding.
+
+**They should be their own phase**, and the Gantt row `Back office —
+academic, admissions, P2P, sponsors` says as much: it does not mention
+settings either. Named here rather than silently folded in, because deciding
+which phase owns fourteen screens is a scheduling decision, not a coding one.
+
+#### Delivered so far — the academic group
+
+Built first because everything downstream needs it: a fee schedule cannot
+price a cohort until a programme, a batch and an admission category exist as
+rows, and a seat quota cannot count offers against a programme that is a
+string.
+
+**What a faculty used to be.**
+
+```vb
+Dim cmd As New SqlCommand("Select Distinct ProgramName From Programs", cnn)
+```
+([frmListPrograms.vb:83](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Registration%20System/Forms/frmListPrograms.vb))
+
+A programme was a text column discovered by `SELECT DISTINCT` and inserted by
+concatenation. A batch was the same, in a table called `AcademicYear` — the
+academic year itself existed nowhere. A faculty was not a table: it was a
+string copied onto every row that mentioned it. Identity was the name, so
+**renaming a faculty orphaned every record pointing at it**, silently. And the
+delete was `Delete From AcademicYear Where Batch=N'..'` with no check for the
+students admitted under it.
+
+| Delivered | Notes |
+| :--- | :--- |
+| **`academic/structure`** | Seven kinds of row — faculties, departments, programmes, batches, admission categories, nationalities, and the calendar — on one screen, selected by `?tab=` so a reload keeps its place |
+| Code, Arabic name and English name required on every one | The legacy tables had a single name column, which is why a bilingual institution ended up with faculty names in whichever language the clerk who created the row was working in |
+| **No delete anywhere on it** | `deactivate` is what the legacy `DELETE ... WHERE Batch=<text>` was reaching for, and the database now refuses the delete once anything refers to the row |
+| Years and terms opened together | `openAcademicYear` checks the terms neither overlap nor leave gaps, which it can only do with the whole set in hand |
+| **`academic/fees`** | The four dimensions of a cohort — programme, batch, admission category, optional nationality rule — chosen in a GET form, so a priced cohort is a URL that can be sent to whoever has to approve it |
+| Versions listed newest first, **superseded ones kept** | The question the list exists to answer is almost always "what changed, and when", which the legacy delete-and-reinsert made permanently unanswerable |
+| **The diff between a version and the one before it** | Rendered as added / removed / changed rather than two tables side by side, because "the tuition went up by 12,000" is the sentence somebody is trying to form. This is the *version comparison* §8 asked for |
+| No way to edit an approved version | Nothing on the screen offers it because nothing in the module does. A price change is a new version; approving it closes the previous one the day before and leaves every registration that resolved against it resolving to the same figures |
+| Drafting and approving are different people | `feematrix.manage` and `feematrix.approve`. The fee schedule decides what every student in a cohort pays; one person deciding it alone is the exposure that maker-checker exists for |
+| **`academic/capacity`** | Seats, reserved, awaiting an answer, accepted, spoken for, available, and offers issued over capacity |
+| Three counts shown, not one | The engine distinguishes an offer awaiting a reply from one accepted, and the screen says so rather than collapsing them. **Available subtracts unanswered offers** — an offer nobody has replied to is not a free seat, and treating it as one is how a programme is over-subscribed on the morning the deadline passes |
+| Override off by default | A quota permitting override on creation is a quota nobody decided about. Turning it on is a stated policy, and the override still demands `admission.override` and a reason recorded against the offer |
+
+#### A change to how the console tracks what exists
+
+`BUILT_PHASES` was phase-granular, which was right while D1, D2 and D3 each
+landed whole. D4 lands in groups, and holding twenty finished screens back
+until the twentieth is done is how a build stops being shippable.
+
+So an item may now carry `built: true` ahead of its phase. That is a second
+place the answer can come from, which is precisely the drift `CONSOLE_ROUTES`
+exists to prevent — so:
+
+- one exported predicate, `isBuilt()`, and both the navigation and the
+  section index call it;
+- a test refusing `built: true` on any item whose phase is already in
+  `BUILT_PHASES`, so there is never more than one way to say a thing;
+- the structural test walks `page.tsx` on disk for everything claiming to
+  exist, in both directions.
+
+#### Delivered — the admissions group
+
+`registry/admissions`, one programme and intake at a time, because that is
+the unit a committee sits over.
+
+The legacy build had **no part of this**. An admission was a row appearing in
+the students table: no screening verdict to disagree with, no rationale to
+look up, no offer to accept or decline, no seat to run out of, no waiting
+list. Deciding and having capacity were the same act, which is exactly how it
+over-admitted.
+
+| Delivered | Notes |
+| :--- | :--- |
+| Screen → decide → offer → accept → enrol | Five separate actions, because each is a separate judgement by a different kind of person |
+| **Applicants who failed screening are listed and marked, not filtered** | The engine's decision, kept: a committee that cannot see the near-misses cannot exercise the discretion it exists for, and a list that quietly omits them looks identical to one where nobody applied |
+| Screening is re-runnable | A corrected certificate score is re-screened by running it again and the previous verdict replaced. A screening history nobody can act on is noise |
+| The rationale is required by the form *and* the database | An unexplained refusal is the one the applicant comes back about, and by then whoever made it has left |
+| **Recording a decision issues nothing** | An ACCEPT moves the application to OFFERED only once a seat has actually been allocated, in `offers.ts` |
+| The override is a field, a permission and a stored reason | Not a checkbox that suppresses a warning. Capacity exceeded without a stated why is indistinguishable from capacity never checked |
+| The deposit is a receipt, not a flag | Taken at the cashier desk through A3. The money and the seat are two facts and the offer ties them together |
+| Promotion names the freed offer explicitly | So "who held this seat before me" has an answer — the question an applicant asks when a place appears in August |
+
+#### Delivered — sponsors and scholarships
+
+**Sponsors.** The legacy build had no sponsor concept: a sponsored student
+was billed in full and the ministry chased by telephone, so the student's own
+statement showed a debt belonging to somebody else. Four views —
+who a sponsor is, what they cover for one student, billing them for a term,
+and what they owe. A contract funds nothing until a second person activates
+it; ending one keeps the range it was in force for, so charges already split
+under it stay attributed. Aging runs from the **invoice due date**, so an
+uninvoiced share sits in the current bucket however old the charge — a
+sponsor is not late for a bill nobody sent them.
+
+**Scholarships.** The legacy equivalent was the phrase `"منحة مجانية"` chosen
+in a combo box on the registration form: no scheme, no eligibility on file, no
+budget it came from, nobody's signature. The scheme's budget line now shows
+**proposed alongside approved**, because an award waiting for a signature is
+money that will be gone if it is signed, and a budget ignoring the queue tells
+the next approver there is more room than there is.
+
+#### One defect fixed on the way
+
+`StudentPicker` built its links as `` `${basePath}?student=${id}` `` and its
+search form carried nothing but `q`. Any caller whose base path already held a
+query — the sponsors screen keeps its tab in one — produced
+`...?tab=contracts?student=…`, a second `?` that browsers read as part of the
+tab value. It now picks the right separator and re-emits the base path's
+existing parameters as hidden fields, so searching does not drop the tab. D3's
+four callers were unaffected because none of them passed a query.
+
+#### Remaining, in the order they should be built
+
+1. **Procure-to-pay** — `procurement/vendors`, `orders`, `receiving`,
+   `invoices`, `budgets`, plus `finance/payments`, which D2 correctly handed
+   back to this phase.
+2. **`procurement/assets`** and **`finance/periods`** — declared D4, described
+   by no phase; see above.
+3. **Tenant administration** — the six `settings` screens. Recommended as its
+   own phase.
 
 
 ---

@@ -52,9 +52,28 @@ import type { PermissionKey } from '@/lib/auth/permissions';
  *  waiting for rather than pretending it exists. */
 export type ConsolePhase = 'D1' | 'D2' | 'D3' | 'D4' | 'D5';
 
-/** Phases whose screens exist. An item outside this set renders as a name and
- *  a phase rather than a link to a 404. */
+/** Phases whose screens all exist. An item outside this set renders as a name
+ *  and a phase rather than a link to a 404. */
 export const BUILT_PHASES: ReadonlySet<ConsolePhase> = new Set<ConsolePhase>(['D1', 'D2', 'D3']);
+
+/**
+ * Whether a screen exists, in the one place both the menu and the section
+ * index ask.
+ *
+ * D1, D2 and D3 each landed whole, so a phase was a fine unit to track this
+ * in. **D4 is twenty screens** and lands in groups, which the phase-level set
+ * cannot express — and the alternative, holding twenty finished screens back
+ * until the twentieth is done, is how a build stops being shippable.
+ *
+ * So an item may say `built: true` ahead of its phase. That is a second place
+ * the answer can come from, which is exactly the drift `CONSOLE_ROUTES`
+ * exists to prevent — so it is one exported predicate, both renderers call
+ * it, and the structural test walks `page.tsx` on disk and fails on anything
+ * that claims to be built and is not.
+ */
+export function isBuilt(item: Pick<ConsoleItem, 'phase' | 'built'>): boolean {
+  return item.built === true || BUILT_PHASES.has(item.phase);
+}
 
 export interface ConsoleItem {
   /** Message key under `console.items`. */
@@ -73,6 +92,12 @@ export interface ConsoleItem {
    * enumerate.
    */
   detail?: string;
+  /**
+   * Set on a screen that exists while its phase is still in flight. Never set
+   * on one whose phase is in `BUILT_PHASES` — that would be two ways to say
+   * the same thing. Asserted by test.
+   */
+  built?: true;
 }
 
 export interface ConsoleSection {
@@ -119,7 +144,7 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
       { key: 'registrations', path: 'registry/registrations', anyOf: ['registration.read'], phase: 'D3', detail: 'registry/registrations/[id]' },
       { key: 'holds', path: 'registry/holds', anyOf: ['hold.manage'], phase: 'D3' },
       { key: 'lifecycle', path: 'registry/lifecycle', anyOf: ['student.status', 'registration.transfer'], phase: 'D3' },
-      { key: 'admissions', path: 'registry/admissions', anyOf: ['application.read', 'application.decide', 'application.offer'], phase: 'D4' },
+      { key: 'admissions', path: 'registry/admissions', anyOf: ['application.read', 'application.decide', 'application.offer'], phase: 'D4', built: true },
       { key: 'documents', path: 'registry/documents', anyOf: ['document.verify'], phase: 'D3' },
       { key: 'medical', path: 'registry/medical', anyOf: ['medical.read', 'medical.manage'], phase: 'D3' },
     ],
@@ -128,11 +153,11 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
     key: 'academic',
     path: 'academic',
     items: [
-      { key: 'structure', path: 'academic/structure', anyOf: ['academic.read', 'academic.manage'], phase: 'D4' },
-      { key: 'feeMatrix', path: 'academic/fees', anyOf: ['feematrix.read', 'feematrix.manage', 'feematrix.approve'], phase: 'D4' },
-      { key: 'capacity', path: 'academic/capacity', anyOf: ['admission.capacity'], phase: 'D4' },
-      { key: 'sponsors', path: 'academic/sponsors', anyOf: ['sponsor.manage', 'sponsor.approve', 'sponsor.invoice'], phase: 'D4' },
-      { key: 'scholarships', path: 'academic/scholarships', anyOf: ['scholarship.manage', 'scholarship.approve'], phase: 'D4' },
+      { key: 'structure', path: 'academic/structure', anyOf: ['academic.read', 'academic.manage'], phase: 'D4', built: true },
+      { key: 'feeMatrix', path: 'academic/fees', anyOf: ['feematrix.read', 'feematrix.manage', 'feematrix.approve'], phase: 'D4', built: true },
+      { key: 'capacity', path: 'academic/capacity', anyOf: ['admission.capacity'], phase: 'D4', built: true },
+      { key: 'sponsors', path: 'academic/sponsors', anyOf: ['sponsor.manage', 'sponsor.approve', 'sponsor.invoice'], phase: 'D4', built: true },
+      { key: 'scholarships', path: 'academic/scholarships', anyOf: ['scholarship.manage', 'scholarship.approve'], phase: 'D4', built: true },
     ],
   },
   {
@@ -225,8 +250,10 @@ export function satisfies(held: ReadonlySet<PermissionKey>, anyOf: readonly Perm
   return anyOf.length === 0 || anyOf.some((p) => held.has(p));
 }
 
-export interface VisibleItem extends ConsoleItem {
-  /** False until the phase that builds the screen has landed. */
+export interface VisibleItem extends Omit<ConsoleItem, 'built'> {
+  /** Resolved by `isBuilt`: false until the screen exists. Widened from the
+   *  declaration's `true | undefined`, which is deliberately narrow so a row
+   *  cannot say `built: false` and mean something different from omitting it. */
   built: boolean;
 }
 
@@ -248,7 +275,7 @@ export function navigationFor(held: ReadonlySet<PermissionKey>): VisibleSection[
   for (const section of CONSOLE_SECTIONS) {
     const items = section.items
       .filter((i) => satisfies(held, i.anyOf))
-      .map((i) => ({ ...i, built: BUILT_PHASES.has(i.phase) }));
+      .map((i) => ({ ...i, built: isBuilt(i) }));
     if (items.length > 0) out.push({ key: section.key, path: section.path, items });
   }
   return out;
