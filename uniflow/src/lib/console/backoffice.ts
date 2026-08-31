@@ -3,6 +3,7 @@ import { Prisma } from '@/generated/prisma/client';
 import type { PermissionKey } from '@/lib/auth/permissions';
 import { withTenant } from '@/lib/db/client';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
+import { budgetPosition } from '@/lib/budget/control';
 
 /**
  * Reference reads for the back office (Track D4).
@@ -942,5 +943,75 @@ export async function paymentRows(principal: Principal): Promise<PaymentRow[]> {
       channel: p.channel,
       createdById: p.createdById,
     }));
+  });
+}
+
+export interface BudgetLinePosition {
+  budgetLineId: string;
+  accountCode: string;
+  accountNameAr: string;
+  accountNameEn: string;
+  costCentreCode: string | null;
+  allocated: string;
+  encumbered: string;
+  actual: string;
+  available: string;
+  utilisation: string;
+  policy: string;
+}
+
+/**
+ * Every line of the approved budget with its live position.
+ *
+ * `budgetPosition` answers for one account and cost centre; this walks the
+ * lines and asks it for each, inside one transaction, rather than
+ * reimplementing the sums. **Committed** — what approved orders have reserved
+ * and not yet consumed — is the column the legacy build had no way to
+ * produce, and a budget showing only what has been spent tells a manager
+ * there is money that is already promised.
+ */
+export async function budgetPositions(
+  principal: Principal,
+  budgetId: string,
+  onDate: Date = new Date(),
+): Promise<BudgetLinePosition[]> {
+  return named(principal, 'budget.read', async (tx) => {
+    const lines = await tx.budgetLine.findMany({
+      where: { tenantId: principal.tenantId, budgetId },
+      orderBy: { account: { code: 'asc' } },
+      select: {
+        id: true,
+        accountId: true,
+        costCenterId: true,
+        policy: true,
+        account: { select: { code: true, nameAr: true, nameEn: true } },
+        costCenter: { select: { code: true } },
+      },
+    });
+
+    const out: BudgetLinePosition[] = [];
+    for (const l of lines) {
+      const position = await budgetPosition(
+        tx,
+        principal.tenantId,
+        l.accountId,
+        l.costCenterId,
+        onDate,
+      );
+      out.push({
+        budgetLineId: l.id,
+        accountCode: l.account.code,
+        accountNameAr: l.account.nameAr,
+        accountNameEn: l.account.nameEn,
+        costCentreCode: l.costCenter?.code ?? null,
+        allocated: position.allocated,
+        encumbered: position.encumbered,
+        actual: position.actual,
+        available: position.available,
+        utilisation: position.utilisation,
+        policy: l.policy,
+      });
+    }
+    return out;
   });
 }

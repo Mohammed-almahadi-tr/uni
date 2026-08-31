@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**906 tests pass across 25 suites; typecheck, lint and production build are all
+**912 tests pass across 25 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
@@ -992,7 +992,7 @@ gantt
     Console shell, session & permission navigation  :done, d1, after c1 b6, 6d
     Finance desk — cashier, cheques, vouchers       :done, d2, after d1, 10d
     Registration desk, holds, withdrawal & transfer :crit, done, d3, after d1, 9d
-    Back office — academic, admissions, P2P, sponsors :active, d4, after d1, 12d
+    Back office — academic, admissions, P2P, sponsors :done, d4, after d1, 12d
     Reports & the print surface                     :d5, after d1, 8d
 
     section Convergence & Release
@@ -2322,7 +2322,7 @@ consequence before confirmation rather than after; and the status timeline on
 the student profile. This is where B4's *"the registration and its posting are
 one transaction"* becomes something a registrar can watch happen.
 
-**D4 · Back Office** *(in progress — see §8.1)* — Academic structure and the fee matrix
+**D4 · Back Office** *(built — see §8.1)* — Academic structure and the fee matrix
 editor with version comparison; the admissions committee queue, eligibility
 screening and offer issue; the procure-to-pay workbench from requisition to
 payment; budget maintenance with encumbrance consumption visible against each
@@ -2333,9 +2333,13 @@ to be denser than D2 or D3.
 *This paragraph names six areas. The route table assigns D4 **twenty**
 screens, and the fourteen it does not describe include the whole `settings`
 section — creating a user, granting a role, the branding, the landing content,
-the enquiry inbox, the audit log. That is **tenant administration**, it has a
-complete engine behind it, and no phase in this plan claims it. It wants a
-phase of its own; §8.1 sets out the case.*
+the enquiry inbox, the audit log. That is **tenant administration**, and no
+paragraph in this plan claimed it. §8.1 made the case for giving it a phase of
+its own; the decision taken was to build it inside D4, ahead of
+procure-to-pay, because until it existed a university could not add a member
+of staff without a developer at a REPL. D4 therefore delivered twenty screens
+against a paragraph describing six, and this paragraph is left as written so
+the gap between a description and a route table stays visible.*
 
 **D5 · Reports & the Print Surface** — Trial balance, balance sheet, income
 statement, aged receivables, sub-ledger reconciliation, discount exposure and
@@ -2824,9 +2828,9 @@ places in a currency is not a secret.
   settlement report waits on the provider adapters, which no phase owns yet.
 
 
-### D4 — Back Office · in progress
+### D4 — Back Office · complete
 
-**Six of twenty screens built.** D4 is not one phase's worth of work and
+**All twenty screens built.** D4 is not one phase's worth of work and
 this section records why, so the remainder can be scheduled honestly rather
 than discovered.
 
@@ -2964,15 +2968,112 @@ tab value. It now picks the right separator and re-emits the base path's
 existing parameters as hidden fields, so searching does not drop the tab. D3's
 four callers were unaffected because none of them passed a query.
 
-#### Remaining, in the order they should be built
+#### Delivered — tenant administration
 
-1. **Procure-to-pay** — `procurement/vendors`, `orders`, `receiving`,
-   `invoices`, `budgets`, plus `finance/payments`, which D2 correctly handed
-   back to this phase.
-2. **`procurement/assets`** and **`finance/periods`** — declared D4, described
-   by no phase; see above.
-3. **Tenant administration** — the six `settings` screens. Recommended as its
-   own phase.
+Built at the user's direction ahead of procure-to-pay, on the argument above:
+until these existed a university could not add a member of staff without a
+developer at a REPL.
+
+**What the legacy user table was.**
+
+```vb
+Dim cmd As New SqlCommand(
+  "Select PWD,Priv From Users Where UserName=N'" & Me.txtUserName.Text & "'", cnn)
+```
+([frmLogin.vb:44](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Form/frmLogin.vb#L44-L54))
+
+`PWD` is the password, in clear, in a column. `Priv` is one of two strings
+typed into a combo box, read into a global at sign-in, and consulted exactly
+once more in the whole application — to fill a dropdown on a report filter.
+
+| Delivered | Notes |
+| :--- | :--- |
+| **`settings/users`** | Who can sign in, what roles they hold, and whether a second factor is enrolled — **whether**, never the secret, which is why the query maps `mfaSecret` to a boolean rather than passing the row through |
+| The SoD matrix is evaluated against the **person** | Not the role. Two individually clean roles combine into a conflict — a cashier role and a supervisor role each pass, and together let one person take a payment and cancel it |
+| **`settings/roles`** | The permission grid, each entry carrying the catalogue's own description rather than a label invented for the screen |
+| Permissions needing a second factor are marked | On the screen where a role is composed, not only at the moment somebody is refused: it tells whoever is designing the role what authority they are handing out |
+| **The matrix is printed in full, with its reasons** | Those reasons were written to be read by a registrar rather than a developer. A refusal at save time explains itself better if the rule was visible beforehand |
+| No client-side conflict check | It would be a second implementation of the matrix, and the one that mattered would be the other one |
+| **`settings/branding`** | HSL channels with a live swatch, chosen in the same space the tokens are stored in. Fonts from the shipped allow-list; text colour derived from lightness, never configured |
+| **`settings/content`** | Landing sections, the hero, news and the calendar. Publishing demands both languages — by constraint, so no code path can put a half-translated page on a public site |
+| The three derived calendar kinds are absent from the form | Semester dates and the registration deadline come from `academic_terms`, and `chk_calendar_event_not_derived` refuses them anyway. A website that can contradict the system about when registration closes will eventually do it |
+| **`settings/enquiries`** | The other end of C1's contact form. Any status but new demands a handler and a timestamp, by constraint |
+| **`settings/audit`** | The trail, read-only, with on-demand chain verification. A break names the sequence number it starts at, because that is where somebody has to look |
+| Before-and-after shown as recorded | An audit entry is evidence. Reformatting it means the thing on screen and the thing that was hashed are two different objects, and only one of them is the record |
+
+#### Delivered — procure-to-pay
+
+| Delivered | Notes |
+| :--- | :--- |
+| **`procurement/vendors`** | Pending bank changes at the **top** of the screen, not in a corner: a proposal nobody notices is one approved in a hurry when a supplier complains, and hurry is what the fraud relies on |
+| The previous account number beside the proposed one | So an approver can see what is actually changing |
+| **`procurement/orders`** | Every line shows ordered, received and invoiced — two of the three legs of the match, on the screen of the person chasing a delivery |
+| **`procurement/receiving`** | Only approved orders with something still outstanding. A stores officer is holding a delivery note; every order that can receive nothing is noise between them and the one that can |
+| The idempotency key is **derived from the delivery**, not random | A random key makes every retry a fresh accrual, which is the failure the key exists to prevent |
+| **`procurement/invoices`** | Held invoices first, with what did not match. A mismatch holds rather than blocks — somebody with authority may still approve it, with a stored reason |
+| **`procurement/budgets`** | Allocated, **committed**, spent, remaining. The second column is the one the legacy build could not produce: it had no purchase order, so nothing reserved money, and a budget report showed only what had already been paid |
+| **`finance/payments`** | The proposal — what is due and how overdue — at the top, because a payment run starts from it. A blocked supplier cannot be paid, and one whose bank details await approval cannot be paid to the proposed account |
+| **`procurement/assets`** | Cost, accumulated depreciation and net book value side by side. Accumulated is summed from **posted** entries, never recomputed from cost and rate |
+| Skipped assets are reported | REQ-AST-03 asks for it. An asset silently left out every period is one that never depreciates, and nobody would know |
+| **`finance/periods`** | Which months accept postings. Sealing a year is deliberately not a button here — it belongs with the pre-close checklist A7 deferred to D5 |
+
+#### One defect fixed, one module split
+
+**`StudentPicker` mis-built its links.** It produced
+`` `${basePath}?student=${id}` ``, so any caller whose base path already
+carried a query — the sponsors screen keeps its tab in one — emitted a second
+`?` that browsers read as part of the preceding value, and its search form
+carried only `q`, dropping the tab. It now picks the right separator and
+re-emits the base path's parameters as hidden fields. D3's four callers were
+unaffected because none of them passed a query.
+
+**`cms/branding.ts` split into `cms/theme.ts`.** The branding editor is a
+client component and needs `ALLOWED_FONTS` and the `Hsl` / `BrandingTokens`
+shapes; importing them from `branding.ts` pulled `server-only`, the RBAC layer
+and the Prisma client into the browser bundle, and Turbopack refused the
+build. The pure values — the font allow-list, `inkFor`, `shade`,
+`themeTokens`, `themeStyle`, `assertHsl`, `BrandingError` — moved to a module
+with no server imports, and `branding.ts` re-exports them so no caller
+changed. **Exactly the shape of D2's `lib/currency.ts`, and for the same
+reason**: a rule two runtimes both need belongs in a module neither has to
+fake. There is still one `ALLOWED_FONTS`, and the server validates against the
+list the form was rendered from.
+
+#### The built flag, and what happened to it
+
+D4 landed in five groups, so `navigation.ts` gained a per-item `built: true`
+that lets a screen say it exists ahead of its phase — with one exported
+predicate `isBuilt()` read by both the menu and the section index, and a test
+refusing the flag on any item whose phase has already landed.
+
+**With the twentieth screen the flags came off and `BUILT_PHASES` gained
+D4.** The mechanism stays for the next phase that lands in pieces, and its
+test now asserts the predicate on synthetic items rather than on whatever the
+route table happens to hold — a mechanism with no live user still has to be
+known to work.
+
+#### Deferred, and named
+
+- **Requisitions.** `raiseRequisition`, `submitRequisition` and
+  `decideRequisition` are complete and tested; the orders screen drafts a
+  purchase order directly. The requisition is the step *before* the order —
+  a department asking rather than procurement buying — and it wants the
+  department's own screen rather than a checkbox on this one.
+- **Budget phasing by period.** `draftBudget` accepts `periodAmounts` and
+  `allocate()` spreads evenly without leaving a residue. Phasing a year by
+  hand is a real requirement and wants its own screen, not twelve more boxes
+  per line.
+- **Asset capitalisation.** `capitaliseAsset` is complete; the register lists,
+  depreciates and disposes but does not yet bring an asset onto the books.
+  It belongs with the invoice that bought it, and that link — invoice line to
+  asset — is a piece of B-track work no phase has claimed.
+- **Vendor statements and the intake importer.** `vendorStatement` and
+  `previewIntake` / `commitIntake` are built and tested. Both are file-shaped
+  work — a statement to send, a spreadsheet to upload — and the upload
+  endpoint is the same one still blocking four other things.
+- **Media upload**, still. It now blocks the branding screen's logo fields as
+  well, which take a URL. Five phases have shipped a screen with a hole in it
+  where an upload belongs.
 
 
 ---

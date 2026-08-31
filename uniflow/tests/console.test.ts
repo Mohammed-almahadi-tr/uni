@@ -15,6 +15,7 @@ import {
 } from '@/lib/console/navigation';
 import { safeNext } from '@/lib/console/navigation';
 import { sessionServes } from '@/lib/console/tenancy';
+import { MFA_REQUIRED_PERMISSIONS } from '@/lib/auth/rbac';
 import { addDomain, resolveTenantByHost } from '@/lib/cms/hosts';
 import { login, resolvePrincipal } from '@/lib/auth/login';
 import { provisionTenant, syncPermissions } from '@/lib/auth/provisioning';
@@ -591,12 +592,16 @@ describe('the finance screens are declared and separated', () => {
       (i) => i.key === 'payments',
     )!;
     expect(item.phase).toBe('D4');
-    expect(BUILT_PHASES.has(item.phase)).toBe(false);
   });
 
   it('lets every finance screen D2 built be reached by somebody the roles ship', () => {
     // A screen no shipped role can open is a screen nobody will find.
-    const built = CONSOLE_SECTIONS.find((s) => s.key === 'finance')!.items.filter(isBuilt);
+    // D2's own six. The finance menu also carries `payments` and `periods`,
+    // which D4 builds — this test is about what D2 delivered, so it filters
+    // on the phase rather than on the section.
+    const built = CONSOLE_SECTIONS.find((s) => s.key === 'finance')!
+      .items.filter((i) => i.phase === 'D2')
+      .filter(isBuilt);
     expect(built.map((i) => i.key).sort()).toEqual([
       'approvals',
       'cashierDesk',
@@ -640,18 +645,107 @@ describe('a screen may be built before its phase is', () => {
     }
   });
 
-  it('has a page on disk for the D4 screens that claim to exist', () => {
+  it('lets an item claim to be built ahead of its phase', () => {
+    // Asserted on synthetic items rather than on whatever the route table
+    // happens to hold. D4 used this while it landed in groups and no longer
+    // needs it; the mechanism stays for the next phase that does, and a
+    // mechanism with no live user still has to be known to work.
+    expect(isBuilt({ phase: 'D5' })).toBe(false);
+    expect(isBuilt({ phase: 'D5', built: true })).toBe(true);
+    expect(isBuilt({ phase: 'D1' })).toBe(true);
+  });
+
+  it('has a page on disk for every screen claiming to exist ahead of its phase', () => {
+    // Vacuous while no item carries the flag, and exactly the test that must
+    // exist the moment one does.
     const root = resolve(__dirname, '..', 'src', 'app', '[locale]', 'console');
-    const early = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) => i.built === true);
-    expect(early.length).toBeGreaterThan(0);
-    for (const item of early) {
+    for (const item of CONSOLE_SECTIONS.flatMap((s) => s.items)) {
+      if (item.built !== true) continue;
       expect(existsSync(join(root, ...item.path.split('/'), 'page.tsx')), item.path).toBe(true);
-      expect(BUILT_PHASES.has(item.phase), `${item.path} phase`).toBe(false);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D4: the back office and tenant administration
+// ---------------------------------------------------------------------------
+
+describe('the back office is declared and reachable', () => {
+  it('has built every screen D4 declares', () => {
+    const d4 = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) => i.phase === 'D4');
+    expect(d4.length).toBe(20);
+    expect(d4.every(isBuilt)).toBe(true);
+  });
+
+  it('gives tenant administration to the University Admin and nobody else by default', () => {
+    // The screens whose absence meant a university could not add a member of
+    // staff without a developer at a REPL.
+    const admin = navigationFor(new Set(DEFAULT_ROLES['University Admin'].permissions));
+    const settings = admin.find((s) => s.key === 'settings');
+    expect(settings).toBeDefined();
+    expect(settings!.items.map((i) => i.key).sort()).toEqual([
+      'audit',
+      'branding',
+      'content',
+      'enquiries',
+      'roles',
+      'users',
+    ]);
+
+    for (const [name, role] of Object.entries(DEFAULT_ROLES)) {
+      if (name === 'University Admin') continue;
+      const nav = navigationFor(new Set(role.permissions));
+      const theirs = nav.find((s) => s.key === 'settings');
+      expect(theirs?.items.map((i) => i.key) ?? [], name).not.toContain('users');
     }
   });
 
-  it('still has D4 work outstanding, or this flag has outlived its purpose', () => {
+  it('keeps the three legs of the purchase match on three different permissions', () => {
+    // Ordering, receiving and invoicing. The Stores Officer confirms delivery
+    // and holds nothing else, which is what makes that confirmation worth
+    // anything.
+    const stores = new Set(DEFAULT_ROLES['Stores Officer'].permissions);
+    const items = navigationFor(stores).flatMap((s) => s.items.map((i) => i.key));
+    expect(items).toContain('receiving');
+    expect(items).not.toContain('orders');
+    expect(items).not.toContain('invoices');
+    expect(items).not.toContain('payments');
+  });
+
+  it('separates proposing a supplier’s bank details from approving them', () => {
+    const officer = new Set(DEFAULT_ROLES['Procurement Officer'].permissions);
+    const controller = new Set(DEFAULT_ROLES['Financial Controller'].permissions);
+    expect(officer.has('vendor.manage')).toBe(true);
+    expect(officer.has('vendor.approve')).toBe(false);
+    expect(controller.has('vendor.approve')).toBe(true);
+    expect(controller.has('vendor.manage')).toBe(false);
+  });
+
+  it('demands a second factor for everything that moves money out or changes who may', () => {
+    // Named here because D4 is where the screens for these finally exist, and
+    // a permission list nobody reads is how one of them quietly loses its
+    // second factor.
+    for (const key of [
+      'payment.approve',
+      'vendor.manage',
+      'vendor.approve',
+      'role.manage',
+      'user.manage',
+      'period.close',
+      'asset.dispose',
+      'admission.override',
+    ] as PermissionKey[]) {
+      expect(MFA_REQUIRED_PERMISSIONS, key).toContain(key);
+    }
+  });
+
+  it('gives every D4 screen at least one shipped role that can open it', () => {
     const d4 = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) => i.phase === 'D4');
-    expect(d4.some((i) => !isBuilt(i))).toBe(true);
+    for (const item of d4) {
+      const reachable = Object.values(DEFAULT_ROLES).some((role) =>
+        satisfies(new Set(role.permissions), item.anyOf),
+      );
+      expect(reachable, `${item.path} is unreachable by every shipped role`).toBe(true);
+    }
   });
 });

@@ -54,7 +54,7 @@ export type ConsolePhase = 'D1' | 'D2' | 'D3' | 'D4' | 'D5';
 
 /** Phases whose screens all exist. An item outside this set renders as a name
  *  and a phase rather than a link to a 404. */
-export const BUILT_PHASES: ReadonlySet<ConsolePhase> = new Set<ConsolePhase>(['D1', 'D2', 'D3']);
+export const BUILT_PHASES: ReadonlySet<ConsolePhase> = new Set<ConsolePhase>(['D1', 'D2', 'D3', 'D4']);
 
 /**
  * Whether a screen exists, in the one place both the menu and the section
@@ -132,7 +132,7 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
       // §8 gives procure-to-pay *through payment* to D4, and this row said
       // D2 only because it sits in the finance menu.
       { key: 'payments', path: 'finance/payments', anyOf: ['payment.create', 'payment.approve'], phase: 'D4' },
-      { key: 'periods', path: 'finance/periods', anyOf: ['period.read', 'period.close'], phase: 'D4', built: true },
+      { key: 'periods', path: 'finance/periods', anyOf: ['period.read', 'period.close'], phase: 'D4' },
     ],
   },
   {
@@ -144,7 +144,7 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
       { key: 'registrations', path: 'registry/registrations', anyOf: ['registration.read'], phase: 'D3', detail: 'registry/registrations/[id]' },
       { key: 'holds', path: 'registry/holds', anyOf: ['hold.manage'], phase: 'D3' },
       { key: 'lifecycle', path: 'registry/lifecycle', anyOf: ['student.status', 'registration.transfer'], phase: 'D3' },
-      { key: 'admissions', path: 'registry/admissions', anyOf: ['application.read', 'application.decide', 'application.offer'], phase: 'D4', built: true },
+      { key: 'admissions', path: 'registry/admissions', anyOf: ['application.read', 'application.decide', 'application.offer'], phase: 'D4' },
       { key: 'documents', path: 'registry/documents', anyOf: ['document.verify'], phase: 'D3' },
       { key: 'medical', path: 'registry/medical', anyOf: ['medical.read', 'medical.manage'], phase: 'D3' },
     ],
@@ -153,23 +153,23 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
     key: 'academic',
     path: 'academic',
     items: [
-      { key: 'structure', path: 'academic/structure', anyOf: ['academic.read', 'academic.manage'], phase: 'D4', built: true },
-      { key: 'feeMatrix', path: 'academic/fees', anyOf: ['feematrix.read', 'feematrix.manage', 'feematrix.approve'], phase: 'D4', built: true },
-      { key: 'capacity', path: 'academic/capacity', anyOf: ['admission.capacity'], phase: 'D4', built: true },
-      { key: 'sponsors', path: 'academic/sponsors', anyOf: ['sponsor.manage', 'sponsor.approve', 'sponsor.invoice'], phase: 'D4', built: true },
-      { key: 'scholarships', path: 'academic/scholarships', anyOf: ['scholarship.manage', 'scholarship.approve'], phase: 'D4', built: true },
+      { key: 'structure', path: 'academic/structure', anyOf: ['academic.read', 'academic.manage'], phase: 'D4' },
+      { key: 'feeMatrix', path: 'academic/fees', anyOf: ['feematrix.read', 'feematrix.manage', 'feematrix.approve'], phase: 'D4' },
+      { key: 'capacity', path: 'academic/capacity', anyOf: ['admission.capacity'], phase: 'D4' },
+      { key: 'sponsors', path: 'academic/sponsors', anyOf: ['sponsor.manage', 'sponsor.approve', 'sponsor.invoice'], phase: 'D4' },
+      { key: 'scholarships', path: 'academic/scholarships', anyOf: ['scholarship.manage', 'scholarship.approve'], phase: 'D4' },
     ],
   },
   {
     key: 'procurement',
     path: 'procurement',
     items: [
-      { key: 'vendors', path: 'procurement/vendors', anyOf: ['vendor.manage', 'vendor.approve'], phase: 'D4', built: true },
+      { key: 'vendors', path: 'procurement/vendors', anyOf: ['vendor.manage', 'vendor.approve'], phase: 'D4' },
       { key: 'orders', path: 'procurement/orders', anyOf: ['po.create', 'po.approve'], phase: 'D4' },
       { key: 'receiving', path: 'procurement/receiving', anyOf: ['grn.create'], phase: 'D4' },
       { key: 'invoices', path: 'procurement/invoices', anyOf: ['apinvoice.record', 'apinvoice.approve'], phase: 'D4' },
       { key: 'budgets', path: 'procurement/budgets', anyOf: ['budget.read', 'budget.manage', 'budget.approve'], phase: 'D4' },
-      { key: 'assets', path: 'procurement/assets', anyOf: ['asset.manage', 'asset.depreciate', 'asset.dispose'], phase: 'D4', built: true },
+      { key: 'assets', path: 'procurement/assets', anyOf: ['asset.manage', 'asset.depreciate', 'asset.dispose'], phase: 'D4' },
     ],
   },
   {
@@ -188,12 +188,12 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
     key: 'settings',
     path: 'settings',
     items: [
-      { key: 'users', path: 'settings/users', anyOf: ['user.read', 'user.manage'], phase: 'D4', built: true },
-      { key: 'roles', path: 'settings/roles', anyOf: ['role.read', 'role.manage'], phase: 'D4', built: true },
-      { key: 'branding', path: 'settings/branding', anyOf: ['cms.manage'], phase: 'D4', built: true },
-      { key: 'content', path: 'settings/content', anyOf: ['cms.manage', 'cms.publish'], phase: 'D4', built: true },
-      { key: 'enquiries', path: 'settings/enquiries', anyOf: ['inquiry.handle'], phase: 'D4', built: true },
-      { key: 'audit', path: 'settings/audit', anyOf: ['audit.read'], phase: 'D4', built: true },
+      { key: 'users', path: 'settings/users', anyOf: ['user.read', 'user.manage'], phase: 'D4' },
+      { key: 'roles', path: 'settings/roles', anyOf: ['role.read', 'role.manage'], phase: 'D4' },
+      { key: 'branding', path: 'settings/branding', anyOf: ['cms.manage'], phase: 'D4' },
+      { key: 'content', path: 'settings/content', anyOf: ['cms.manage', 'cms.publish'], phase: 'D4' },
+      { key: 'enquiries', path: 'settings/enquiries', anyOf: ['inquiry.handle'], phase: 'D4' },
+      { key: 'audit', path: 'settings/audit', anyOf: ['audit.read'], phase: 'D4' },
     ],
   },
 ] as const;
