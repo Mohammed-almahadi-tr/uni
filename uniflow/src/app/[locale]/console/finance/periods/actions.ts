@@ -57,3 +57,35 @@ export async function changeStatus(
     return { ...blank(), error: 'That could not be completed.' };
   }
 }
+
+/**
+ * Sealing a period (Track D5, SRS REQ-PER-02).
+ *
+ * D4 left `PERMANENTLY_CLOSED` unreachable from this screen and said it
+ * belonged with the pre-close checklist. The checklist now exists, so this
+ * does — and it runs the same gate a close does, because `setPeriodStatus`
+ * checks both states against the same checklist inside its own transaction.
+ *
+ * The typed confirmation is checked here as well as in the form. A form is a
+ * suggestion to a browser; the action is what runs.
+ */
+export async function seal(_prev: PeriodState, form: FormData): Promise<PeriodState> {
+  const ctx = await currentContext();
+  if (!ctx) return { ...blank(), error: 'Your session has ended. Sign in again.' };
+
+  if (str(form, 'confirm').toUpperCase() !== 'SEAL') {
+    return { ...blank(), error: 'Type SEAL to confirm. Nothing has been changed.' };
+  }
+
+  try {
+    await setPeriodStatus(ctx.principal, str(form, 'periodId'), 'PERMANENTLY_CLOSED');
+    revalidatePath('/console/finance/periods');
+    return { error: null, changed: true };
+  } catch (e) {
+    if (e instanceof Error && e.name !== 'Error' && e.message) {
+      return { ...blank(), error: e.message };
+    }
+    console.error('[periods]', e);
+    return { ...blank(), error: 'That could not be completed.' };
+  }
+}

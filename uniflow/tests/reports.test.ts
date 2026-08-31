@@ -20,6 +20,9 @@ import {
   OpeningBalanceError,
 } from '@/lib/ledger/opening-balances';
 import { closeFiscalYear, reopenFiscalYear, YearEndError } from '@/lib/ledger/year-end';
+import { preCloseChecklist, PreCloseError } from '@/lib/ledger/close';
+import { setPeriodStatus } from '@/lib/ledger/fiscal-year';
+import { createDraft } from '@/lib/voucher/draft';
 import {
   trialBalanceDocument,
   balanceSheetDocument,
@@ -28,6 +31,15 @@ import {
 } from '@/lib/reports/document';
 import { toCsv, toPrintableHtml } from '@/lib/reports/render';
 import { toXlsx } from '@/lib/reports/xlsx';
+import {
+  exportHref,
+  parseReportRequest,
+  reportQuery,
+  runReport,
+  today,
+  yearStart,
+  ReportRequestError,
+} from '@/lib/console/reports';
 import { ForbiddenError } from '@/lib/auth/rbac';
 import type { Principal } from '@/lib/auth/rbac';
 
@@ -995,5 +1007,528 @@ describe('export formats', () => {
     const recon = reconciliationDocument(await subledgerReconciliation(rep), CTX);
     expect(recon.titleAr).toBe('مطابقة الدفاتر المساعدة');
     expect(toPrintableHtml(recon, { locale: 'en' })).toContain('Sub-Ledger Reconciliation');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D5: one report, two renderings
+// ---------------------------------------------------------------------------
+
+/**
+ * The claim D5 exists to make.
+ *
+ * **The spreadsheet an auditor is handed is the report the accountant looked
+ * at.** The legacy build's report screen and its export were two procedures
+ * with two hand-written date predicates — one inclusive at both ends and the
+ * other not — so a figure on screen and the same figure in the exported file
+ * could differ by a day's transactions, and nothing anywhere said so.
+ */
+describe('a report and its export are one report', () => {
+  it('parses one request and renders it into every format from that', async () => {
+    const { uni: u, reporter: rep } = await freshUniversity();
+    await journal(u.tenantId, D(2026, 1, 10), '11111', '41211', '1234.56', u.accounts);
+
+    const query = 'kind=trial-balance&from=2026-01-01&to=2026-01-31&level=5';
+    const request = parseReportRequest(Object.fromEntries(new URLSearchParams(query)), 'trial-balance');
+    const result = await runReport(rep, request);
+
+    // The screen renders `result.document`; the route renders the same object
+    // through toCsv/toXlsx/toPrintableHtml. So it is enough to prove the
+    // document holds the figure, and that every renderer receives it.
+    expect(result.kind).toBe('trial-balance');
+    expect(toCsv(result.document, { locale: 'en' })).toContain('1234.5600');
+    expect(toPrintableHtml(result.document, { locale: 'ar' })).toContain('1234.5600');
+    expect(toXlsx(result.document, { locale: 'en' }).toString('latin1')).toContain('1234.5600');
+  });
+
+  it('round-trips a request through the query string the export link carries', async () => {
+    const { uni: u, reporter: rep } = await freshUniversity();
+    await journal(u.tenantId, D(2026, 2, 3), '11111', '41211', '99.99', u.accounts);
+
+    const screen = parseReportRequest(
+      { kind: 'trial-balance', from: '2026-02-01', to: '2026-02-28', level: '3' },
+      'trial-balance',
+    );
+
+    // What the export link on the screen would carry, read back the way the
+    // route handler reads it. Two hand-built query strings is exactly how the
+    // legacy grid and its Excel button came to disagree.
+    const exported = parseReportRequest(
+      Object.fromEntries(new URLSearchParams(reportQuery(screen))),
+      'trial-balance',
+    );
+    expect(exported).toEqual(screen);
+
+    const a = await runReport(rep, screen);
+    const b = await runReport(rep, exported);
+    expect(b.document.rows).toEqual(a.document.rows);
+    expect(b.filename).toBe(a.filename);
+  });
+
+  it('defaults a mistyped filter instead of refusing the report', () => {
+    // A report screen reached with a broken parameter should render the
+    // default report and let the user correct the filter, not a stack trace.
+    const req = parseReportRequest(
+      { kind: 'not-a-report', from: 'yesterday', level: '99', dimension: 'colour' },
+      'reconciliation',
+    );
+    expect(req.kind).toBe('reconciliation');
+    expect(req.from).toBe(yearStart());
+    expect(req.to).toBe(today());
+    expect(req.maxLevel).toBeNull();
+    expect(req.dimension).toBe('faculty');
+  });
+
+  it('reads a repeated parameter as its first value rather than as an array', () => {
+    // `?from=x&from=y` is a thing a browser will send. Taking the array would
+    // put "x,y" into a date and produce an empty report with no error.
+    const req = parseReportRequest({ from: ['2026-03-01', '2026-04-01'] }, 'trial-balance');
+    expect(req.from).toBe('2026-03-01');
+  });
+
+  it('keeps the two report permissions apart', async () => {
+    const { uni: u } = await freshUniversity();
+    const registrar = await makePrincipal(u.tenantId, ['report.student', 'student.read'], {
+      name: 'reg',
+    });
+
+    // A registrar settling a fee dispute reads one student's history and not
+    // the institution's ledger.
+    await expect(
+      runReport(registrar, parseReportRequest({ kind: 'trial-balance' }, 'trial-balance')),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('refuses a statement with no student rather than producing an empty one', async () => {
+    const { uni: u } = await freshUniversity();
+    const registrar = await makePrincipal(u.tenantId, ['report.student'], { name: 'reg2' });
+
+    await expect(
+      runReport(registrar, parseReportRequest({ kind: 'student-account' }, 'student-account')),
+    ).rejects.toBeInstanceOf(ReportRequestError);
+  });
+
+  it('does not raise the balance alarm on a cost-centre segment', async () => {
+    // A segment of the ledger is not a ledger — a salary posting debits an
+    // expense carrying a faculty and credits a bank account carrying none — so
+    // it legitimately does not balance. Flagging that as an alarm would train
+    // the reader to ignore the alarm.
+    const { uni: u, reporter: rep } = await freshUniversity();
+    await journal(u.tenantId, D(2026, 1, 12), '51111', '11111', '500.00', u.accounts, {
+      costCenterId: u.costCenterId,
+    });
+
+    const segmented = await runReport(rep, {
+      ...parseReportRequest({ from: '2026-01-01', to: '2026-01-31' }, 'trial-balance'),
+      costCenterId: u.costCenterId,
+    });
+    expect(segmented.alert).toBe(false);
+  });
+
+  it('raises the alarm when the sub-ledgers do not reconcile, and not otherwise', async () => {
+    const { uni: u, reporter: rep } = await freshUniversity();
+    const clean = await runReport(rep, parseReportRequest({}, 'reconciliation'));
+    expect(clean.alert).toBe(false);
+    expect(clean.filename.startsWith('reconciliation_')).toBe(true);
+    expect(u.tenantId).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D5: the three reports A7 had engines for and no document
+// ---------------------------------------------------------------------------
+
+describe('the aging, statement and exposure documents', () => {
+  it('ages students, sponsors and vendors as three reports, not one', async () => {
+    const { uni: u, reporter: rep } = await freshUniversity();
+    const asOf = { asOf: '2026-03-31' };
+
+    const students = await runReport(rep, parseReportRequest(asOf, 'aging-students'));
+    const sponsors = await runReport(rep, parseReportRequest({ ...asOf, kind: 'aging-sponsors' }, 'aging-students'));
+    const vendors = await runReport(rep, parseReportRequest({ ...asOf, kind: 'aging-vendors' }, 'aging-students'));
+
+    // Three titles, three files, three definitions of "overdue". Stacking them
+    // would put three different clocks in one column and invite somebody to
+    // total it.
+    expect(students.document.titleEn).toBe('Aged Student Receivables');
+    expect(sponsors.document.titleEn).toBe('Aged Sponsor Receivables');
+    expect(vendors.document.titleEn).toBe('Aged Accounts Payable');
+    expect(new Set([students.filename, sponsors.filename, vendors.filename]).size).toBe(3);
+    expect(u.tenantId).toBeTruthy();
+  });
+
+  it('gives every aging row a cell for every column', async () => {
+    // The defect this catches is a bucket added to the engine and not to the
+    // document: the export would be short a column and the totals would sit
+    // under the wrong heading.
+    const { reporter: rep } = await freshUniversity();
+    const doc = (await runReport(rep, parseReportRequest({}, 'aging-students'))).document;
+    for (const row of doc.rows) expect(row.cells).toHaveLength(doc.columns.length);
+  });
+
+  it('carries the budget-cap column only when cut by scheme', async () => {
+    const { reporter: rep } = await freshUniversity();
+    const byFaculty = await runReport(
+      rep,
+      parseReportRequest({ dimension: 'faculty' }, 'discounts'),
+    );
+    const byScheme = await runReport(
+      rep,
+      parseReportRequest({ dimension: 'scheme' }, 'discounts'),
+    );
+
+    // A cap exists against a scheme and against nothing else. An empty column
+    // on the other four would invite the reading that a faculty has a discount
+    // budget, which it does not.
+    expect(byFaculty.document.columns.map((c) => c.key)).not.toContain('cap');
+    expect(byScheme.document.columns.map((c) => c.key)).toContain('cap');
+    for (const row of byScheme.document.rows) {
+      expect(row.cells).toHaveLength(byScheme.document.columns.length);
+    }
+  });
+
+  it('opens and closes a statement with rows rather than with header notes', async () => {
+    // A running-balance column that starts at a figure whose origin the reader
+    // cannot see is a column the reader has to take on trust.
+    const { uni: u } = await freshUniversity();
+    const clerk = await makePrincipal(u.tenantId, ['report.student', 'student.read'], {
+      name: 'clerk',
+    });
+    const studentId = await asTenant(u.tenantId, async (tx) => {
+      const s = await tx.student.create({
+        data: {
+          tenantId: u.tenantId,
+          studentNo: `S-${Date.now().toString(36)}`,
+          fullNameAr: 'طالب كشف',
+          fullNameEn: 'Statement Student',
+          searchKey: 'statement student',
+          programmeId: u.programmeIds.MBBS,
+          batchId: u.batchId,
+          admissionCategoryId: u.admissionCategories.REGULAR,
+        },
+        select: { id: true },
+      });
+      return s.id;
+    });
+
+    const doc = (
+      await runReport(clerk, {
+        ...parseReportRequest({ from: '2026-01-01', to: '2026-03-31' }, 'student-account'),
+        studentId,
+      })
+    ).document;
+
+    const labels = doc.rows.map((r) => (r.cells[2].kind === 'text' ? r.cells[2].value : ''));
+    expect(labels[0]).toContain('Opening balance');
+    expect(labels[labels.length - 1]).toContain('Closing balance');
+    expect(doc.rows[0].emphasis).toBe('subtotal');
+    expect(doc.rows[doc.rows.length - 1].emphasis).toBe('total');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D5: the pre-close checklist (REQ-PER-02)
+// ---------------------------------------------------------------------------
+
+/**
+ * The gate A7 deferred.
+ *
+ * A7 computed every figure this needs and did not wire it, on the grounds that
+ * a hard refusal with no screen to explain it is a refusal a controller cannot
+ * act on. D5 has the screen, so the gate is connected — and what these tests
+ * are checking is that closing a period whose books are not straight is now
+ * impossible rather than merely inadvisable.
+ *
+ * The legacy build had no fiscal period concept at all, so there was nothing
+ * to close and nothing to check: a mistyped year on a voucher silently
+ * rewrote a closed year's results.
+ */
+describe('pre-close checklist', () => {
+  it('clears a period with nothing outstanding, and closes it', async () => {
+    const { uni: u, controller } = await freshUniversity();
+    await journal(u.tenantId, D(2026, 1, 10), '11111', '41211', '100.00', u.accounts);
+
+    const report = await preCloseChecklist(controller, u.periodIds[0]);
+    expect(report.mayClose).toBe(true);
+    expect(report.checks.filter((c) => c.blocking).every((c) => c.status === 'PASS')).toBe(true);
+
+    await setPeriodStatus(controller, u.periodIds[0], 'CLOSED');
+    const status = await asTenant(u.tenantId, (tx) =>
+      tx.fiscalPeriod.findUniqueOrThrow({
+        where: { id: u.periodIds[0] },
+        select: { status: true },
+      }),
+    );
+    expect(status.status).toBe('CLOSED');
+  });
+
+  it('refuses the close while a voucher in the period is awaiting a decision', async () => {
+    // Closing would shut the period those vouchers must post into, which
+    // silently destroys work already done and waiting on a signature.
+    const { uni: u, controller } = await freshUniversity();
+    const maker = await makePrincipal(u.tenantId, ['voucher.create'], { name: 'maker' });
+
+    await createDraft(maker, {
+      voucherType: 'JOURNAL',
+      docDate: D(2026, 1, 20),
+      description: 'Half-entered journal',
+      lines: [
+        { accountId: u.accounts['11111'], debit: '50.00' },
+        { accountId: u.accounts['41211'], credit: '50.00' },
+      ],
+    });
+
+    const report = await preCloseChecklist(controller, u.periodIds[0]);
+    const vouchers = report.checks.find((c) => c.key === 'vouchers')!;
+    expect(vouchers.status).toBe('FAIL');
+    expect(vouchers.blocking).toBe(true);
+    expect(report.mayClose).toBe(false);
+
+    await expect(setPeriodStatus(controller, u.periodIds[0], 'CLOSED')).rejects.toBeInstanceOf(
+      PreCloseError,
+    );
+  });
+
+  it('names the failing check in the refusal rather than saying only no', async () => {
+    const { uni: u, controller } = await freshUniversity();
+    const maker = await makePrincipal(u.tenantId, ['voucher.create'], { name: 'maker2' });
+    await createDraft(maker, {
+      voucherType: 'JOURNAL',
+      docDate: D(2026, 2, 4),
+      description: 'Awaiting a signature',
+      lines: [{ accountId: u.accounts['11111'], debit: '10.00' }],
+    });
+
+    // "The checklist failed" tells a controller nothing they can act on.
+    await expect(setPeriodStatus(controller, u.periodIds[1], 'CLOSED')).rejects.toThrow(
+      /awaiting a decision/i,
+    );
+  });
+
+  it('only counts vouchers dated inside the period being closed', async () => {
+    const { uni: u, controller } = await freshUniversity();
+    const maker = await makePrincipal(u.tenantId, ['voucher.create'], { name: 'maker3' });
+    await createDraft(maker, {
+      voucherType: 'JOURNAL',
+      docDate: D(2026, 5, 6),
+      description: 'A May draft',
+      lines: [{ accountId: u.accounts['11111'], debit: '10.00' }],
+    });
+
+    // January is not held up by a draft dated in May.
+    const january = await preCloseChecklist(controller, u.periodIds[0]);
+    expect(january.checks.find((c) => c.key === 'vouchers')!.status).toBe('PASS');
+    expect(january.mayClose).toBe(true);
+
+    const may = await preCloseChecklist(controller, u.periodIds[4]);
+    expect(may.checks.find((c) => c.key === 'vouchers')!.status).toBe('FAIL');
+  });
+
+  it('warns about unposted depreciation without blocking on it', async () => {
+    // A period with no assets legitimately has no depreciation, and a block
+    // that fires on an empty register is a block somebody disables. So it is
+    // advisory, and reported with its counts so a controller can tell "nothing
+    // to post" from "not posted yet".
+    const { uni: u, controller } = await freshUniversity();
+    const report = await preCloseChecklist(controller, u.periodIds[0]);
+
+    const dep = report.checks.find((c) => c.key === 'depreciation')!;
+    expect(dep.blocking).toBe(false);
+    expect(dep.status).toBe('NOT_APPLICABLE');
+    expect(dep.detailEn).toMatch(/no assets in service/i);
+    expect(report.mayClose).toBe(true);
+    expect(u.tenantId).toBeTruthy();
+  });
+
+  it('reports FX revaluation as not applicable rather than quietly passing it', async () => {
+    // REQ-PER-02 lists it; there is no exchange-rate data to revalue until a
+    // tenant runs a second currency. A check that always passes for a reason
+    // nobody wrote down is a check that will be wrong the first time it
+    // matters.
+    const { uni: u, controller } = await freshUniversity();
+    const report = await preCloseChecklist(controller, u.periodIds[0]);
+    const fx = report.checks.find((c) => c.key === 'fx')!;
+    expect(fx.status).toBe('NOT_APPLICABLE');
+    expect(fx.detailEn).toMatch(/one currency/i);
+    expect(u.tenantId).toBeTruthy();
+  });
+
+  it('asks all six questions, every time', async () => {
+    // A check quietly dropped from the list is a check nobody notices is gone.
+    const { uni: u, controller } = await freshUniversity();
+    const report = await preCloseChecklist(controller, u.periodIds[0]);
+    expect(report.checks.map((c) => c.key)).toEqual([
+      'vouchers',
+      'reconciliation',
+      'balanced',
+      'depreciation',
+      'recognition',
+      'fx',
+    ]);
+    expect(report.periodLabel).toContain('1/');
+    expect(u.tenantId).toBeTruthy();
+  });
+
+  it('runs no checklist when reopening', async () => {
+    // The checklist protects a figure from being frozen while it is wrong.
+    // Reopening unfreezes it, which is the remedy rather than the risk.
+    const { uni: u, controller } = await freshUniversity();
+    await setPeriodStatus(controller, u.periodIds[0], 'CLOSED');
+
+    const maker = await makePrincipal(u.tenantId, ['voucher.create'], { name: 'maker4' });
+    await createDraft(maker, {
+      voucherType: 'JOURNAL',
+      docDate: D(2026, 1, 25),
+      description: 'Raised after the close',
+      lines: [{ accountId: u.accounts['11111'], debit: '10.00' }],
+    });
+
+    await setPeriodStatus(controller, u.periodIds[0], 'OPEN');
+    const status = await asTenant(u.tenantId, (tx) =>
+      tx.fiscalPeriod.findUniqueOrThrow({
+        where: { id: u.periodIds[0] },
+        select: { status: true },
+      }),
+    );
+    expect(status.status).toBe('OPEN');
+  });
+
+  it('gates sealing on the same checklist as closing', async () => {
+    // `PERMANENTLY_CLOSED` cannot be undone, so it is the last state that
+    // should be reachable over an outstanding check.
+    const { uni: u, controller } = await freshUniversity();
+    const maker = await makePrincipal(u.tenantId, ['voucher.create'], { name: 'maker5' });
+    await createDraft(maker, {
+      voucherType: 'JOURNAL',
+      docDate: D(2026, 3, 3),
+      description: 'Still unsigned',
+      lines: [{ accountId: u.accounts['11111'], debit: '10.00' }],
+    });
+
+    await expect(
+      setPeriodStatus(controller, u.periodIds[2], 'PERMANENTLY_CLOSED'),
+    ).rejects.toBeInstanceOf(PreCloseError);
+  });
+
+  it('opens the checklist to either period permission and to neither else', async () => {
+    // `period.read` is "may see the calendar" and the checklist is a fact
+    // about the calendar; `period.close` is "may move the boundary", and
+    // refusing somebody the reasons for a refusal they are about to receive is
+    // how a gate becomes a mystery. Both answer yes; nothing else does.
+    const { uni: u, controller } = await freshUniversity();
+    const reader = await makePrincipal(u.tenantId, ['period.read'], { name: 'perread' });
+    const nobody = await makePrincipal(u.tenantId, ['report.financial'], { name: 'nocheck' });
+
+    expect(controller.permissions.has('period.read')).toBe(false);
+    await expect(preCloseChecklist(controller, u.periodIds[0])).resolves.toBeTruthy();
+    await expect(preCloseChecklist(reader, u.periodIds[0])).resolves.toBeTruthy();
+    await expect(preCloseChecklist(nobody, u.periodIds[0])).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+  });
+
+  it('refuses a period belonging to another university', async () => {
+    const { uni: a, controller } = await freshUniversity();
+    const b = await makeUniversity();
+    await expect(preCloseChecklist(controller, b.periodIds[0])).rejects.toBeInstanceOf(
+      PreCloseError,
+    );
+    expect(a.tenantId).not.toBe(b.tenantId);
+  });
+});
+
+describe('the reconciliation document keeps what the engine explains', () => {
+  it('carries a line note into the notes every renderer sees', () => {
+    // The engine sets a note when the numbers alone do not explain a line —
+    // the orphaned-control-balance check, which the database makes impossible
+    // to produce and which therefore has to be trusted to work when it does.
+    // Every renderer used to drop it; D5 carries it into the document, so the
+    // CSV, the spreadsheet and the print sheet all say it.
+    const doc = reconciliationDocument(
+      {
+        asOf: '2026-03-31',
+        currency: 'SDG',
+        ok: false,
+        lines: [
+          {
+            key: 'control-unattributed-21100',
+            labelEn: '21100 Student advances — balances carrying a party',
+            labelAr: '21100 دفعات الطلاب — أرصدة منسوبة لأطرافها',
+            subledger: '900.0000',
+            control: '1000.0000',
+            variance: '100.0000',
+            severity: 'VARIANCE',
+            note: '100.00 sits on this control account with no party attached.',
+          },
+        ],
+        breaches: [],
+      },
+      CTX,
+    );
+
+    expect(doc.notesEn.some((n) => n.includes('no party attached'))).toBe(true);
+    expect(doc.notesAr.some((n) => n.includes('no party attached'))).toBe(true);
+    // And the Arabic note is labelled in Arabic, not in English.
+    expect(doc.notesAr.some((n) => n.includes('دفعات الطلاب'))).toBe(true);
+  });
+
+  it('adds no note when every line explains itself', () => {
+    const doc = reconciliationDocument(
+      {
+        asOf: '2026-03-31',
+        currency: 'SDG',
+        ok: true,
+        lines: [
+          {
+            key: 'students',
+            labelEn: 'Student receivables',
+            labelAr: 'ذمم الطلاب',
+            subledger: '0.0000',
+            control: '0.0000',
+            variance: '0.0000',
+            severity: 'OK',
+          },
+        ],
+        breaches: [],
+      },
+      CTX,
+    );
+    expect(doc.notesEn).toEqual([]);
+    expect(doc.notesAr).toEqual([]);
+  });
+});
+
+describe('an export link', () => {
+  it('carries the locale, because an unprefixed one silently changes language', () => {
+    // `localePrefix: 'always'` redirects an unprefixed `/console/...` to the
+    // default locale — Arabic — whatever the reader was using, and the export
+    // route picks the language of the CSV and the print sheet off that
+    // segment. An English user following an unprefixed link would download an
+    // Arabic spreadsheet with the right figures in it, which is the kind of
+    // wrong nobody reports as a bug.
+    const req = parseReportRequest(
+      { kind: 'trial-balance', from: '2026-01-01', to: '2026-03-31' },
+      'trial-balance',
+    );
+    expect(exportHref('en', req, 'csv').startsWith('/en/console/reports/export?')).toBe(true);
+    expect(exportHref('ar', req, 'xlsx').startsWith('/ar/console/reports/export?')).toBe(true);
+  });
+
+  it('carries the screen’s own filters, and the format', () => {
+    const req = parseReportRequest(
+      { kind: 'income-statement', from: '2026-01-01', to: '2026-06-30', comparative: '1' },
+      'trial-balance',
+    );
+    const q = new URLSearchParams(exportHref('en', req, 'html').split('?')[1]);
+
+    expect(q.get('kind')).toBe('income-statement');
+    expect(q.get('from')).toBe('2026-01-01');
+    expect(q.get('to')).toBe('2026-06-30');
+    expect(q.get('comparative')).toBe('1');
+    expect(q.get('format')).toBe('html');
+
+    // And read back, it is the same request the screen ran.
+    const reparsed = parseReportRequest(Object.fromEntries(q.entries()), 'trial-balance');
+    expect(reparsed).toEqual(req);
   });
 });

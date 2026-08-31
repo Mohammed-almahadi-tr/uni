@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { Link } from '@/i18n/navigation';
 import { guardConsole } from '@/lib/console/guard';
 import { tenantCurrency } from '@/lib/console/lookups';
 import { batchOptions, offersFor, programmeRows } from '@/lib/console/backoffice';
@@ -60,6 +61,7 @@ export default async function AdmissionsPage({
   const dec = await getTranslations('academic.decision');
   const el = await getTranslations('academic.eligibility');
   const os = await getTranslations('academic.offerState');
+  const pr = await getTranslations('print');
   const sp = await searchParams;
 
   const [currency, programmes, batches] = await Promise.all([
@@ -289,6 +291,18 @@ export default async function AdmissionsPage({
                     <span className="text-xs text-muted-foreground">
                       {t('promotedInto')}
                     </span>
+                  )}
+                  {/* The letter itself (D5). Reachable for a closed offer as
+                      well as a live one: the applicant may be holding their
+                      copy and disputing it, and the useful document is the one
+                      that reproduces what was issued. */}
+                  {mayOffer && (
+                    <Link
+                      href={`/console/registry/admissions/${o.id}/offer`}
+                      className="ms-auto text-xs underline hover:no-underline"
+                    >
+                      {pr('offerLetter')}
+                    </Link>
                   )}
                 </div>
                 {o.conditions && <p className="mt-1 text-sm">{o.conditions}</p>}

@@ -119,6 +119,29 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ----------------------------------------------------------------------------
+   The print surface (Track D5)
+
+   D2, D3 and D4 each shipped a screen that prints and each deferred the page
+   setup to here. The receipt, the voucher, the registration card, the profile
+   card, the offer letter and the sponsor invoice are all A4 portrait, and they
+   are all laid out by these rules rather than by six stylesheets that agree
+   until one of them is edited.
+
+   Reports do NOT use this. They are rendered as standalone HTML by
+   `reports/render.ts`, which carries its own landscape page box — a trial
+   balance is six columns of figures and a receipt is a column of facts, and
+   forcing either into the other's orientation is what produces a report
+   nobody can read at arm's length. The two are declared side by side in
+   `lib/print/sheet.ts` so the difference stays deliberate.
+---------------------------------------------------------------------------- */
+
+@page {
+  size: A4 portrait;
+  /* The bottom margin is deeper than the top because the footer sits in it. */
+  margin: 16mm 16mm 20mm;
+}
+
 @media print {
   /* Vouchers are printed constantly. Print styling is a feature here, not an
      afterthought. */
@@ -128,5 +151,42 @@ body {
   }
   .no-print {
     display: none !important;
+  }
+
+  /* The console shell — sidebar, header, page chrome — is application, not
+     document. A sheet prints as the whole page or it prints as a screenshot of
+     a screen, and the second is what the legacy Crystal Reports produced. */
+  .print-sheet {
+    margin: 0;
+    max-width: none;
+    box-shadow: none;
+  }
+
+  /* Backgrounds carry meaning on these documents: the banded total row on a
+     receipt is how the amount reads at a glance. Ask the browser to keep
+     them rather than dropping them to save toner. */
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* A table header that does not repeat leaves page two of a statement as an
+     unlabelled grid of numbers. */
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Links printed with their href are useful on a web page and noise on a
+     receipt, so nothing here expands them — but a link still has to be
+     legible in black. */
+  a {
+    color: inherit;
+    text-decoration: none;
   }
 }

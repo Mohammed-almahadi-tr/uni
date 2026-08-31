@@ -69,6 +69,8 @@ export default async function StudentProfile({
   if (!header) notFound();
 
   const t = await getTranslations('registry');
+  const p = await getTranslations('print');
+  const rp = await getTranslations('reports');
   const [balance, holds, blocks, history, registrations] = await Promise.all([
     studentBalance(principal, id),
     listHolds(principal, id, { includeCleared: true }),
@@ -97,6 +99,23 @@ export default async function StudentProfile({
               className="inline-flex h-11 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
             >
               {t('profile.placeHold')}
+            </Link>
+            {/* The student card (D5). */}
+            <Link
+              href={`/console/registry/students/${id}/card`}
+              className="inline-flex h-11 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
+            >
+              {p('profileCard')}
+            </Link>
+            {/* And their statement of account, which is a report rather than a
+                document — it belongs to the reports section and is reached
+                from here because this is where somebody is standing when a
+                student disputes a balance. */}
+            <Link
+              href={`/console/reports/student-account?student=${id}`}
+              className="inline-flex h-11 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted"
+            >
+              {rp('studentAccount.title')}
             </Link>
             <Link
               href={`/console/registry/lifecycle?student=${id}`}

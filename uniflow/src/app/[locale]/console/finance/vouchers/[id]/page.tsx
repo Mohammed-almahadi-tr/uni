@@ -48,6 +48,7 @@ export default async function VoucherDetailPage({
 
   const t = await getTranslations('finance.vouchers');
   const c = await getTranslations('finance.common');
+  const p = await getTranslations('print');
   const ds = await getTranslations('finance.draftState');
   const sp = await searchParams;
 
@@ -78,12 +79,23 @@ export default async function VoucherDetailPage({
         title={draft.draftNo}
         subtitle={draft.description}
         actions={
-          <Link
-            href="/console/finance/vouchers"
-            className="h-11 rounded-md border border-border px-4 text-sm font-medium leading-[2.75rem] hover:bg-muted"
-          >
-            {c('back')}
-          </Link>
+          <>
+            {/* The printed voucher. A draft prints too — it goes round the
+                building to be signed before it is approved in the system,
+                which is the order the work actually happens in. */}
+            <Link
+              href={`/console/finance/vouchers/${draft.id}/print`}
+              className="h-11 rounded-md bg-primary px-4 text-sm font-medium leading-[2.75rem] text-primary-foreground hover:opacity-90"
+            >
+              {p('print')}
+            </Link>
+            <Link
+              href="/console/finance/vouchers"
+              className="h-11 rounded-md border border-border px-4 text-sm font-medium leading-[2.75rem] hover:bg-muted"
+            >
+              {c('back')}
+            </Link>
+          </>
         }
       />
 

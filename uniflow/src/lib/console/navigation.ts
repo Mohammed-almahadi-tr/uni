@@ -54,7 +54,13 @@ export type ConsolePhase = 'D1' | 'D2' | 'D3' | 'D4' | 'D5';
 
 /** Phases whose screens all exist. An item outside this set renders as a name
  *  and a phase rather than a link to a 404. */
-export const BUILT_PHASES: ReadonlySet<ConsolePhase> = new Set<ConsolePhase>(['D1', 'D2', 'D3', 'D4']);
+export const BUILT_PHASES: ReadonlySet<ConsolePhase> = new Set<ConsolePhase>([
+  'D1',
+  'D2',
+  'D3',
+  'D4',
+  'D5',
+]);
 
 /**
  * Whether a screen exists, in the one place both the menu and the section
@@ -84,14 +90,20 @@ export interface ConsoleItem {
   anyOf: readonly PermissionKey[];
   phase: ConsolePhase;
   /**
-   * A dynamic sub-route belonging to this screen — `registry/students/[id]`.
-   * Declared rather than inferred, so the guard covers it and the structural
-   * test finds it. It carries the item's own permissions: a detail page is
-   * the same screen with one row selected, and giving it a looser rule than
-   * the list it came from is how a "read" permission turns into a way to
-   * enumerate.
+   * Dynamic sub-routes belonging to this screen — `registry/students/[id]`,
+   * and from D5 the printed document that screen produces. Declared rather
+   * than inferred, so the guard covers them and the structural test finds
+   * them. They carry the item's own permissions: a detail page is the same
+   * screen with one row selected, and giving it a looser rule than the list
+   * it came from is how a "read" permission turns into a way to enumerate.
+   *
+   * **A printed document is a detail route, not a screen of its own.** That
+   * is the whole of D5's access model for the print surface: whoever may read
+   * a receipt may print one, and nobody acquires a capability by walking
+   * through it. A `print.*` permission would have been a second, looser
+   * declaration of who may see the same rows.
    */
-  detail?: string;
+  detail?: string | readonly string[];
   /**
    * Set on a screen that exists while its phase is still in flight. Never set
    * on one whose phase is in `BUILT_PHASES` — that would be two ways to say
@@ -119,9 +131,9 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
     path: 'finance',
     items: [
       { key: 'cashierDesk', path: 'finance/cashier', anyOf: ['receipt.create'], phase: 'D2' },
-      { key: 'receipts', path: 'finance/receipts', anyOf: ['receipt.create', 'receipt.cancel'], phase: 'D2' },
+      { key: 'receipts', path: 'finance/receipts', anyOf: ['receipt.create', 'receipt.cancel'], phase: 'D2', detail: 'finance/receipts/[id]' },
       { key: 'cheques', path: 'finance/cheques', anyOf: ['cheque.manage', 'cheque.cancel'], phase: 'D2', detail: 'finance/cheques/[id]' },
-      { key: 'vouchers', path: 'finance/vouchers', anyOf: ['voucher.read', 'voucher.create'], phase: 'D2', detail: 'finance/vouchers/[id]' },
+      { key: 'vouchers', path: 'finance/vouchers', anyOf: ['voucher.read', 'voucher.create'], phase: 'D2', detail: ['finance/vouchers/[id]', 'finance/vouchers/[id]/print'] },
       { key: 'approvals', path: 'finance/approvals', anyOf: ['voucher.review', 'voucher.approve'], phase: 'D2' },
       // The till a cashier's cash posts to. `assignTill` demands `coa.manage`,
       // so the screen does too — the menu and the module name the same
@@ -139,12 +151,12 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
     key: 'registry',
     path: 'registry',
     items: [
-      { key: 'students', path: 'registry/students', anyOf: ['student.read', 'student.manage'], phase: 'D3', detail: 'registry/students/[id]' },
+      { key: 'students', path: 'registry/students', anyOf: ['student.read', 'student.manage'], phase: 'D3', detail: ['registry/students/[id]', 'registry/students/[id]/card'] },
       { key: 'registrationDesk', path: 'registry/register', anyOf: ['registration.create'], phase: 'D3' },
-      { key: 'registrations', path: 'registry/registrations', anyOf: ['registration.read'], phase: 'D3', detail: 'registry/registrations/[id]' },
+      { key: 'registrations', path: 'registry/registrations', anyOf: ['registration.read'], phase: 'D3', detail: ['registry/registrations/[id]', 'registry/registrations/[id]/print'] },
       { key: 'holds', path: 'registry/holds', anyOf: ['hold.manage'], phase: 'D3' },
       { key: 'lifecycle', path: 'registry/lifecycle', anyOf: ['student.status', 'registration.transfer'], phase: 'D3' },
-      { key: 'admissions', path: 'registry/admissions', anyOf: ['application.read', 'application.decide', 'application.offer'], phase: 'D4' },
+      { key: 'admissions', path: 'registry/admissions', anyOf: ['application.read', 'application.decide', 'application.offer'], phase: 'D4', detail: 'registry/admissions/[id]/offer' },
       { key: 'documents', path: 'registry/documents', anyOf: ['document.verify'], phase: 'D3' },
       { key: 'medical', path: 'registry/medical', anyOf: ['medical.read', 'medical.manage'], phase: 'D3' },
     ],
@@ -156,7 +168,7 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
       { key: 'structure', path: 'academic/structure', anyOf: ['academic.read', 'academic.manage'], phase: 'D4' },
       { key: 'feeMatrix', path: 'academic/fees', anyOf: ['feematrix.read', 'feematrix.manage', 'feematrix.approve'], phase: 'D4' },
       { key: 'capacity', path: 'academic/capacity', anyOf: ['admission.capacity'], phase: 'D4' },
-      { key: 'sponsors', path: 'academic/sponsors', anyOf: ['sponsor.manage', 'sponsor.approve', 'sponsor.invoice'], phase: 'D4' },
+      { key: 'sponsors', path: 'academic/sponsors', anyOf: ['sponsor.manage', 'sponsor.approve', 'sponsor.invoice'], phase: 'D4', detail: 'academic/sponsors/invoices/[id]' },
       { key: 'scholarships', path: 'academic/scholarships', anyOf: ['scholarship.manage', 'scholarship.approve'], phase: 'D4' },
     ],
   },
@@ -209,20 +221,48 @@ export interface RouteRule {
   anyOf: readonly PermissionKey[];
 }
 
+/**
+ * Console surfaces that are not screens (Track D5).
+ *
+ * A route handler serving a file is reachable exactly like a page is, and a
+ * report export is the most sensitive thing in the console to leave
+ * undeclared: it returns the whole general ledger as a spreadsheet. So it is
+ * declared here and guarded by the same table, and the structural test walks
+ * `route.ts` alongside `page.tsx` so a handler added without a rule fails the
+ * build rather than serving.
+ *
+ * The rule is the **union** of the two report permissions on purpose. It is
+ * the coarse check that stops a user reaching the endpoint at all; which
+ * report they may actually run is decided inside `runReport`, against the
+ * permission that specific report answers to.
+ */
+export const HANDLER_ROUTES: readonly RouteRule[] = [
+  { path: 'reports/export', anyOf: ['report.financial', 'report.student'] },
+];
+
+/** An item's detail routes, whether it declared one or several. Normalising
+ *  here rather than at each reader keeps `detail: 'x'` — still the common
+ *  case — from having to be written as a one-element array. */
+export function detailsOf(item: Pick<ConsoleItem, 'detail'>): readonly string[] {
+  if (!item.detail) return [];
+  return typeof item.detail === 'string' ? [item.detail] : item.detail;
+}
+
 export const CONSOLE_ROUTES: readonly RouteRule[] = [
   // The console root. Any authenticated member of staff reaches it; it shows
   // them what they may do, which is the one question the legacy build could
   // not answer about itself.
   { path: '', anyOf: [] },
+  ...HANDLER_ROUTES,
   ...CONSOLE_SECTIONS.map((s) => ({
     path: s.path,
     anyOf: [...new Set(s.items.flatMap((i) => i.anyOf))],
   })),
   ...CONSOLE_SECTIONS.flatMap((s) => s.items.map((i) => ({ path: i.path, anyOf: i.anyOf }))),
   ...CONSOLE_SECTIONS.flatMap((s) =>
-    s.items
-      .filter((i) => i.detail)
-      .map((i) => ({ path: i.detail!, anyOf: i.anyOf })),
+    s.items.flatMap((i) =>
+      detailsOf(i).map((path) => ({ path, anyOf: i.anyOf })),
+    ),
   ),
 ];
 

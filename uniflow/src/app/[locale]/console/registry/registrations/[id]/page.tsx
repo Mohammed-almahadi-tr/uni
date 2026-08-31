@@ -62,6 +62,7 @@ export default async function RegistrationDetail({
   }
 
   const t = await getTranslations('registry');
+  const p = await getTranslations('print');
   const host = await canonicalHostFor(principal.tenantId);
   const url = verifyUrl(host, card.verifyPath);
   const qr = await qrSvg(url);
@@ -77,6 +78,16 @@ export default async function RegistrationDetail({
           actions={
             <>
               <Pill tone={tone}>{t(`regStatus.${card.status}`)}</Pill>
+              {/* The printed card, on D5's shared sheet — letterhead, page
+                  setup and the registrar's signature block. This screen keeps
+                  its own on-screen rendering because it is the one a clerk
+                  reads at the desk. */}
+              <Link
+                href={`/console/registry/registrations/${id}/print`}
+                className="inline-flex h-11 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+              >
+                {p('print')}
+              </Link>
               <Link
                 href="/console/registry/registrations"
                 className="inline-flex h-11 items-center rounded-md border border-border px-4 text-sm hover:bg-muted"

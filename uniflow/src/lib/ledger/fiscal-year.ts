@@ -1,6 +1,7 @@
 import 'server-only';
 import type { PeriodStatus } from '@/generated/prisma/enums';
 import { withTenant, type Tx } from '@/lib/db/client';
+import { buildPreCloseChecklist, refuseClose } from './close';
 import { audit } from '@/lib/audit/log';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { monthlyPeriods, toDateOnly } from './period';
@@ -147,6 +148,21 @@ export async function provisionFiscalYear(
  * it was when it was signed. Reopening is possible but deliberately
  * permissioned and audited — `PERMANENTLY_CLOSED` is the state that cannot be
  * undone, and is what a year-end close leaves behind.
+ *
+ * ## The pre-close checklist (REQ-PER-02), added in D5
+ *
+ * A7 computed every figure the checklist needs and deferred the gate, because
+ * a hard refusal with no screen to explain it is a refusal nobody can act on.
+ * D5 has the screen, so closing now runs `buildPreCloseChecklist` **inside
+ * this transaction** and refuses if a blocking check fails.
+ *
+ * Inside the transaction rather than before it, deliberately: run separately,
+ * a voucher could be submitted between the check and the close, and the check
+ * would have said the period was clear.
+ *
+ * Reopening runs no checklist. The checklist protects a figure from being
+ * frozen while it is wrong; reopening unfreezes it, which is the remedy rather
+ * than the risk.
  */
 export async function setPeriodStatus(
   principal: Principal,
@@ -172,6 +188,11 @@ export async function setPeriodStatus(
         `Period ${period.seq} of ${period.fiscalYear.name} is permanently closed. ` +
           `Post a correcting entry in an open period instead.`,
       );
+    }
+
+    if (status === 'CLOSED' || status === 'PERMANENTLY_CLOSED') {
+      const report = await buildPreCloseChecklist(tx, principal.tenantId, fiscalPeriodId);
+      if (!report.mayClose) throw refuseClose(report);
     }
 
     await tx.fiscalPeriod.update({

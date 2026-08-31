@@ -179,7 +179,16 @@ export default async function ReceiptsPage({
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <Td>
-                      <span className="numeric">{r.receiptNo}</span>
+                      {/* The receipt number is the link to the printed
+                          receipt. D5 built the document; this is where a
+                          cashier reaches it — from the number the student
+                          quotes on the telephone. */}
+                      <Link
+                        href={`/console/finance/receipts/${r.id}`}
+                        className="numeric hover:underline"
+                      >
+                        {r.receiptNo}
+                      </Link>
                       {r.chequeNo && (
                         <span className="numeric block text-xs text-muted-foreground">
                           {r.chequeNo}

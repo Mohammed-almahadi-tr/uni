@@ -1015,3 +1015,70 @@ export async function budgetPositions(
     return out;
   });
 }
+
+// ---------------------------------------------------------------------------
+// Sponsor invoices (Track D5)
+// ---------------------------------------------------------------------------
+
+export interface SponsorInvoiceRow {
+  id: string;
+  invoiceNo: string;
+  sponsorCode: string;
+  sponsorNameAr: string;
+  sponsorNameEn: string;
+  docDate: string;
+  dueDate: string;
+  currency: string;
+  totalAmount: string;
+  settledAmount: string;
+  status: string;
+  lineCount: number;
+}
+
+/**
+ * The invoices already raised.
+ *
+ * D4's sponsors screen offered a button that raised one and then showed
+ * nothing — the invoice existed, in the sub-ledger and on the aging report,
+ * and there was no way to look at it. D5 needs the list because the printed
+ * invoice has to be reachable from somewhere, and "somewhere" is the screen
+ * that raised it.
+ */
+export async function sponsorInvoiceRows(
+  principal: Principal,
+): Promise<SponsorInvoiceRow[]> {
+  return named(principal, 'sponsor.invoice', async (tx) => {
+    const rows = await tx.sponsorInvoice.findMany({
+      where: { tenantId: principal.tenantId },
+      orderBy: [{ docDate: 'desc' }, { invoiceNo: 'desc' }],
+      take: 100,
+      select: {
+        id: true,
+        invoiceNo: true,
+        docDate: true,
+        dueDate: true,
+        currency: true,
+        totalAmount: true,
+        settledAmount: true,
+        status: true,
+        sponsor: { select: { code: true, nameAr: true, nameEn: true } },
+        _count: { select: { shares: true } },
+      },
+    });
+
+    return rows.map((r) => ({
+      id: r.id,
+      invoiceNo: r.invoiceNo,
+      sponsorCode: r.sponsor.code,
+      sponsorNameAr: r.sponsor.nameAr,
+      sponsorNameEn: r.sponsor.nameEn,
+      docDate: r.docDate.toISOString().slice(0, 10),
+      dueDate: r.dueDate.toISOString().slice(0, 10),
+      currency: r.currency.trim(),
+      totalAmount: r.totalAmount.toFixed(4),
+      settledAmount: r.settledAmount.toFixed(4),
+      status: r.status,
+      lineCount: r._count.shares,
+    }));
+  });
+}

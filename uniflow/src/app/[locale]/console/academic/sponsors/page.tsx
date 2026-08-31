@@ -3,7 +3,12 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { guardConsole } from '@/lib/console/guard';
 import { studentHeader, tenantCurrency } from '@/lib/console/lookups';
-import { feeCatalogue, sponsorOptions, type FeeItemRow } from '@/lib/console/backoffice';
+import {
+  feeCatalogue,
+  sponsorInvoiceRows,
+  sponsorOptions,
+  type FeeItemRow,
+} from '@/lib/console/backoffice';
 import { listSponsorships } from '@/lib/sponsors/contracts';
 import { sponsorAging } from '@/lib/sponsors/billing';
 import { ForbiddenScreen, localeOf, pickText } from '@/components/console/text';
@@ -73,6 +78,8 @@ export default async function SponsorsPage({
 
   const currency = await tenantCurrency(principal);
   const sponsors = mayManage ? await sponsorOptions(principal) : [];
+  const invoices =
+    tab === 'invoices' && mayInvoice ? await sponsorInvoiceRows(principal) : [];
 
   return (
     <div className="space-y-6">
@@ -121,9 +128,54 @@ export default async function SponsorsPage({
       {tab === 'contracts' && (await contractsView())}
 
       {tab === 'invoices' && mayInvoice && (
-        <Panel title={t('invoices')}>
-          <Invoicing sponsors={sponsors} locale={locale} />
-        </Panel>
+        <>
+          {/* The invoices already raised. D4 offered a button that created one
+              and then showed nothing — the invoice existed, in the sub-ledger
+              and on the aging report, and there was no way to look at it.
+              Each row links to the printed invoice D5 built. */}
+          <Panel title={t('invoices')}>
+            {invoices.length === 0 ? (
+              <Empty>{c('nothing')}</Empty>
+            ) : (
+              <ul className="divide-y divide-border">
+                {invoices.map((inv) => (
+                  <li key={inv.id} className="flex flex-wrap items-center gap-3 py-3">
+                    <Link
+                      href={`/console/academic/sponsors/invoices/${inv.id}`}
+                      className="numeric font-medium hover:underline"
+                    >
+                      {inv.invoiceNo}
+                    </Link>
+                    <span className="min-w-40 flex-1">
+                      {pickText(locale, inv.sponsorNameAr, inv.sponsorNameEn)}
+                    </span>
+                    <span className="numeric text-xs text-muted-foreground">
+                      {inv.lineCount}
+                    </span>
+                    <span className="numeric text-xs text-muted-foreground">
+                      {inv.dueDate}
+                    </span>
+                    <Money amount={inv.totalAmount} currency={inv.currency} />
+                    <Pill
+                      tone={
+                        inv.status === 'SETTLED'
+                          ? 'good'
+                          : inv.status === 'CANCELLED'
+                            ? 'neutral'
+                            : 'warn'
+                      }
+                    >
+                      {inv.status}
+                    </Pill>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+          <Panel title={t('raiseInvoice')}>
+            <Invoicing sponsors={sponsors} locale={locale} />
+          </Panel>
+        </>
       )}
       {tab === 'invoices' && !mayInvoice && (
         <Panel>

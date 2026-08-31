@@ -6,6 +6,8 @@ import {
   BUILT_PHASES,
   CONSOLE_ROUTES,
   CONSOLE_SECTIONS,
+  detailsOf,
+  type ConsolePhase,
   isBuilt,
   navigationFor,
   normaliseConsolePath,
@@ -119,26 +121,56 @@ describe('the route table is the single declaration', () => {
    * as the RLS coverage test in §9.3.
    */
   it('declares every console page that exists on disk', () => {
-    const root = resolve(__dirname, '..', 'src', 'app', '[locale]', 'console');
-
-    const pages: string[] = [];
-    const walk = (dir: string, prefix: string): void => {
-      for (const entry of readdirSync(dir)) {
-        const full = join(dir, entry);
-        if (statSync(full).isDirectory()) {
-          walk(full, prefix ? `${prefix}/${entry}` : entry);
-        } else if (entry === 'page.tsx') {
-          pages.push(prefix);
-        }
-      }
-    };
-    walk(root, '');
-
-    expect(pages.length).toBeGreaterThan(0);
-    const undeclared = pages.filter((p) => ruleFor(p) === null);
+    const undeclared = consoleSurfaces('page.tsx').filter((p) => ruleFor(p) === null);
     expect(undeclared).toEqual([]);
   });
+
+  /**
+   * The same rule for route handlers, added in D5.
+   *
+   * A `route.ts` under the console is reachable exactly like a page is, and
+   * the first one built — the report export — returns the whole general
+   * ledger as a spreadsheet. Walking only `page.tsx` would have let it ship
+   * with no declaration at all, which is precisely the silence this test
+   * exists to break.
+   */
+  it('declares every console route handler that exists on disk', () => {
+    const handlers = consoleSurfaces('route.ts');
+    expect(handlers.length).toBeGreaterThan(0);
+    expect(handlers.filter((p) => ruleFor(p) === null)).toEqual([]);
+  });
+
+  it('gives the report export the union of both report permissions', () => {
+    // Coarse on purpose: which report a user may actually run is decided
+    // inside `runReport`, against the permission that report answers to.
+    // `report.student` reaches the statement of account and not the trial
+    // balance, and the route-level rule is the union of the two.
+    const rule = ruleFor('reports/export');
+    expect(rule).not.toBeNull();
+    expect(new Set(rule!.anyOf)).toEqual(new Set(['report.financial', 'report.student']));
+  });
 });
+
+
+/** Every console surface of a given filename, as a console path. Walks disk
+ *  rather than a list somebody maintains — the same spirit as the RLS
+ *  coverage test in §9.3. */
+function consoleSurfaces(filename: 'page.tsx' | 'route.ts'): string[] {
+  const root = resolve(__dirname, '..', 'src', 'app', '[locale]', 'console');
+  const found: string[] = [];
+  const walk = (dir: string, prefix: string): void => {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        walk(full, prefix ? `${prefix}/${entry}` : entry);
+      } else if (entry === filename) {
+        found.push(prefix);
+      }
+    }
+  };
+  walk(root, '');
+  return found;
+}
 
 // ---------------------------------------------------------------------------
 // The menu is generated, not filtered
@@ -234,9 +266,14 @@ describe('navigation is generated from the permission set', () => {
       CONSOLE_SECTIONS.flatMap((s) => s.items).map((i) => [i.path, i]),
     );
     expect(items.every((i) => i.built === isBuilt(declared.get(i.path)!))).toBe(true);
-    // …and there is still something waiting, or this test has stopped saying
-    // anything.
-    expect(items.some((i) => !i.built)).toBe(true);
+  });
+
+  it('leans on no per-item flag now that every phase has landed', () => {
+    // With D5 in `BUILT_PHASES` every declared screen is built by its phase,
+    // so a stray `built: true` would be two ways of saying the same thing —
+    // which is the drift `CONSOLE_ROUTES` exists to prevent.
+    const items = CONSOLE_SECTIONS.flatMap((s) => s.items);
+    expect(items.every((i) => i.built === undefined)).toBe(true);
   });
 
   it('lets the console root through on authentication alone', () => {
@@ -401,10 +438,11 @@ describe('the registry screens are declared and reachable', () => {
     // to enumerate by guessing identifiers.
     for (const section of CONSOLE_SECTIONS) {
       for (const item of section.items) {
-        if (!item.detail) continue;
-        expect(item.detail.startsWith(`${item.path}/`)).toBe(true);
-        expect(ruleFor(item.detail)).not.toBeNull();
-        expect(new Set(ruleFor(item.detail)!.anyOf)).toEqual(new Set(item.anyOf));
+        for (const detail of detailsOf(item)) {
+          expect(detail.startsWith(`${item.path}/`)).toBe(true);
+          expect(ruleFor(detail)).not.toBeNull();
+          expect(new Set(ruleFor(detail)!.anyOf)).toEqual(new Set(item.anyOf));
+        }
       }
     }
   });
@@ -418,8 +456,8 @@ describe('the registry screens are declared and reachable', () => {
 
     for (const item of built) {
       expect(exists(item.path), `${item.path} claims to be built`).toBe(true);
-      if (item.detail) {
-        expect(exists(item.detail), `${item.detail} claims to be built`).toBe(true);
+      for (const detail of detailsOf(item)) {
+        expect(exists(detail), `${detail} claims to be built`).toBe(true);
       }
     }
   });
@@ -647,12 +685,16 @@ describe('a screen may be built before its phase is', () => {
 
   it('lets an item claim to be built ahead of its phase', () => {
     // Asserted on synthetic items rather than on whatever the route table
-    // happens to hold. D4 used this while it landed in groups and no longer
-    // needs it; the mechanism stays for the next phase that does, and a
-    // mechanism with no live user still has to be known to work.
-    expect(isBuilt({ phase: 'D5' })).toBe(false);
-    expect(isBuilt({ phase: 'D5', built: true })).toBe(true);
+    // happens to hold. D4 used the flag while it landed in groups and D5 while
+    // its reports landed ahead of its documents; **every declared phase is now
+    // in `BUILT_PHASES`**, so the table cannot exercise this any more — and a
+    // mechanism with no live user still has to be known to work, because the
+    // next phase that declares a screen ahead of building it will need it.
+    const unshipped = 'D9' as ConsolePhase;
+    expect(isBuilt({ phase: unshipped })).toBe(false);
+    expect(isBuilt({ phase: unshipped, built: true })).toBe(true);
     expect(isBuilt({ phase: 'D1' })).toBe(true);
+    expect(isBuilt({ phase: 'D5' })).toBe(true);
   });
 
   it('has a page on disk for every screen claiming to exist ahead of its phase', () => {
@@ -747,5 +789,74 @@ describe('the back office is declared and reachable', () => {
       );
       expect(reachable, `${item.path} is unreachable by every shipped role`).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D5: the reports and the print surface
+// ---------------------------------------------------------------------------
+
+describe('the reports and the printed documents are declared and reachable', () => {
+  it('has built every screen D5 declares', () => {
+    const d5 = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) => i.phase === 'D5');
+    expect(d5.length).toBe(6);
+    expect(d5.every(isBuilt)).toBe(true);
+  });
+
+  it('gives every D5 screen at least one shipped role that can open it', () => {
+    const d5 = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) => i.phase === 'D5');
+    for (const item of d5) {
+      const reachable = Object.values(DEFAULT_ROLES).some((role) =>
+        satisfies(new Set(role.permissions), item.anyOf),
+      );
+      expect(reachable, `${item.path} is unreachable by every shipped role`).toBe(true);
+    }
+  });
+
+  it('lets a registrar read a statement of account without the general ledger', () => {
+    // The whole point of splitting `report.student` from `report.financial`.
+    // Somebody settling a fee dispute needs one student's history; they do not
+    // need the institution's trial balance to get it.
+    const student = setOf('report.student');
+    const items = navigationFor(student).flatMap((s) => s.items.map((i) => i.key));
+    expect(items).toContain('studentAccount');
+    expect(items).not.toContain('trialBalance');
+    expect(items).not.toContain('reconciliation');
+  });
+
+  /**
+   * D5's access model for the print surface, in one assertion.
+   *
+   * A printed document is a **detail route of the screen that produced it**,
+   * never a screen of its own — so whoever may read a receipt may print one,
+   * and nobody acquires a capability by walking through the print surface. A
+   * `print.*` permission would have been a second, looser declaration of who
+   * may see the same rows.
+   */
+  it('gives each printed document the permissions of the screen that made it', () => {
+    const cases: Array<[string, string]> = [
+      ['finance/receipts', 'finance/receipts/[id]'],
+      ['finance/vouchers', 'finance/vouchers/[id]/print'],
+      ['registry/registrations', 'registry/registrations/[id]/print'],
+      ['registry/students', 'registry/students/[id]/card'],
+      ['registry/admissions', 'registry/admissions/[id]/offer'],
+      ['academic/sponsors', 'academic/sponsors/invoices/[id]'],
+    ];
+    for (const [screen, document] of cases) {
+      const owner = ruleFor(screen);
+      const doc = ruleFor(document);
+      expect(owner, screen).not.toBeNull();
+      expect(doc, document).not.toBeNull();
+      expect(new Set(doc!.anyOf), document).toEqual(new Set(owner!.anyOf));
+    }
+  });
+
+  it('lets one screen declare several detail routes', () => {
+    // The mechanism D5 needed: a voucher has a detail page *and* a printed
+    // form, and both belong to the vouchers screen. `detail` therefore takes
+    // a string or a list, and `detailsOf` is the one place that is resolved.
+    expect(detailsOf({ detail: undefined })).toEqual([]);
+    expect(detailsOf({ detail: 'a/b' })).toEqual(['a/b']);
+    expect(detailsOf({ detail: ['a/b', 'a/b/print'] })).toEqual(['a/b', 'a/b/print']);
   });
 });

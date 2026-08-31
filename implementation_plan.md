@@ -33,8 +33,13 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**912 tests pass across 25 suites; typecheck, lint and production build are all
+**947 tests pass across 25 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
+
+**Track D is complete, D1-D5.** Every screen the console declares exists, and
+`BUILT_PHASES` now holds all five phases. What remains of the roadmap is
+Track C's public applicant form and student portal (C2, C3) and the release
+phases.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
 maker-checker, fee catalog / student AR / cashiering, the cheque clearing
@@ -993,7 +998,7 @@ gantt
     Finance desk — cashier, cheques, vouchers       :done, d2, after d1, 10d
     Registration desk, holds, withdrawal & transfer :crit, done, d3, after d1, 9d
     Back office — academic, admissions, P2P, sponsors :done, d4, after d1, 12d
-    Reports & the print surface                     :d5, after d1, 8d
+    Reports & the print surface                     :done, d5, after d1, 8d
 
     section Convergence & Release
     Registration-posts-to-GL integration            :crit, milestone, m1, after a3 b4, 0d
@@ -2341,7 +2346,7 @@ of staff without a developer at a REPL. D4 therefore delivered twenty screens
 against a paragraph describing six, and this paragraph is left as written so
 the gap between a description and a route table stays visible.*
 
-**D5 · Reports & the Print Surface** — Trial balance, balance sheet, income
+**D5 · Reports & the Print Surface** *(built — see §8.1)* — Trial balance, balance sheet, income
 statement, aged receivables, sub-ledger reconciliation, discount exposure and
 the student statement of account, each over A7's single figure source and each
 with the XLSX export it already has. Plus the print stylesheets themselves:
@@ -3073,8 +3078,226 @@ known to work.
   endpoint is the same one still blocking four other things.
 - **Media upload**, still. It now blocks the branding screen's logo fields as
   well, which take a URL. Five phases have shipped a screen with a hole in it
-  where an upload belongs.
+  where an upload belongs — *six once D5 shipped the student card with a ruled
+  box where the photograph goes.*
 
+
+
+### D5 — Reports & the Print Surface · complete
+
+The last phase of Track D, and the one with the least new arithmetic in it:
+A7 had already built every figure. What was missing was the two things that
+make a figure usable — a screen a person sets filters on, and a piece of paper
+that leaves the building.
+
+#### One screen, two radio buttons, two different questions
+
+`frmRptIncome` is the income report. It has a from-date, a to-date, and two
+radio buttons — "total" and "by programme" — and **one** `btnShow_Click` that
+runs a different query for each.
+
+The total:
+
+```vb
+"... From View_1 Where StudID Is Not Null  and  " & _
+"TransDate > N'" & Me.DTPFrom.Value.ToShortDateString & " 00:00:01' and " & _
+"TransDate < N'" & Me.DTPTo.Value.ToShortDateString & " 23:59:59'", cnn)
+```
+([frmRptIncome.vb:61-64](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmRptIncome.vb#L61-L64))
+
+And the detail, from the same click, with the same two date pickers on screen:
+
+```vb
+StrSel = "Select StudID,StudName,dbo.GetStdProgram(StudID) Acc1,TuitionFees1,RegsFees," & _
+    "Sum(TotalValueOut)-Sum(TotalValueIn) TotalValueIn  from View_1 where Acc4=N'" & _
+    Me.CombProgram.SelectedItem & "' and StudName<>N'' ... Group by ..."
+```
+([frmRptIncome.vb:109](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmRptIncome.vb#L109))
+
+**The detail has no date predicate at all.** A user sets a range, reads a
+total for that range, switches the radio button to see what makes it up, and
+gets every transaction since the institution opened. The breakdown does not
+add up to the total it is a breakdown of, and nothing on the screen says the
+dates stopped applying.
+
+The total is not right either. `> 'DD/MM/YYYY 00:00:01'` excludes anything
+stamped at midnight — which is every date-only value SQL Server stores — and
+`< '23:59:59'` excludes the last second of the closing day. Both bounds are
+strict, both are off, and the string is built from `ToShortDateString`, so the
+predicate's correctness depends on the workstation's regional settings.
+
+That is the shape of the defect D5 exists to make impossible: one question,
+answered by however many code paths happen to be attached to the buttons.
+
+And `frmTrialBalance` is worse than a wrong window:
+
+```vb
+"Sum(TotalValueIn)-Sum(TotalValueOut) TotalValueIn," & _
+"Sum(TotalValueIn)-Sum(TotalValueOut) TotalValueOut " & _
+"From Transactionees " & _
+"where Transdate > N'" & ... & " 00:00:01'" & ...
+```
+([frmTrialBalance.vb:165-169](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmTrialBalance.vb#L165-L169))
+
+**The debit column and the credit column are the same expression**, aliased
+twice. The report prints one signed net under two headings, so the columns are
+equal by construction: it can never fail to balance and it can never detect
+that anything is wrong, because it is not two columns. It reads
+`Transactionees`, while the balance sheet two forms away reads `Transactions`
+— so the two reports are not over the same rows, and neither can be checked
+against the other. And it has no opening balance, because there were no fiscal
+periods to open one from.
+
+The trial balance D5 ships **says whether it balances**, and its two columns
+are computed from the raw debit and credit sides separately. That property is
+the report's whole reason to exist.
+
+#### The claim D5 makes, and the test that holds it
+
+**The spreadsheet an auditor is handed is the report the accountant looked
+at.** One `runReport`, called by the screen and by the export route, from one
+`parseReportRequest` — and `exportHref` builds every export link from the same
+parsed request the screen rendered, so a filter cannot be re-typed differently
+into a URL. Tests assert the round-trip and that two runs of one request
+produce identical rows.
+
+There is no path by which a report's window can differ from its export's, and
+none by which one of the six screens can carry a filter the export drops:
+`ReportRequest` is one shape, and both callers read and write it whole.
+
+That is D2's `previewAllocation` / `takeReceipt` discipline again, and it is
+here for the same reason: two code paths that answer one question will
+eventually answer it differently.
+
+| Delivered | Notes |
+| :--- | :--- |
+| **`reports/trial-balance`** | Opening, movement and closing, to any level of the chart. **It says whether it balances** — an imbalance means something wrote to the ledger outside the posting engine, and that is the loudest thing on the page rather than a discrepancy for the reader to find by adding two columns |
+| A cost-centre run is not flagged as an alarm | A segment of the ledger is not a ledger: a salary posting debits an expense carrying a faculty and credits a bank account carrying none. `segmented` says which situation you are looking at, and flagging it as a fault would train the reader to ignore the fault |
+| **`reports/statements`** | Balance sheet and income statement on one screen, because a surplus and the equity it lands in are one fact from two sides |
+| Over one ledger, where there were two | The legacy balance sheet reads `From Transactions` ([frmBalanceSheetLevels.vb:214-218](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmBalanceSheetLevels.vb#L214-L218)); its trial balance reads `From Transactionees`. **Two report screens in one application over two separate tables** — they were never describing the same ledger, which is why they could not be reconciled to each other |
+| The comparative is the same window **a year** earlier | Not the previous quarter. Enrolment is seasonal; a management report putting October beside July would show a catastrophe every summer |
+| **`reports/aging`** | Students, sponsors and suppliers as three tabs, deliberately not one table with a party-type column |
+| Against a report with no aging in it | `frmUncollectedFees` gave one balance per student as at a date and no buckets at all ([frmUncollectedFees.vb:38-42](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/Forms/frmUncollectedFees.vb#L38-L42)) — no due date, no way to tell a fee raised last week from one unpaid for two years. A registrar chasing arrears got everybody who owed anything, in student-number order |
+| Three clocks, named on the screen | A student ages from the charge's due date; a sponsor from the **invoice** due date, never the charge, because a sponsor is not late for a bill nobody sent them; a supplier from the terms on their invoice. Stacking them would put three definitions of "60 days overdue" in one column and invite somebody to total it |
+| **`reports/reconciliation`** | No filters, and that is the design: the question is whether the control accounts agree with their sub-ledgers **now**. A date filter would let somebody run it against a day it happened to agree on, and file that |
+| The verdict is above the table | A non-zero variance is a P1 data-integrity alert. A reader who has to add up a column to discover something is broken has been told too late |
+| A line's own note now reaches every renderer | The engine sets one where the numbers alone do not explain a row — the orphaned-control-balance check, which reads zero in a healthy system. A7 computed them and all four renderers dropped them |
+| **`reports/student-account`** | The document handed across the counter in a fee dispute. Opening balance as a **row**, not a header note; cancelled and dishonoured receipts as the reversals they are, because a receipt taken and then bounced is two events and a statement showing one is a statement the student can disprove |
+| Sponsored portions absent | That debt is the sponsor's. Billing the student in full and chasing the ministry by telephone is what the legacy build did, and it is why students were shown demands for money they did not owe |
+| Browsing the roll and reading one statement are separate permissions | `report.student` produces a statement for a student whose number you were given; `student.read` searches the directory. A finance clerk gets the first without the second, and the picker is simply absent for them |
+| **`reports/discounts`** | Summed from the discount **posted** on each registration — its own expense line. The legacy report read `[RebatUniv].[dbo].[viewDiscount]` ([frmRptDisc.vb:48-52](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Form/frmRptDisc.vb#L48-L52)), a view deriving each discount from a stored percentage against a fee figure — never posted, so it appeared in no expense account and on no statement, and recomputed on every read, so last year's report was not reproducible |
+| Five dimensions, where there was one | The legacy view cut by college and year only. "What did this scholarship scheme cost us" had no answer, because a scheme was a description string (`DiscDescr`) rather than a thing with a budget |
+| The budget-cap column appears only on the scheme cut | A cap exists against a scheme and nothing else. An empty column on the other four dimensions would invite the reading that a faculty has a discount budget |
+| **`reports/export`** | One route handler, every report, every format. CSV, XLSX and the print sheet, with `Content-Disposition` carrying both a UTF-8 name and an ASCII fallback |
+| A link, not a button | The query string is the report, so an export can be bookmarked, mailed to a colleague, and read before it is opened |
+| 401 rather than a redirect on an expired session | A browser following a redirect to the sign-in page would save the HTML of a login form under the name of a trial balance |
+
+#### The print surface
+
+D2, D3 and D4 each shipped a screen that printed and each deferred the same
+three things: the letterhead, the page setup, the signature block. All six
+documents now share one.
+
+| Delivered | Notes |
+| :--- | :--- |
+| **`lib/print/sheet.ts`** | The letterhead's content and the page geometry, in a module with no server imports. Two renderers draw it — the report sheet is a standalone HTML string, the documents are React pages — and the *institution's own name and address* must not be two implementations. The `lib/currency.ts` and `cms/theme.ts` shape again |
+| The institution's name prints in **both** scripts | Always, whatever the interface language. A printed document is presented to a bank, a ministry, an embassy, and the reader on the other side did not choose the locale it was rendered in. The body follows the locale; the name on the paper does not |
+| Signature roles are declared once | On a receipt the line is the cashier accepting accountability; on a voucher it is the approval the segregation matrix already enforced, written where an auditor pulling a paper file can see it. The two must agree, so the roles are in one table rather than typed into six templates |
+| The name sits **above** the rule | Printing a known name onto the signature line leaves nowhere to sign |
+| **The receipt** | Amount in words from `spellMoney`, which handles Arabic number agreement and takes the minor unit from the currency. The legacy version was an English speller with `.Replace("Dollar", "Pound")` and `.Replace("and No Cent", "")` applied to it — on an Arabic receipt handed to an Arabic-speaking student |
+| A cancelled or bounced receipt prints, and says so | There was no cancellation concept in the legacy build — its generated data adapters carry `DELETE FROM [dbo].[Transactions]` and `DELETE FROM [dbo].[Transactionees]` ([DsTrans.Designer.vb:3211, 4246](Nile%20College%20E-University%20System/Oasis%20-%20E-University/Financial%20System/DataSets/DsTrans.Designer.vb#L3211)), so a wrong posting was removable rather than reversible. The student is still holding their copy, and the useful thing to hand them is a page that explains it |
+| **The voucher** | Preparer, checker and approver printed above their rules, read off the draft's own history. `Delete From TempVouchers Where MoveNo=…` destroyed all three at the moment of approval |
+| A draft prints, with a banner | It goes round the building to be signed before it is approved in the system, which is the order the work happens in. Refusing to print until approval would start the paper trail after the decision it was meant to inform |
+| **The registration card** | The same `registrationCard` read D3 renders — not a second version of the fee arithmetic — with the QR resolving to the sessionless verification endpoint |
+| **The student card** | A ruled box where the photograph belongs, and "affix and stamp" under it |
+| **The offer letter** | REQ-ADM-04, the bilingual template B2 deferred. Its prose is in the message catalogue, held to identical key sets in both languages by test — so a paragraph cannot exist in English only, which would mean an applicant being told less than the other applicants |
+| A withdrawn offer prints, with a banner | It is a thing that happened, and the applicant may be holding their copy and disputing it |
+| **The sponsor invoice** | Every line names its student, which is what a ministry's accounts department needs to check the bill against their nomination list. A single "tuition" total is unauditable from the other side |
+| The invoices list, which D4 did not build | D4 offered a button that raised an invoice and then showed nothing — it existed, in the sub-ledger and on the aging report, and there was no way to look at it |
+| **Access model** | A printed document is a **detail route of the screen that produced it**, never a screen of its own. Whoever may read a receipt may print one, and nobody gains a capability by walking through the print surface — which a `print.*` permission would have created as a second, looser declaration of who may see the same rows. Asserted by test for all six |
+
+#### The pre-close checklist — REQ-PER-02, the gate A7 deferred
+
+A7 computed every figure and did not wire it, on the grounds that a hard
+refusal with no screen to explain it is a refusal a controller cannot act on.
+D5 has the screen.
+
+- **Six checks, and the list is asserted by test** — a check quietly dropped
+  is a check nobody notices is gone.
+- **Three block**: vouchers awaiting a decision in that period (closing shuts
+  the period they must post into, destroying work waiting on a signature),
+  sub-ledger reconciliation, and the trial balance balancing.
+- **Two are advisory**: depreciation and revenue recognition. A period with no
+  assets legitimately has no depreciation, and a block that fires on an empty
+  register is a block somebody disables. They report their counts, so
+  "nothing to post" is distinguishable from "not posted yet".
+- **FX revaluation reports as not applicable**, with the reason. A check that
+  always passes for a reason nobody wrote down is a check that will be wrong
+  the first time it matters.
+- **The checklist runs inside `setPeriodStatus`'s own transaction.** Run
+  separately, a voucher could be submitted between the check and the close,
+  and the check would have said the period was clear.
+- **Reopening runs no checklist.** It unfreezes a figure, which is the remedy
+  rather than the risk.
+- **Sealing is here and nowhere else.** D4 kept `PERMANENTLY_CLOSED` off the
+  month list deliberately; it now sits under the checklist, behind a typed
+  confirmation, because two adjacent buttons where one is undoable and the
+  other is not — distinguished only by their labels — is how a year gets
+  sealed by somebody who meant to close a month.
+
+#### Three corrections found while building
+
+**`preCloseChecklist` accepts either period permission.** The first draft
+demanded `period.read`; a principal holding `period.close` alone was refused
+the reasons for a refusal it was about to receive. The shipped Financial
+Controller holds both, so nothing about the delivered roles changes — the
+module stops depending on that being true.
+
+**The structural test now walks `route.ts` as well as `page.tsx`.** The report
+export is the first console route handler, and it returns the whole general
+ledger as a spreadsheet. Walking only pages would have let it ship undeclared,
+which is exactly the silence that test exists to break. `HANDLER_ROUTES`
+declares it, and the guard reads the same table.
+
+**An export link without a locale prefix silently changes language.** The
+first version of the export bar emitted `/console/reports/export?…`. Routing
+is `localePrefix: 'always'`, so an unprefixed path is redirected to the
+*default* locale — Arabic — whatever the reader was using, and the export
+route picks the language of the CSV and the print sheet off that segment. An
+English user would have downloaded an Arabic spreadsheet with the right
+figures in it: wrong in a way nobody reports as a bug. `Link` from
+`@/i18n/navigation` handles this for ordinary navigation, but a download and a
+new tab want a real anchor, and a real anchor has to be told. There is now one
+`exportHref()`, it is tested, and the report tabs were made query-only for the
+same reason.
+
+#### The built flag, retired
+
+D4 introduced `built: true` so a twenty-screen phase could land in groups, and
+D5 used it while its six reports landed ahead of its six documents. **Every
+declared phase is now in `BUILT_PHASES` and no row carries the flag.** The
+mechanism stays for the next phase that lands in pieces; its test asserts the
+predicate on synthetic items, and a second test refuses any live row that
+leans on it.
+
+#### Deferred, and named
+
+- **Gateway settlement reconciliation** (REQ-CSH-05), still. A gateway receipt
+  posts like a transfer; matching it against the provider's settlement report
+  waits on adapters no phase owns.
+- **FX revaluation.** Reported by the checklist as not applicable and honestly
+  so — there is no second currency to revalue. It is a Module 12 requirement
+  with no data to run against, and it should be scheduled when a tenant banks
+  in a second currency rather than before.
+- **A saved-report or scheduled-delivery surface.** Every report is a URL, so
+  a filter set can be bookmarked and mailed today. Emailing a monthly pack on
+  a schedule is a different thing, wants the job runner A5 built, and nobody
+  has asked for it.
+- **Media upload**, still, and now blocking **six** surfaces: A2's voucher
+  attachments, B3's student documents, C1's media library, D3's photo capture,
+  D4's branding logos, and D5's student card. It has waited for a phase to
+  adopt it through five phases and no phase has. **It should be scheduled on
+  its own.**
 
 ---
 
