@@ -19,6 +19,7 @@ import {
   openAcademicYear,
   setTermStatus,
   type DeactivatableEntity,
+  setApplicationWindow,
 } from '@/lib/academic/structure';
 
 /**
@@ -250,6 +251,37 @@ export async function withdraw(
     );
     refresh();
     return { ...blank(), message: 'withdrawn' };
+  } catch (e) {
+    return { ...blank(), error: explain(e) };
+  }
+}
+
+/**
+ * Open or close the public application portal for a batch (Track C2).
+ *
+ * Clearing both dates closes it. That is offered as a button rather than as
+ * "empty the fields and save", because closing admissions in a hurry — a
+ * quota filled, a ministry instruction — is the case where a form somebody
+ * has to blank two boxes in is a form they get wrong.
+ */
+export async function setWindow(
+  _prev: StructureState,
+  form: FormData,
+): Promise<StructureState> {
+  const ctx = await currentContext();
+  if (!ctx) return { ...blank(), error: 'Your session has ended. Sign in again.' };
+
+  const close = str(form, 'how') === 'close';
+  const from = str(form, 'from');
+  const to = str(form, 'to');
+
+  try {
+    await setApplicationWindow(ctx.principal, str(form, 'batchId'), {
+      from: close || !from ? null : new Date(`${from}T00:00:00.000Z`),
+      to: close || !to ? null : new Date(`${to}T00:00:00.000Z`),
+    });
+    refresh();
+    return { ...blank(), message: close ? 'closed' : 'saved' };
   } catch (e) {
     return { ...blank(), error: explain(e) };
   }

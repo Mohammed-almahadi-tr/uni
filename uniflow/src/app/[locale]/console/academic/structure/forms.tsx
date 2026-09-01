@@ -8,6 +8,7 @@ import {
   addStructure,
   changeTermStatus,
   openYear,
+  setWindow,
   withdraw,
   type StructureState,
 } from './actions';
@@ -435,6 +436,104 @@ export function TermStatus({
       >
         {pending ? c('working') : t('setStatus')}
       </button>
+    </form>
+  );
+}
+
+/**
+ * The public application window for one batch (Track C2, SRS REQ-LP-04).
+ *
+ * ## Why it is here
+ *
+ * Applications are made *into* a batch, so the window lives on the batch. The
+ * website could have carried its own "applications open" banner and its own
+ * dates; it would then be a second copy of a fact the portal enforces, and the
+ * two would disagree the first time somebody extended a deadline without
+ * telling whoever edits the site.
+ *
+ * ## Closing is a button
+ *
+ * Not "empty two fields and save". Closing admissions in a hurry — a quota
+ * filled, a ministry instruction — is exactly the case where a form somebody
+ * has to blank two boxes in is a form they get wrong under pressure.
+ */
+export function ApplicationWindow({
+  batchId,
+  from,
+  to,
+  open,
+}: {
+  batchId: string;
+  from: string | null;
+  to: string | null;
+  /** Whether the window contains today, resolved on the server so the console
+   *  and the public page cannot disagree about what "open" means. */
+  open: boolean;
+}) {
+  const [state, action, pending] = useActionState(setWindow, initial);
+  const t = useTranslations('academic.structure');
+  const c = useTranslations('academic.common');
+
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-2">
+      <input type="hidden" name="batchId" value={batchId} />
+      {state.error && (
+        <p role="alert" className="w-full text-xs text-destructive">
+          {state.error}
+        </p>
+      )}
+      {state.message && <span className="w-full text-xs text-success">{c('saved')}</span>}
+
+      <label className="block">
+        <span className="mb-1 block text-xs text-muted-foreground">{t('opensOn')}</span>
+        <input
+          name="from"
+          type="date"
+          defaultValue={from ?? ''}
+          className="numeric h-9 rounded-md border border-input bg-background px-2 text-sm"
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs text-muted-foreground">{t('closesOn')}</span>
+        <input
+          name="to"
+          type="date"
+          defaultValue={to ?? ''}
+          className="numeric h-9 rounded-md border border-input bg-background px-2 text-sm"
+        />
+      </label>
+
+      <button
+        type="submit"
+        name="how"
+        value="save"
+        disabled={pending}
+        className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+      >
+        {pending ? c('working') : t('setWindow')}
+      </button>
+
+      {(from || to) && (
+        <button
+          type="submit"
+          name="how"
+          value="close"
+          disabled={pending}
+          className="h-9 rounded-md border border-destructive/50 px-3 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+        >
+          {t('closePortal')}
+        </button>
+      )}
+
+      <span
+        className={
+          open
+            ? 'inline-block rounded-full border border-success/40 bg-success/10 px-2 py-0.5 text-xs text-success'
+            : 'inline-block rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground'
+        }
+      >
+        {open ? t('portalOpen') : t('portalClosed')}
+      </span>
     </form>
   );
 }

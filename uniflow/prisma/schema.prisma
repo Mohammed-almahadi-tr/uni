@@ -352,6 +352,15 @@ enum ProcurementDocType {
   PAYMENT_VOUCHER
 }
 
+/// Where an application came from. A committee reading a certificate score
+/// needs to know whether a registrar typed it from a certified document or
+/// the applicant typed it about themselves (Track C2).
+enum ApplicationSource {
+  STAFF
+  PUBLIC
+  IMPORT
+}
+
 enum VoucherType {
   JOURNAL
   STUDENT_RECEIPT
@@ -2697,6 +2706,14 @@ model Batch {
   admissionYear Int     @map("admission_year")
   isActive      Boolean @default(true) @map("is_active")
 
+  /// The window in which the **public** application portal accepts
+  /// applications for this batch (Track C2, REQ-LP-04). Both NULL means
+  /// closed, which is the default and therefore what every existing tenant
+  /// gets: a public write surface that is open the moment it is deployed is
+  /// one nobody decided to open.
+  applicationsOpenFrom DateTime? @map("applications_open_from") @db.Date
+  applicationsOpenTo   DateTime? @map("applications_open_to") @db.Date
+
   tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   feeSchedules  FeeSchedule[]
   students      Student[]
@@ -3032,6 +3049,15 @@ model Application {
   /// Set when an accepted offer produced a student record.
   studentId   String?   @unique @map("student_id") @db.Uuid
 
+  /// How this application reached the system (Track C2).
+  source ApplicationSource @default(STAFF)
+  /// Opaque secret an applicant quotes with their application number to check
+  /// their own status. A public applicant has no account and no session; this
+  /// is the only thing that proves an enquiry about an application comes from
+  /// the person who made it. PUBLIC rows carry one and no others do, by
+  /// `chk_application_public_is_trackable`.
+  trackingToken String? @map("tracking_token")
+
   tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   batch             Batch               @relation(fields: [batchId], references: [id])
   admissionCategory AdmissionCategory   @relation(fields: [admissionCategoryId], references: [id])
@@ -3043,6 +3069,7 @@ model Application {
   offers            AdmissionOffer[]
 
   @@unique([tenantId, applicationNo])
+  @@unique([tenantId, trackingToken])
   @@index([tenantId, batchId, state])
   @@index([tenantId, searchKey])
   @@index([tenantId, nationalId])

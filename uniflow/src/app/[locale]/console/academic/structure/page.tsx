@@ -23,7 +23,13 @@ import {
   Td,
   Th,
 } from '@/components/console/ui';
-import { AddStructure, OpenYear, TermStatus, Withdraw } from './forms';
+import {
+  AddStructure,
+  ApplicationWindow,
+  OpenYear,
+  TermStatus,
+  Withdraw,
+} from './forms';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('academic.structure');
@@ -273,6 +279,7 @@ export default async function StructurePage({
                     <Th>{c('code')}</Th>
                     <Th>{c('nameEn')}</Th>
                     <Th numeric>{t('admissionYear')}</Th>
+                    <Th>{t('applicationWindow')}</Th>
                     {mayManage && <Th />}
                   </tr>
                 </thead>
@@ -285,6 +292,26 @@ export default async function StructurePage({
                       <Td>{pickText(locale, b.nameAr, b.nameEn)}</Td>
                       <Td numeric>
                         <span className="numeric">{b.admissionYear}</span>
+                      </Td>
+                      {/* The public application portal, opened per batch —
+                          applications are made into a batch, so the window
+                          lives on it rather than as a second set of dates in
+                          the website's own CMS. */}
+                      <Td>
+                        {mayManage ? (
+                          <ApplicationWindow
+                            batchId={b.id}
+                            from={b.applicationsOpenFrom}
+                            to={b.applicationsOpenTo}
+                            open={windowOpen(b)}
+                          />
+                        ) : (
+                          <span className="numeric text-sm text-muted-foreground">
+                            {b.applicationsOpenFrom
+                              ? `${b.applicationsOpenFrom} → ${b.applicationsOpenTo}`
+                              : '—'}
+                          </span>
+                        )}
                       </Td>
                       {mayManage && (
                         <Td>
@@ -426,4 +453,21 @@ export default async function StructurePage({
       <p className="text-xs text-muted-foreground">{t('neverDeleted')}</p>
     </div>
   );
+}
+
+/**
+ * Whether a batch's application window contains today.
+ *
+ * Resolved on the server, beside the screen that shows it, using the same
+ * comparison `openBatches` makes for the public page. Two readings of "open"
+ * — one in the console and one on the site — is how a registrar comes to
+ * believe the portal is shut while it is taking applications.
+ */
+function windowOpen(batch: {
+  applicationsOpenFrom: string | null;
+  applicationsOpenTo: string | null;
+}): boolean {
+  if (!batch.applicationsOpenFrom || !batch.applicationsOpenTo) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return batch.applicationsOpenFrom <= today && today <= batch.applicationsOpenTo;
 }

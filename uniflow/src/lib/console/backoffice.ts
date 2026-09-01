@@ -78,19 +78,36 @@ export async function departmentOptions(
 
 export interface BatchOption extends Named {
   admissionYear: number;
+  /** The public application window (Track C2). Both null means the portal is
+   *  closed for this batch, which is the default. */
+  applicationsOpenFrom: string | null;
+  applicationsOpenTo: string | null;
 }
 
 export async function batchOptions(
   principal: Principal,
   permission: PermissionKey = 'academic.read',
 ): Promise<BatchOption[]> {
-  return named(principal, permission, (tx) =>
-    tx.batch.findMany({
+  return named(principal, permission, async (tx) => {
+    const rows = await tx.batch.findMany({
       where: { tenantId: principal.tenantId, isActive: true },
       orderBy: [{ admissionYear: 'desc' }, { code: 'asc' }],
-      select: { ...NAMED, admissionYear: true },
-    }),
-  );
+      select: {
+        ...NAMED,
+        admissionYear: true,
+        applicationsOpenFrom: true,
+        applicationsOpenTo: true,
+      },
+    });
+    // Dates crossing to a client component are formatted here. A `Date` sent
+    // through renders as "Mon Aug 31 2026 …" in whatever the server's locale
+    // is, which is neither language this application speaks.
+    return rows.map((r) => ({
+      ...r,
+      applicationsOpenFrom: r.applicationsOpenFrom?.toISOString().slice(0, 10) ?? null,
+      applicationsOpenTo: r.applicationsOpenTo?.toISOString().slice(0, 10) ?? null,
+    }));
+  });
 }
 
 export async function admissionCategoryOptions(

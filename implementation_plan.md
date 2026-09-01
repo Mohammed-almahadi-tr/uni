@@ -33,13 +33,18 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**947 tests pass across 25 suites; typecheck, lint and production build are all
+**991 tests pass across 26 suites; typecheck, lint and production build are all
 clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track D is complete, D1-D5.** Every screen the console declares exists, and
-`BUILT_PHASES` now holds all five phases. What remains of the roadmap is
-Track C's public applicant form and student portal (C2, C3) and the release
-phases.
+`BUILT_PHASES` now holds all five phases.
+
+**Track C is complete but for C3**: C1's theme engine and landing CMS, and
+**C2's public admissions portal** — the multi-step application, the tracking
+number and code, the printed application form, and the sessionless
+registration-card verification page B4 and D3 both deferred here. What remains
+of the roadmap is **C3** (the student and guardian portal) and the release
+phases §11-§13.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
 maker-checker, fee catalog / student AR / cashiering, the cheque clearing
@@ -100,6 +105,9 @@ That leaves, in order: **D2** (the finance desk), then **D4** and **D5**;
 **C2** (the public admissions application flow) and **C3** (the student and
 guardian portal); the release phases §11-§13; and the two Phase 7-8
 academic-records phases deliberately scoped out of v1.
+
+*All of that is now built except **C3** and the release phases — see §7.1 and
+§8.1.*
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -2121,7 +2129,7 @@ actually see the credit.
 
 **C1 · Theme Engine & Landing CMS** *(built — see §7.1)* — Per-tenant branding tokens (names, logo, favicon, motto, HSL palette, typography, social links) driving both the public site and the admin portals. Hero with configurable media and CTAs; faculties and programmes explorer; news, announcements and academic calendar; campus contact and map. A live-preview editor in the admin panel for text, colours, banners and section toggles.
 
-**C2 · Public Admissions Application Flow** — Multi-step public application: personal details, secondary certificate scores, ranked programme choices, document uploads. Optional application fee payable online. Tracking number and downloadable PDF slip. Feeds directly into the B2 committee queue.
+**C2 · Public Admissions Application Flow** *(built — see §7.1)* — Multi-step public application: personal details, secondary certificate scores, ranked programme choices, document uploads. Optional application fee payable online. Tracking number and downloadable PDF slip. Feeds directly into the B2 committee queue.
 
 **C3 · Student & Guardian Self-Service Portal** — Invoices, statement of account, instalment schedule with due dates, online payment, registration proofs and ID card, document upload, and application status. Guardian access scoped to their own students.
 
@@ -2259,11 +2267,155 @@ serving four phases now — A2's voucher attachments, B3's student documents,
 this, and the photograph capture D3 shipped without — and it has stopped
 being a thing future phases want: **D2 and D3 have both now shipped a screen
 with a hole in it where an upload belongs.** It should be scheduled on its own
-rather than waiting for a phase to adopt it.
+rather than waiting for a phase to adopt it. *By the close of C2 the count is
+**seven**: D4's branding logos, D5's student card and C2's national-ID upload
+have joined it, and no phase has adopted it yet.*
+
 Rich text in a post body is stored and rendered as plain paragraphs for the
 same reason the editor is deferred: HTML from an editor must be sanitised
 before it reaches a public page, and shipping the storage before the
 sanitiser is how a CMS becomes an XSS delivery mechanism.
+
+---
+
+### C2 — Public Admissions Application Flow · complete
+
+The second path in the system by which a request carrying no session writes a
+row — and the first that writes into a queue somebody acts on.
+
+#### What a member of the public could do before
+
+Nothing. There was no application entity at all: a person became known to the
+system when a cashier took money from them.
+
+```sql
+ALTER VIEW … COUNT(DISTINCT StudID) … WHERE Transtype = N'سند قبض'
+```
+([frmStudentsVacants.vb:141-160](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Form/frmStudentsVacants.vb#L141-L160))
+
+Seats taken meant **receipt vouchers issued**, so payment *was* admission. It
+follows that there was nowhere to record that somebody applied, nowhere to
+record that they were refused, and no moment at which two records of one person
+could be noticed. An applicant travelled to the campus, queued, and was typed
+into a form by a clerk — or they did not apply.
+
+#### The rules a public write inherits, and the ones it adds
+
+C1's enquiry form was the first sessionless write, and its own docstring says
+what it deliberately withheld: *"send mail, create an application, or touch the
+admissions queue"*. C2 does the withheld thing, so it takes every one of C1's
+rules and adds four.
+
+| Rule | Where it comes from |
+| :--- | :--- |
+| The tenant is the **resolved host**, never the form body | C1. A hidden field naming the university would let anyone post into any university's admissions queue |
+| Runs under `withTenant` as `uniflow_app` — NOSUPERUSER, NOBYPASSRLS | C1. A public write is not a privileged one |
+| The bounds are **in the database** | C1, extended. `chk_application_name_bounds` and `chk_application_certificate_year` were the form's business while only staff could reach the table |
+| **Nothing is written until a complete application exists** | New. `insertApplication` allocates an application number, and a number is scarce, sequential and quoted by the applicant. A server-side draft row at step one lets a script mint them by the thousand |
+| **No actor in the audit chain** | New. Recording the applicant as their own actor would put an unauthenticated party in the actor column as though they held a role. `actorId: null`, and the chain still covers the row |
+| **The applicant is told nothing the committee has not decided** | New. The screening runs — an unscreened application is one a committee can pick up without the verdict in front of them — and its outcome is not returned. REQ-ADM-CAP-02 is explicit that screening advises rather than blocks |
+| **The portal is closed unless somebody opened it** | New. See below |
+
+#### The window, and why it is on the batch
+
+Applications are made *into* a batch, so `batches` carries
+`applications_open_from` / `applications_open_to`. **Both default to NULL and
+NULL means closed**, so every existing tenant stays shut: a public write
+surface that is open the moment it is deployed is one nobody decided to open.
+
+Two alternatives were considered and rejected:
+
+- **Infer it from the seat quotas.** Seats are declared months before
+  applications open, and closing the portal would then mean deactivating the
+  quotas — which would break the capacity report those same quotas feed.
+- **Author it in the CMS.** That is a second copy of a fact the portal
+  enforces, and the two disagree the first time somebody extends a deadline
+  without telling whoever edits the site. Exactly the defect §0.0 correction 39
+  removed from the academic calendar.
+
+The window is re-checked **inside the submitting transaction**: a wizard begun
+on the last open day and submitted after midnight is submitted after the portal
+closed, and the applicant is told so rather than discovering it when nobody
+replies.
+
+| Delivered | Notes |
+| :--- | :--- |
+| **`/apply`** | Five steps — intake, about you, certificate, programmes, review — because the people filling it in are on telephones, often shared, and one long page is a page they abandon halfway |
+| The step is in the URL; the **answers are not** | The back button works and a reload survives. A national ID number in a query string ends up in browser history and in a server log, so the answers travel in a signed HttpOnly cookie scoped to two hours |
+| A step the draft has not reached does not open | Typing `?step=review` into an empty form lands on the first unanswered step rather than a review of nothing |
+| The review shows **everything**, not a summary | A review that summarises selectively is one where the field somebody mistyped is the field it left out, and this is the last moment before a committee reads it |
+| Both scripts, both required | The offer letter and the eventual certificate are issued in both, and a name transliterated later by a clerk stops matching the passport |
+| The certificate's **own maximum** beside the score box | An IB candidate scoring 4.2/45 typing it into a field the university reads as a percentage is the defect REQ-ADM-CAP-02 exists to prevent, and the cheapest place to prevent it is the label |
+| Ranked choices as three named selects | The rank is the field's position, not something to drag on a telephone. Blank entries drop, which is how somebody names one choice instead of three |
+| **Only programmes with seats declared for that intake** | An offer is issued against a seat quota, so an application to a programme with none cannot become an offer however good the applicant is — offering it would take somebody's ranked first choice and spend it on a place that does not exist. "Seats declared for this intake" is what "we are admitting to it this year" already means in the data. Enforced in the form *and* at submission |
+| **The tracking number and code, shown once** | The number identifies — sequential, printed, quoted over a telephone. The **code** authenticates: 32 hex characters, as the registration card's verification token is |
+| **`/apply/status`** | The pair is **posted**, never in a URL. A secret in a query string is a secret in the browser history, the `Referer` header and the access log |
+| One answer for two failures | A wrong number and a wrong token both return "not found". Told which half was wrong, an attacker walks the sequential numbers until one says "wrong token" and knows that application exists |
+| **The printed application form** | REQ-LP-04's "downloadable Application Form PDF", on **D5's own `PrintSheet`** — one letterhead across every document the institution issues, whether a member of staff or an applicant is holding it. Produced by printing the HTML, as A7 settled |
+| It lives on the status page, not the submission screen | An applicant needs it more than once. Printed only in the seconds after submitting it is a document they lose; reachable whenever they have their number and code, it is one they can produce at a counter months later |
+| The tracking code is **not** on the form | The form is a thing an applicant hands to somebody. The code is what proves an enquiry comes from them, and printing it onto a document meant to be handed over would defeat it |
+| **`/verify/registration/[token]`** | The page B4's QR code has resolved to since D3 drew it and D5 printed it — named in B4's deferrals as *"genuinely public and stays in Track C"*, and the last thing Track C owed either |
+| No header, no footer, no navigation | It is an answer to one question, and a verifier standing at a counter should not have to find it among a university's menus. What makes it trustworthy is the token — anyone can copy a stylesheet, nobody guesses 128 bits. `noindex`, and **no money on it, ever**: what a student paid is not a fact a QR scan should disclose |
+| **The window control on `academic/structure`** | Opening the portal is `academic.manage` — the same authority as creating the batch applications are made into. A separate permission nobody grants is a portal nobody can open |
+| Closing is a **button**, not "blank two fields and save" | Closing admissions in a hurry — a quota filled, a ministry instruction — is exactly the case where a form somebody has to empty under pressure is a form they get wrong |
+| One reading of "open" | The console resolves it with the same comparison `openBatches` makes. Two readings is how a registrar comes to believe the portal is shut while it is taking applications |
+| **`applications.source`** — STAFF / PUBLIC / IMPORT | A committee reading a certificate score needs to know whether a registrar typed it from a certified document or the applicant typed it about themselves, and REQ-ADM-CAP-05's duplicate surfacing matters far more for the second. The bulk importer now marks its own rows |
+| And it is **read**, on the ranked list the committee scores from | A self-declared row is badged and an ordinary one is not — badging every row would badge nothing. A column stored, loaded and gating nothing is the legacy `Priv`, which this project has cited eight times; adding a ninth would be worse than not adding the column |
+
+#### A constraint that reached backwards
+
+`chk_application_name_bounds` — two to two hundred characters, both scripts —
+was added because the table now takes public writes and the bounds belong in
+the database rather than in one form. It applies to **every** writer, which is
+the point, and it immediately failed a B2 committee-ranking test that named its
+three applicants `A`, `B` and `C`.
+
+The constraint is right and the test was changed. A one-character full name is
+not a name, and a rule that exempts the callers that already exist is not a
+rule — it is a rule for strangers, which is the shape of validation that lets
+placeholder data into a real admissions queue through the door somebody trusted.
+
+It reached one place further. B2's **bulk intake importer** checks that a name
+is *present* and did not check its length, so its dry-run preview would have
+passed a row the commit then refused — a registrar told their spreadsheet was
+clean, finding out halfway through a roster of four hundred. The preview now
+enforces the same bound, which is the whole value of having a dry run.
+
+#### One defect found while building
+
+**An absent id was read as no filter at all.** `assertBelongs` checked the
+admission category with `findFirst({ where: { id: input.admissionCategoryId } })`,
+and Prisma treats `{ id: undefined }` as *no predicate* — so a request omitting
+the field entirely matched the first active category rather than none, and the
+refusal that should have been a sentence surfaced as a foreign-key error two
+calls later. Every id is now required to be a non-empty string before it
+reaches a query. Found by a test whose fixture named a category code that did
+not exist, which is the accident worth having.
+
+#### Deferred, and named
+
+- **Document upload.** REQ-LP-04 asks for a national ID / passport upload and
+  the object-storage endpoint still does not exist. The certificate step says
+  so in words — *"bring the originals when the university calls you in;
+  nothing is uploaded through this form"* — rather than showing a control that
+  does not work. **Seven surfaces now wait on it:** A2's voucher attachments,
+  B3's student documents, C1's media library, D3's photo capture, D4's branding
+  logos, D5's student card, and this.
+- **The application fee.** REQ-LP-04 asks for one "payable online, gating
+  submission where the tenant requires it". There is no payment gateway — the
+  same adapters REQ-CSH-05's gateway settlement reconciliation waits on, which
+  no phase owns. Building the *gate* without the payment would produce a portal
+  that refuses applications for a fee nobody can pay, so neither half is built
+  and the requirement is named here whole.
+- **Rate limiting.** Nothing is written until a complete, validated application
+  exists, which removes the cheap abuse; a determined script can still submit
+  complete applications. That wants a shared limiter — the login path has its
+  own per-account counter and there is no general one — and it should be
+  scheduled with the release hardening in §12 rather than invented here for one
+  endpoint.
+- **Withdrawing an application from the public side.** `withdrawApplication`
+  exists and is staff-only. An applicant who wants to withdraw telephones,
+  which is what the status page tells them.
 
 ---
 

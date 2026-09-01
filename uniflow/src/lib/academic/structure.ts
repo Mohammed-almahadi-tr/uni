@@ -696,3 +696,94 @@ async function refuseDuplicate(
 function iso(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
+
+// ---------------------------------------------------------------------------
+// The public application window (Track C2, SRS REQ-LP-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * Open or close the public application portal for one batch.
+ *
+ * ## Why this lives on the batch and not in the CMS
+ *
+ * The website could have carried its own "applications open" banner and its
+ * own dates. It would then be a second copy of a fact the portal enforces, and
+ * the two would disagree the first time somebody extends a deadline without
+ * telling whoever edits the site — the same defect §0.0 correction 39 removed
+ * from the academic calendar, where semester dates are read from
+ * `academic_terms` rather than authored twice.
+ *
+ * So there is one window, it is on the thing applications are made *into*, and
+ * the public page reads it.
+ *
+ * ## Closed is the default and closed is a real state
+ *
+ * Passing nulls closes the portal. It is not the same as an expired window: a
+ * university that has finished an intake and a university that never opened
+ * one both want the portal shut, and both get the same page.
+ *
+ * `academic.manage` rather than a permission of its own. Opening admissions is
+ * the same authority as creating the batch admissions are made into, and a
+ * separate permission nobody grants is a portal nobody can open.
+ */
+export async function setApplicationWindow(
+  principal: Principal,
+  batchId: string,
+  window: { from: Date | null; to: Date | null },
+): Promise<void> {
+  requirePermission(principal, 'academic.manage');
+
+  const from = window.from ? toDateOnly(window.from) : null;
+  const to = window.to ? toDateOnly(window.to) : null;
+
+  // Both or neither. `chk_batch_application_window_complete` refuses the half
+  // case anyway; this is here so the user reads a sentence rather than a
+  // constraint name.
+  if ((from === null) !== (to === null)) {
+    throw new AcademicStructureError(
+      'An application window needs both a start and an end. One date alone would be read ' +
+        'as "forever" by somebody.',
+    );
+  }
+  if (from && to && to < from) {
+    throw new AcademicStructureError('The window closes before it opens.');
+  }
+
+  await withTenant(principal.tenantId, async (tx) => {
+    const batch = await tx.batch.findUnique({
+      where: { id: batchId },
+      select: {
+        tenantId: true,
+        code: true,
+        applicationsOpenFrom: true,
+        applicationsOpenTo: true,
+      },
+    });
+    if (!batch || batch.tenantId !== principal.tenantId) {
+      throw new AcademicStructureError('That batch does not belong to this university.');
+    }
+
+    await tx.batch.update({
+      where: { id: batchId },
+      data: { applicationsOpenFrom: from, applicationsOpenTo: to },
+    });
+
+    // Audited like any other change to who may do what. Opening a public
+    // write surface is a decision somebody made on a date, and "when did the
+    // portal open" is a question an admissions dispute turns on.
+    await audit(tx, principal.tenantId, {
+      actorId: principal.userId,
+      action: 'UPDATE',
+      resourceType: 'batch',
+      resourceId: batchId,
+      before: {
+        applicationsOpenFrom: batch.applicationsOpenFrom?.toISOString().slice(0, 10) ?? null,
+        applicationsOpenTo: batch.applicationsOpenTo?.toISOString().slice(0, 10) ?? null,
+      },
+      after: {
+        applicationsOpenFrom: from?.toISOString().slice(0, 10) ?? null,
+        applicationsOpenTo: to?.toISOString().slice(0, 10) ?? null,
+      },
+    });
+  });
+}

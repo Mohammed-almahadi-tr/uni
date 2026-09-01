@@ -1,5 +1,9 @@
 import 'server-only';
-import type { AdmissionDecision, ApplicationState } from '@/generated/prisma/enums';
+import type {
+  AdmissionDecision,
+  ApplicationSource,
+  ApplicationState,
+} from '@/generated/prisma/enums';
 import { withTenant, type Tx } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
@@ -98,11 +102,22 @@ export async function createApplication(
  * transaction per row. Validation lives in `createApplication` above and in the
  * import's own pass; this is the write.
  */
+export interface InsertOrigin {
+  /** Where this application came from. A committee reading a certificate
+   *  score needs to know whether a registrar typed it from a certified
+   *  document or the applicant typed it about themselves. */
+  source: ApplicationSource;
+  /** Required for a PUBLIC application and refused for any other, by
+   *  `chk_application_public_is_trackable`. */
+  trackingToken?: string | null;
+}
+
 export async function insertApplication(
   tx: Tx,
   tenantId: string,
-  actorId: string,
+  actorId: string | null,
   input: ApplicationInput,
+  origin: InsertOrigin = { source: 'STAFF' },
 ): Promise<CreatedApplication> {
   {
     const principal = { tenantId, userId: actorId };
@@ -141,6 +156,8 @@ export async function insertApplication(
         certificateYear: input.certificateYear ?? null,
         subjects: (input.subjects ?? []).map((s) => s.trim()).filter(Boolean),
         state: 'DRAFT',
+        source: origin.source,
+        trackingToken: origin.trackingToken ?? null,
         choices: {
           create: input.choices.map((programmeId, i) => ({
             tenantId: principal.tenantId,
@@ -162,6 +179,7 @@ export async function insertApplication(
         fullNameEn: input.fullNameEn.trim(),
         choices: input.choices.length,
         duplicateCandidates: duplicates.length,
+        source: origin.source,
       },
     });
 
@@ -400,6 +418,15 @@ export interface RankedApplicant {
   committeeScore: string | null;
   state: ApplicationState;
   decision: AdmissionDecision | null;
+  /**
+   * Where the application came from (Track C2).
+   *
+   * On the list a committee scores from, because a certificate score typed by
+   * a registrar off a certified document and one typed by the applicant about
+   * themselves are not the same evidence — and REQ-ADM-CAP-05's duplicate
+   * surfacing matters far more for the second.
+   */
+  source: ApplicationSource;
 }
 
 /**
@@ -438,6 +465,7 @@ export async function rankedList(
             committeeScore: true,
             state: true,
             decision: true,
+            source: true,
           },
         },
       },
@@ -478,6 +506,7 @@ export async function rankedList(
       committeeScore: r.app.committeeScore?.toFixed(3) ?? null,
       state: r.app.state,
       decision: r.app.decision,
+      source: r.app.source,
     }));
   });
 }

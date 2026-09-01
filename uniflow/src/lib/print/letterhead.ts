@@ -19,14 +19,27 @@ import { bareLetterhead, type Letterhead } from './sheet';
  * document still has to print.
  */
 export async function letterheadFor(principal: Principal): Promise<Letterhead> {
-  return withTenant(principal.tenantId, async (tx) => {
+  return letterheadForTenant(principal.tenantId);
+}
+
+/**
+ * The same letterhead for a tenant with nobody signed in.
+ *
+ * Track C2's public application slip needs it: an applicant printing the form
+ * they just submitted has no session and no principal, and a slip with no
+ * university on it is not a slip. Nothing here is a secret — it is the header
+ * of the page they are already looking at, and every fact on it is published
+ * on the site's own contact page.
+ */
+export async function letterheadForTenant(tenantId: string): Promise<Letterhead> {
+  return withTenant(tenantId, async (tx) => {
     const tenant = await tx.tenant.findUniqueOrThrow({
-      where: { id: principal.tenantId },
+      where: { id: tenantId },
       select: { nameAr: true, nameEn: true },
     });
 
     const branding = await tx.tenantBranding.findUnique({
-      where: { tenantId: principal.tenantId },
+      where: { tenantId },
       select: {
         shortCode: true,
         mottoAr: true,
@@ -36,7 +49,7 @@ export async function letterheadFor(principal: Principal): Promise<Letterhead> {
     });
 
     const campus = await tx.campus.findFirst({
-      where: { tenantId: principal.tenantId, isPrimary: true, isActive: true },
+      where: { tenantId, isPrimary: true, isActive: true },
       select: {
         addressAr: true,
         addressEn: true,

@@ -194,6 +194,18 @@ export default async function AdmissionsPage({
                       <div className="text-xs text-muted-foreground" dir="ltr">
                         {r.fullNameEn}
                       </div>
+                      {/* Where it came from (C2). A certificate score typed by
+                          a registrar off a certified document and one typed by
+                          the applicant about themselves are not the same
+                          evidence, and a committee scoring the list has to
+                          know which it is reading. Only the self-declared
+                          case is marked: a row with no badge is the ordinary
+                          one, and badging every row would badge nothing. */}
+                      {r.source === 'PUBLIC' && (
+                        <span className="mt-1 inline-block">
+                          <Pill>{t('selfDeclared')}</Pill>
+                        </span>
+                      )}
                     </Td>
                     <Td numeric>
                       <span className="numeric">{r.choiceRank}</span>

@@ -178,7 +178,7 @@ export async function commitIntake(
         certificateYear: row.resolved.certificateYear,
         subjects: splitList(source.subjects),
         choices: row.resolved.programmeIds,
-      });
+      }, { source: 'IMPORT' });
       applicationNos.push(created.applicationNo);
     }
 
@@ -282,8 +282,21 @@ async function validateRows(
     const fail = (field: string, message: string) =>
       rowIssues.push({ rowNumber, field, message });
 
-    if (!row.fullNameAr?.trim()) fail('fullNameAr', 'Arabic name is missing.');
-    if (!row.fullNameEn?.trim()) fail('fullNameEn', 'English name is missing.');
+    // Bounds, not just presence. C2 put `chk_application_name_bounds` on the
+    // table when it opened it to public writes, and the whole value of a
+    // dry-run preview is that it refuses exactly what the commit would — a
+    // preview that passes a row the commit rejects is a preview that has
+    // told a registrar their spreadsheet is clean when it is not.
+    const nameBounds = (value: string | undefined, field: 'fullNameAr' | 'fullNameEn') => {
+      const name = value?.trim() ?? '';
+      if (!name) {
+        fail(field, field === 'fullNameAr' ? 'Arabic name is missing.' : 'English name is missing.');
+      } else if (name.length < 2 || name.length > 200) {
+        fail(field, 'A name is between 2 and 200 characters.');
+      }
+    };
+    nameBounds(row.fullNameAr, 'fullNameAr');
+    nameBounds(row.fullNameEn, 'fullNameEn');
 
     const categoryCode = (row.admissionCategoryCode ?? '').trim().toUpperCase();
     const admissionCategoryId = byCategory.get(categoryCode);

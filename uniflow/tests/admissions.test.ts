@@ -888,9 +888,13 @@ describe('committee workflow', () => {
   it('ranks applicants by committee score, then certificate score', async () => {
     const { uni: u, registrar } = await fresh();
 
-    const a = await applicant(registrar, u, { name: 'A', nationalId: 'K-1', score: '70' });
-    const b = await applicant(registrar, u, { name: 'B', nationalId: 'K-2', score: '90' });
-    const c = await applicant(registrar, u, { name: 'C', nationalId: 'K-3', score: '80' });
+    // Named rather than lettered: C2 put `chk_application_name_bounds` on the
+    // table when it opened it to public writes, and a one-character full name
+    // is not a name. The constraint applies to every writer, which is the
+    // point of putting it in the database rather than in one form.
+    const a = await applicant(registrar, u, { name: 'Ranked A', nationalId: 'K-1', score: '70' });
+    const b = await applicant(registrar, u, { name: 'Ranked B', nationalId: 'K-2', score: '90' });
+    const c = await applicant(registrar, u, { name: 'Ranked C', nationalId: 'K-3', score: '80' });
     for (const app of [a, b, c]) await submitApplication(registrar, app.id);
 
     let list = await rankedList(registrar, u.programmeIds.MBBS, u.batchId);
@@ -1434,6 +1438,21 @@ describe('bulk intake import', () => {
 
     expect(preview.importable).toBe(0);
     expect(preview.issues[0].message).toMatch(/exceeds the maximum of 45/);
+  });
+
+  it('refuses in the preview exactly what the commit would refuse', async () => {
+    // C2 put `chk_application_name_bounds` on the table when it opened it to
+    // public writes, and the whole value of a dry run is that it rejects what
+    // the commit will. A preview that passes a row the commit refuses has told
+    // a registrar their spreadsheet is clean when it is not — and they find
+    // out halfway through a roster of four hundred.
+    const { uni: u, registrar } = await fresh();
+    const rows = roster();
+    rows[0].fullNameEn = 'X';
+
+    const preview = await previewIntake(registrar, u.batchId, rows);
+    expect(preview.importable).toBe(1);
+    expect(preview.issues.some((i) => /between 2 and 200/.test(i.message))).toBe(true);
   });
 
   it('catches the same national ID twice within one file', async () => {

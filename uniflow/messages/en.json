@@ -89,7 +89,8 @@
       "programmes": "Programmes",
       "news": "News",
       "calendar": "Calendar",
-      "contact": "Contact"
+      "contact": "Contact",
+      "apply": "Apply"
     },
     "sections": {
       "about": "About {university}",
@@ -760,7 +761,14 @@
       "setStatus": "Set",
       "neverDeleted": "Structure is withdrawn, never deleted. The legacy build deleted a batch with no check for the students admitted under it.",
       "notFiscal": "An academic year is not a fiscal year. The two calendars meet only at a posting’s document date.",
-      "withdrawWhat": "What to withdraw"
+      "withdrawWhat": "What to withdraw",
+      "applicationWindow": "Public applications",
+      "opensOn": "Opens",
+      "closesOn": "Closes",
+      "setWindow": "Set window",
+      "closePortal": "Close now",
+      "portalOpen": "Open",
+      "portalClosed": "Closed"
     },
     "degreeLevel": {
       "DIPLOMA": "Diploma",
@@ -903,7 +911,8 @@
       "promoteHint": "A freed seat is offered by a person, not by a rule. An offer is a commitment to somebody, and the institution should make it deliberately.",
       "closedBecause": "Closed: {reason}",
       "promotedInto": "Replaced a seat that came free.",
-      "reason": "Reason"
+      "reason": "Reason",
+      "selfDeclared": "Self-declared"
     },
     "applicationState": {
       "DRAFT": "Draft",
@@ -1547,5 +1556,118 @@
       "MALE": "Male",
       "FEMALE": "Female"
     }
+  },
+  "apply": {
+    "title": "Apply for admission",
+    "blurb": "Four short steps. Nothing is submitted until you have read it back at the end.",
+    "next": "Continue",
+    "working": "Working…",
+    "trackHint": "Already applied?",
+    "trackLink": "Check your application",
+    "steps": {
+      "intake": "Intake",
+      "identity": "About you",
+      "certificate": "Certificate",
+      "choices": "Programmes",
+      "review": "Review"
+    },
+    "closed": {
+      "blurb": "Applications are not open at the moment. When the next intake opens it will be announced here and on the university's news page.",
+      "contact": "Contact admissions"
+    },
+    "intake": {
+      "batch": "Which intake",
+      "closes": "Applications close on {date}.",
+      "category": "How you are applying",
+      "categoryHint": "Choose the channel you are applying through. It decides which fee schedule and which seat allocation apply to you, so choosing the wrong one delays your application."
+    },
+    "identity": {
+      "nameAr": "Full name in Arabic",
+      "nameEn": "Full name in English",
+      "nameHint": "Exactly as it appears on your passport or national ID. Your offer letter and your certificate are issued in both languages.",
+      "nationalId": "National ID number",
+      "passportNo": "Passport number",
+      "idHint": "Give at least one. It is how the university tells two applicants with the same name apart.",
+      "dateOfBirth": "Date of birth",
+      "nationality": "Nationality",
+      "email": "Email address",
+      "phone": "Telephone number",
+      "reachHint": "Give at least one. An offer that cannot be sent to you is an offer you will not receive."
+    },
+    "certificate": {
+      "type": "Certificate",
+      "score": "Score",
+      "outOf": "Out of {max}.",
+      "scoreHint": "Choose your certificate first and this will show what it is marked out of.",
+      "year": "Year obtained",
+      "subjects": "Subjects sat",
+      "subjectsHint": "Separated by commas. Used to check the subject requirements of the programmes you choose.",
+      "documentsLater": "Do not send documents yet. Bring the originals of your certificate and your ID when the university calls you in; nothing is uploaded through this form."
+    },
+    "choices": {
+      "title": "Programme choices",
+      "blurb": "Rank the programmes you want in order. Your first choice is considered first; the others are considered if it is full or you are not eligible for it.",
+      "rank": "Choice {n}",
+      "none": "No further choice",
+      "duplicateHint": "The same programme cannot be chosen twice. Ranking a programme against itself has no meaning."
+    },
+    "review": {
+      "title": "What you are submitting",
+      "edit": "Change something",
+      "declaration": "By submitting you confirm that what you have entered is true. An application found to contain a false statement is refused, and an admission obtained by one is withdrawn.",
+      "submit": "Submit my application",
+      "discard": "Clear this form and start again"
+    },
+    "receipt": {
+      "title": "Your application has been received.",
+      "blurb": "It is now with the admissions committee. You will be contacted using the email address or telephone number you gave.",
+      "applicationNo": "Application number",
+      "trackingToken": "Tracking code",
+      "keepIt": "Keep both of these. You need them together to check your application, and the tracking code is shown only once — the university cannot show it to you again.",
+      "print": "Print this page"
+    },
+    "errors": {
+      "noSite": "No university is configured at this address.",
+      "incomplete": "Some of the form is not filled in. Please go back through the steps.",
+      "failed": "That could not be submitted. Please try again in a moment."
+    },
+    "status": {
+      "title": "Check your application",
+      "blurb": "Enter the application number and the tracking code you were given when you applied.",
+      "applicationNo": "Application number",
+      "trackingToken": "Tracking code",
+      "tokenHint": "The 32-character code shown once when you submitted.",
+      "check": "Check",
+      "intake": "Intake",
+      "submitted": "Submitted on",
+      "choices": "Your programme choices",
+      "advisoryNote": "A decision is taken by the admissions committee. Until one is recorded, this page shows only that your application has been received.",
+      "lost": "Lost your tracking code?",
+      "lostLink": "Contact admissions",
+      "offer": {
+        "title": "You have been made an offer.",
+        "acceptBy": "You must reply by {date}. After that date the place is offered to another applicant.",
+        "howTo": "Contact the admissions office to accept. Bring your original certificate and identification."
+      },
+      "errors": {
+        "noSite": "No university is configured at this address.",
+        "notFound": "No application matches that number and code. Check both and try again.",
+        "failed": "That could not be checked. Please try again in a moment."
+      },
+      "printForm": "Print my application form"
+    }
+  },
+  "verify": {
+    "title": "Registration card verification",
+    "valid": "This registration is valid.",
+    "notValid": "This card is not valid.",
+    "university": "University",
+    "student": "Student",
+    "studentNo": "Student number",
+    "programme": "Programme",
+    "term": "Term",
+    "registrationNo": "Registration number",
+    "status": "Status",
+    "footer": "This page is produced by the university's own records at the moment you opened it. It shows no financial information."
   }
 }
