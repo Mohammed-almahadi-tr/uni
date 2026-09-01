@@ -1,5 +1,5 @@
 import 'server-only';
-import { withTenant } from '@/lib/db/client';
+import { withTenant, type Tx } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { toDateOnly } from '@/lib/ledger/period';
@@ -152,6 +152,75 @@ function buildSchedule(input: CreatePlanInput, total: ReturnType<typeof toStorag
   }
 
   return dates.map((dueDate, i) => ({ dueDate, amount: amounts[i] }));
+}
+
+export interface ScheduledInstalment {
+  seq: number;
+  dueDate: Date;
+  amount: string;
+  /** Past its due date as at the date asked about. Says nothing on its own
+   *  about whether the student owes anything — see below. */
+  overdue: boolean;
+}
+
+export interface SchedulePlan {
+  planId: string;
+  termLabel: string | null;
+  totalAmount: string;
+  instalments: ScheduledInstalment[];
+}
+
+/**
+ * One student's payment schedule, inside a transaction the caller already
+ * holds (REQ-CSH-02).
+ *
+ * B4 built `overdueInstalments` for a finance office chasing a list of
+ * students. This is the other direction: one student, every date, so the
+ * person who has to find the money can see when it is wanted. It is the
+ * question the legacy build could not answer at all — a `ChkBoPrem` checkbox
+ * wrote a `Remain` balance and a `PaymentStatus` flag onto the registration
+ * row, with no dates and therefore no schedule to show anybody.
+ *
+ * `overdue` here means only that the date has passed. Whether the student is
+ * actually behind is the account balance's business, and the portal shows the
+ * two together for the reason `overdueInstalments` cross-checks them: a
+ * student who paid the whole term up front is not in arrears merely because a
+ * scheduled date went by, and telling them they are is how a finance office
+ * loses the right to be believed.
+ */
+export async function instalmentSchedule(
+  tx: Tx,
+  tenantId: string,
+  studentId: string,
+  asOfDate: Date = new Date(),
+): Promise<SchedulePlan[]> {
+  const asOf = toDateOnly(asOfDate);
+
+  const plans = await tx.instalmentPlan.findMany({
+    where: { tenantId, studentId, isActive: true },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      termLabel: true,
+      totalAmount: true,
+      instalments: {
+        orderBy: { seq: 'asc' },
+        select: { seq: true, dueDate: true, amount: true },
+      },
+    },
+  });
+
+  return plans.map((p) => ({
+    planId: p.id,
+    termLabel: p.termLabel,
+    totalAmount: p.totalAmount.toFixed(4),
+    instalments: p.instalments.map((i) => ({
+      seq: i.seq,
+      dueDate: i.dueDate,
+      amount: i.amount.toFixed(4),
+      overdue: i.dueDate < asOf,
+    })),
+  }));
 }
 
 export interface OverdueInstalment {

@@ -557,6 +557,10 @@ model Tenant {
   campuses        Campus[]
   inquiries       Inquiry[]
 
+  portalAccounts    PortalAccount[]
+  portalAccess      PortalAccess[]
+  portalInvitations PortalInvitation[]
+
   @@map("tenants")
 }
 
@@ -661,6 +665,9 @@ model User {
   postsPublished   NewsPost[]       @relation("PostPublisher")
   calendarAuthored CalendarEvent[]  @relation("CalendarAuthor")
   inquiriesHandled Inquiry[]        @relation("InquiryHandler")
+
+  portalInvitationsIssued PortalInvitation[] @relation("PortalInviter")
+  portalAccessRevoked     PortalAccess[]     @relation("PortalAccessRevoker")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -1355,6 +1362,8 @@ model Student {
   programmeHistory  StudentProgrammeHistory[]
   sponsorships      Sponsorship[]
   awards            ScholarshipAward[]
+  portalAccess      PortalAccess[]
+  portalInvitations PortalInvitation[]
 
   @@unique([tenantId, studentNo])
   @@index([tenantId, searchKey])
@@ -3050,13 +3059,13 @@ model Application {
   studentId   String?   @unique @map("student_id") @db.Uuid
 
   /// How this application reached the system (Track C2).
-  source ApplicationSource @default(STAFF)
+  source        ApplicationSource @default(STAFF)
   /// Opaque secret an applicant quotes with their application number to check
   /// their own status. A public applicant has no account and no session; this
   /// is the only thing that proves an enquiry about an application comes from
   /// the person who made it. PUBLIC rows carry one and no others do, by
   /// `chk_application_public_is_trackable`.
-  trackingToken String? @map("tracking_token")
+  trackingToken String?           @map("tracking_token")
 
   tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   batch             Batch               @relation(fields: [batchId], references: [id])
@@ -4572,4 +4581,127 @@ model Inquiry {
 
   @@index([tenantId, status, createdAt])
   @@map("inquiries")
+}
+
+// ---------------------------------------------------------------------------
+// Track C3 — the student and guardian portal
+// ---------------------------------------------------------------------------
+
+/// Whose account it is. Not a permission and not a role in the RBAC sense —
+/// it decides only how many students an account may be linked to, and whether
+/// a relationship has to be stated.
+enum PortalRole {
+  STUDENT
+  GUARDIAN
+}
+
+/// A student's or guardian's login (REQ-LP-05).
+///
+/// Deliberately not a `User`. A staff user carries roles, permissions, a till
+/// and forty relations naming things they did to the institution's money; a
+/// student carries none of that and must never be one role assignment away
+/// from carrying it. Two tables cannot be confused by a bug in permission
+/// resolution — one table with a flag on it can.
+///
+/// The account holds **no permission at all**. What it may read is decided by
+/// the live rows in `PortalAccess`, and enforced in the database by the
+/// `portal_scope` policies rather than by the code that queries.
+model PortalAccount {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  email        String
+  fullName     String     @map("full_name")
+  /// Argon2id, as staff passwords are. A CHECK constraint refuses anything
+  /// that is not an Argon2 digest, so an import script cannot put a cleartext
+  /// password back into this system.
+  passwordHash String     @map("password_hash")
+  role         PortalRole
+  isActive     Boolean    @default(true) @map("is_active")
+
+  /// Bumped when access is revoked or the password changes, so a live session
+  /// is refused at its next request rather than at expiry — the same rotation
+  /// counter staff sessions carry, for the same reason.
+  sessionVersion   Int       @default(1) @map("session_version")
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  access      PortalAccess[]
+  invitations PortalInvitation[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("portal_accounts")
+}
+
+/// One account's permission to read one student — expressed as a
+/// relationship, because that is what it is.
+///
+/// Revocation is a timestamp rather than a delete: *who could see this
+/// student's account in March* is a question a registry office is asked after
+/// a custody dispute, and a deleted row cannot answer it.
+model PortalAccess {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @map("tenant_id") @db.Uuid
+  accountId    String  @map("account_id") @db.Uuid
+  studentId    String  @map("student_id") @db.Uuid
+  /// Mother, father, uncle. Required of a guardian, absent on a student's own
+  /// account — a student is not related to themselves.
+  relationship String?
+
+  grantedAt              DateTime  @default(now()) @map("granted_at") @db.Timestamptz(6)
+  grantedViaInvitationId String?   @map("granted_via_invitation_id") @db.Uuid
+  revokedAt              DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedById            String?   @map("revoked_by_id") @db.Uuid
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account    PortalAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  student    Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  invitation PortalInvitation? @relation(fields: [grantedViaInvitationId], references: [id])
+  revokedBy  User?             @relation("PortalAccessRevoker", fields: [revokedById], references: [id])
+
+  @@index([tenantId, studentId])
+  @@index([accountId])
+  @@map("portal_access")
+}
+
+/// A one-time code that turns a registrar's decision into an account.
+///
+/// A registrar grants access; they do **not** choose the password. The person
+/// who accepts the invitation sets their own, which means no member of staff
+/// has ever known it and none can be accused of having used it.
+///
+/// The code is stored as a SHA-256 digest, unlike C2's application tracking
+/// token which is stored as issued. A tracking token discloses one
+/// application's progress; this one mints a credential that reads a student's
+/// money for as long as the account lives.
+model PortalInvitation {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  studentId    String     @map("student_id") @db.Uuid
+  role         PortalRole
+  email        String
+  fullName     String     @map("full_name")
+  relationship String?
+  tokenHash    String     @map("token_hash")
+
+  issuedById String?  @map("issued_by_id") @db.Uuid
+  issuedAt   DateTime @default(now()) @map("issued_at") @db.Timestamptz(6)
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+
+  acceptedAt        DateTime? @map("accepted_at") @db.Timestamptz(6)
+  acceptedAccountId String?   @map("accepted_account_id") @db.Uuid
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student         Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  issuedBy        User?          @relation("PortalInviter", fields: [issuedById], references: [id])
+  acceptedAccount PortalAccount? @relation(fields: [acceptedAccountId], references: [id])
+  granted         PortalAccess[]
+
+  @@unique([tokenHash])
+  @@index([tenantId, studentId])
+  @@map("portal_invitations")
 }

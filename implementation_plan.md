@@ -33,18 +33,19 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**991 tests pass across 26 suites; typecheck, lint and production build are all
-clean.** Every item §4.1-§4.10 is built and verified.
+**1,038 tests pass across 27 suites; typecheck, lint and production build are
+all clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track D is complete, D1-D5.** Every screen the console declares exists, and
 `BUILT_PHASES` now holds all five phases.
 
-**Track C is complete but for C3**: C1's theme engine and landing CMS, and
-**C2's public admissions portal** — the multi-step application, the tracking
-number and code, the printed application form, and the sessionless
-registration-card verification page B4 and D3 both deferred here. What remains
-of the roadmap is **C3** (the student and guardian portal) and the release
-phases §11-§13.
+**Track C is complete, C1-C3**: the theme engine and landing CMS; the public
+admissions portal — the multi-step application, the tracking number and code,
+the printed application form, and the sessionless registration-card
+verification page B4 and D3 both deferred here; and **C3's student and
+guardian portal**, where a student reads the institution's own figures under a
+confinement the database enforces rather than the page. What remains of the
+roadmap is the release phases §11-§13.
 
 **Track A is complete, A1-A7**: chart of accounts, journal vouchers and
 maker-checker, fee catalog / student AR / cashiering, the cheque clearing
@@ -106,8 +107,7 @@ That leaves, in order: **D2** (the finance desk), then **D4** and **D5**;
 guardian portal); the release phases §11-§13; and the two Phase 7-8
 academic-records phases deliberately scoped out of v1.
 
-*All of that is now built except **C3** and the release phases — see §7.1 and
-§8.1.*
+*All of that is now built except the release phases — see §7.1 and §8.1.*
 
 Six things were decided or corrected during the build and are recorded here
 because they change what this document said (D-F are covered below the table):
@@ -998,8 +998,8 @@ gantt
 
     section Track C — Public Surface
     Theme engine & white-label landing CMS          :done, c1, after p0c, 9d
-    Public admissions application flow              :c2, after c1, 7d
-    Student & guardian self-service portal          :c3, after c2, 8d
+    Public admissions application flow              :done, c2, after c1, 7d
+    Student & guardian self-service portal          :done, c3, after c2, 8d
 
     section Track D — Staff Console
     Console shell, session & permission navigation  :done, d1, after c1 b6, 6d
@@ -2131,7 +2131,7 @@ actually see the credit.
 
 **C2 · Public Admissions Application Flow** *(built — see §7.1)* — Multi-step public application: personal details, secondary certificate scores, ranked programme choices, document uploads. Optional application fee payable online. Tracking number and downloadable PDF slip. Feeds directly into the B2 committee queue.
 
-**C3 · Student & Guardian Self-Service Portal** — Invoices, statement of account, instalment schedule with due dates, online payment, registration proofs and ID card, document upload, and application status. Guardian access scoped to their own students.
+**C3 · Student & Guardian Self-Service Portal** *(built — see §7.1)* — Invoices, statement of account, instalment schedule with due dates, online payment, registration proofs and ID card, document upload, and application status. Guardian access scoped to their own students.
 
 ---
 
@@ -2416,6 +2416,153 @@ not exist, which is the accident worth having.
 - **Withdrawing an application from the public side.** `withdrawApplication`
   exists and is staff-only. An applicant who wants to withdraw telephones,
   which is what the status page tells them.
+
+### C3 — Student & Guardian Self-Service Portal · complete · **Track C closed**
+
+The third external audience — after the anonymous visitor (C1) and the
+applicant (C2) — and the first one that authenticates. It is also the first
+party in this system allowed to read a record that is neither their own doing
+nor the institution's: a guardian reads their child's account.
+
+#### What a student could find out before
+
+Nothing, without travelling to the campus. Their balance was a `Remain` column
+on the registration row, written by whichever screen last touched it; the only
+way to read it was to stand in front of somebody with the application open.
+There was no student identity to authenticate at all. The system's one login
+selected a cleartext password out of `Users` and compared it in application
+code, and its `Priv` column had two values and gated nothing
+([frmLogin.vb:44-54](Nile%20College%20System%20-%20Ribat%20Univ/Rebat%20University%20Application/Form/frmLogin.vb#L44-L54)).
+
+So C3 does not add "a login for students". It adds the first record anywhere
+in this system of **who is entitled to see a particular student's money** —
+which is a different fact from who may see the student, and one no legacy
+table had a place for.
+
+#### The question the whole phase answers
+
+*What stops a portal request reading a student who is not theirs?*
+
+The answer is not "the page remembers to filter". A `withPortal` transaction
+sets `app.portal_student_id` alongside `app.tenant_id`, and **every**
+RLS-enabled table in the database carries a restrictive policy that reads it:
+
+| Table group | What a portal transaction sees |
+| :--- | :--- |
+| `students`, `student_charges`, `student_receipts`, `semester_registrations`, `instalment_plans`, `holds`, `student_documents`, `applications`, `sponsorships`, `scholarship_awards`, the two history tables, `student_profiles` | rows for **one** student |
+| `registration_lines`, `receipt_allocations`, `instalments`, `application_choices` | rows whose parent that same transaction can already see |
+| `transaction_headers` | only the vouchers a charge or receipt it can see points at |
+| the twelve reference tables that name things — programmes, terms, fee items, document types | tenant-wide, read-only |
+| **everything else**, 76 tables — the ledger postings, the audit chain, the medical record, the vendors, every other student, and pointedly the three tables this phase adds | nothing |
+
+Every one of those policies also refuses to write. **A portal transaction is
+read-only by policy**, not by the absence of a call site.
+
+The deny list is *generated*, not typed: the migration walks `pg_class` and
+denies every RLS-enabled table it has not already scoped. A table added by a
+later migration inherits nothing from that loop — so a test reads `pg_policies`
+and fails when any RLS-enabled table has neither policy. That turns "somebody
+must remember" into a red test.
+
+#### A portal account is not a `User`, and holds no permission
+
+| Decision | Why |
+| :--- | :--- |
+| A separate `portal_accounts` table | A staff user carries roles, permissions, a till and forty relations naming things they did to the institution's money. A student must never be one role assignment away from carrying it. Two tables cannot be confused by a bug in permission resolution; one table with a flag on it can |
+| **No permission key anywhere** | A permission is granted once and then applies to every row of a kind — the right shape for a registrar who reads all students, the catastrophic shape for a parent who reads one. The question is not *may this account read student records* but *may it read **this** student*, and the only honest way to store that is a row per pair |
+| A different cookie and a different **token audience** | `uniflow_portal` / `aud: uniflow-portal`. A member of staff who is also a parent is signed into both at once without either logging the other out, and neither credential opens the other's door. Asserted both ways by test |
+| Two hours, not eight | Eight is a cashier's shift at their own desk. A student is on a telephone that is often shared, and a browser left open in a computer lab is the ordinary case |
+| The session carries no student | Not the id, not the list of children. Looked up per request, so a grant withdrawn at the desk this morning is not still live in a pocket at teatime |
+
+#### Nobody chooses somebody else's password
+
+A registrar decides that a person may see a student's account. They do not
+decide, know, or type that person's password. They issue an **invitation** and
+hand over a one-time code; the person who accepts it sets their own. A staff
+member who never knew a credential cannot be accused of having used it, and
+the alternative — the registrar types a starting password and reads it out —
+produces a portal where a fifth of the accounts still have it.
+
+| Delivered | Notes |
+| :--- | :--- |
+| The code is stored as a **SHA-256 digest** | Unlike C2's tracking token, which is stored as issued. A tracking token discloses one application's progress; this mints a credential that reads a student's money for as long as the account lives. A database dump must not contain live invitations |
+| Shown to the registrar **once** | A second look means issuing a second invitation, which is the right amount of friction for handing over a credential |
+| **Posted, never in a link** | The obvious design is an emailed `/activate/<code>` URL, and it is wrong for C2's reason: a secret in a path is a secret in the history, the `Referer` and the access log. It also has to survive being read out over a telephone |
+| One answer for four failures | Unknown, expired, withdrawn and already-accepted are indistinguishable |
+| An address that already has an account | A guardian with two children is invited twice. The second acceptance **proves** the existing password rather than setting one, so a stolen invitation cannot take over an account whose password the thief does not have — and the password policy applies to a password being set, never to one being proved |
+| `student.manage` to grant, and to withdraw | The same authority as editing the record. Deciding who may read a student's file is not a lesser act than editing it, and a separate permission nobody grants is a portal nobody can be let into |
+| Withdrawal bumps the session version | In the same transaction as the revocation. A revocation that takes effect eventually is not one; the reason somebody withdraws one of these in a hurry is that a relationship has gone wrong |
+| Withdrawn rows stay on the list | *Who could see this student's account in March* is what a registry office is asked after a custody dispute, and a list of only live grants cannot answer it |
+| The audit entry names the staff member and **not** the code | An audit log is read by more people than a credential should be. The acceptance, by contrast, records `actorId: null` — the invited person is not a `User`, and putting them in the actor column would say a member of staff did it |
+
+#### Every figure on the portal is the institution's own
+
+Nothing in `lib/portal/views.ts` computes money. The balance is A3's, the
+arrears position and the blocking holds are B5's, the schedule is A3's, the
+statement is the one D5 prints at the counter and the card is B4's with D3's QR
+on it. Four staff-facing functions were split into a permission gate and a
+`build*` that takes a transaction — the same shape D5 used for the pre-close
+checklist — so both audiences call one implementation.
+
+A second implementation would be a second answer, and the first time they
+disagreed the student would be right to believe neither.
+
+| Delivered | Notes |
+| :--- | :--- |
+| **The blocking holds, on the first page** | The one thing here a legacy system would never have shown a student. B5 made a hold a control rather than a report and D3 put it in front of the registrar *before* the work; the argument reaches one step further. A student who learns at the desk that a document expired in March has lost the morning — and the university has one more person at the front of its queue |
+| The statement, on **D5's letterhead**, printable | Not a "student copy". A proof that announces itself as unofficial is one nobody accepts, so everyone still queues and the portal has saved nobody anything |
+| The registration card, with the **same verification token** | It resolves to the same sessionless `/verify/registration` page C2 built. A card printed at midnight verifies exactly as one handed across a counter, because it is the same card |
+| Charges showing the **sponsored portion** on the line | A student who does not know a ministry is carrying half the fee reads the smaller figure as an error and telephones about it |
+| Reversed charges struck through, **cancelled and dishonoured receipts shown** | A payment taken and then undone is the most alarming thing that can happen to an account. A portal that drops the row leaves somebody to discover it from a balance that changed overnight |
+| The schedule **never without the arrears position** | Payments settle charges, not instalments. A date that has passed does not mean money is owed, and a student who paid the term up front must not be shown three instalments "overdue" |
+| A guardian's student chooser, and one student per transaction | The choice rides on every link. An id the account is not linked to is a **404**, not a silent fallback to one it is — quietly showing a different child is how somebody pays the wrong fee, and "not found" rather than "not yours" is C2's answer about application numbers |
+| The portal-access panel on `registry/students/[id]` | Who may see this student, who has been invited, and who used to be able to. It is a fact *about the student*, and the registrar deciding it is looking at their record |
+| The account page lists who else can read it | A student should be able to see that somebody else has access. There is no control here to grant or withdraw it — that is the registry's — but it is not a secret |
+
+#### Two things the first cut got wrong
+
+**Denying the portal `transaction_headers` deleted two statement lines.** The
+obvious confinement — the student's own sub-ledger and none of the general
+ledger — narrows the statement on paper and in fact removes the reversal and
+dishonour rows, because both are *dated from the voucher that made them*. A
+statement that quietly omits the cheque that bounced is worse than one naming
+a voucher number the reader ignores. So the policy lets one header through
+when a charge or receipt the same transaction can already see points at it,
+and `transaction_lines` stays denied.
+
+**The password policy was being applied to a password that was only being
+proved.** `acceptInvitation` hashed before it knew whether it was creating an
+account, so a guardian linking a second child — whose password predates a
+tightening of the policy — would have been refused for a rule they could not
+retroactively have met. It now asks the question first, and hashes inside the
+transaction only in the rare case the answer changed underneath it.
+
+#### Deferred, and named
+
+- **Document upload**, again, and this is the **eighth** surface: A2's voucher
+  attachments, B3's student documents, C1's media library, D3's photo capture,
+  D4's branding logos, D5's student card, C2's national-ID page, and now this.
+  Eight surfaces is no longer a deferral but a scheduled piece of work, and it
+  belongs in §11 rather than being improvised for one of them. The documents
+  page says so in words: a control that accepted a file and dropped it would
+  be worse than none, because a student who believes they have submitted a
+  document does not bring it.
+- **Paying online.** REQ-LP-05 asks for it and there is no payment gateway —
+  the same adapters REQ-CSH-05's settlement reconciliation and C2's
+  application fee wait on. The account page says where money can actually be
+  paid today instead of offering a button that opens an apology.
+- **A sponsor-facing login.** B6 named it as a third external audience and
+  said it was not in C1-C3. It still is not. The infrastructure this phase
+  builds — an account table with no permissions, confinement by relationship —
+  is the shape it would take, and it is worth saying so before somebody
+  reaches for a staff `User` row.
+- **Email.** Nothing in this system sends any, so an invitation is handed over
+  or read out at the registry desk rather than posted to the address on it.
+  The address is still what the account is keyed on, so the day a mail
+  transport exists the flow does not change — only who carries the code.
+- **A forgotten-password flow**, for the same reason. Somebody who has lost
+  their password telephones the registry, which issues a fresh invitation; the
+  acceptance path already links to an existing account or creates one.
 
 ---
 

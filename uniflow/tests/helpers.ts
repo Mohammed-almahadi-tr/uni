@@ -7,7 +7,14 @@
  * side for tuition — so the tests exercise the same relationships the real
  * product will.
  */
-import { prisma, systemPrisma, withSystem, withTenant, type Tx } from '@/lib/db/client';
+import {
+  prisma,
+  systemPrisma,
+  withPortal,
+  withSystem,
+  withTenant,
+  type Tx,
+} from '@/lib/db/client';
 import { ALL_VOUCHER_TYPES, initialiseSequences } from '@/lib/ledger/sequence';
 import { monthlyPeriods } from '@/lib/ledger/period';
 import { provisionFiscalYear } from '@/lib/ledger/fiscal-year';
@@ -245,6 +252,23 @@ async function buildChartOfAccounts(tx: Tx, tenantId: string): Promise<Fixture['
 /** Run inside tenant context on the test client. */
 export function asTenant<T>(tenantId: string, fn: (tx: Tx) => Promise<T>, options = {}) {
   return withTenant(tenantId, fn, options, testDb);
+}
+
+/**
+ * Run as a signed-in portal account, confined to one student (C3).
+ *
+ * The app role again, plus `app.portal_student_id` — so the restrictive
+ * `portal_scope` and `portal_denied` policies bind. Tests use it to assert
+ * what the database refuses, rather than what the application remembers not
+ * to ask for.
+ */
+export function asPortal<T>(
+  tenantId: string,
+  studentId: string,
+  fn: (tx: Tx) => Promise<T>,
+  options = {},
+) {
+  return withPortal(tenantId, studentId, fn, options, testDb);
 }
 
 /** Run with RLS bypassed, as the owner role. */

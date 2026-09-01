@@ -89,6 +89,10 @@ export interface ResolvedTenant {
   slug: string;
   nameAr: string;
   nameEn: string;
+  /** The currency the books are kept in. Carried here because every page that
+   *  shows a student money needs it and none of them should be guessing: an
+   *  amount rendered against the wrong currency is a figure somebody acts on. */
+  functionalCurrency: string;
   /** The host the request arrived on, normalised. */
   host: string;
   /** True when that host is the one the site advertises. */
@@ -127,6 +131,7 @@ export async function resolveTenantByHost(
             slug: true,
             nameAr: true,
             nameEn: true,
+            functionalCurrency: true,
             isActive: true,
             domains: {
               where: { isCanonical: true },
@@ -148,6 +153,7 @@ export async function resolveTenantByHost(
       slug: row.tenant.slug,
       nameAr: row.tenant.nameAr,
       nameEn: row.tenant.nameEn,
+      functionalCurrency: row.tenant.functionalCurrency.trim(),
       host: row.host,
       isCanonical: row.isCanonical,
       canonicalHost: row.tenant.domains[0]?.host ?? null,

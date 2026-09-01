@@ -489,6 +489,28 @@
       "noHistory": "No examination on file.",
       "superseded": "Superseded",
       "current": "Current"
+    },
+    "portalAccess": {
+      "title": "Portal access",
+      "none": "Nobody can see this student's account in the portal.",
+      "who": "Who",
+      "kind": "Account type",
+      "state": "State",
+      "lastSignIn": "Last signed in",
+      "active": "Active",
+      "withdraw": "Withdraw",
+      "withdrawnOn": "Withdrawn {date}",
+      "cancelInvitation": "Cancel invitation",
+      "invitedUntil": "Invited, expires {date}",
+      "expiredOn": "Invitation expired {date}",
+      "name": "Full name",
+      "email": "Email address",
+      "relationship": "Relationship",
+      "relationshipHint": "Required for a guardian - mother, father, uncle. Leave empty for the student themselves.",
+      "inviteButton": "Issue invitation",
+      "working": "Working...",
+      "codeIssued": "Give this code to the person you invited. It is shown once and cannot be shown again.",
+      "codeHint": "Good until {date}, and can be used once."
     }
   },
   "finance": {
@@ -1669,5 +1691,184 @@
     "registrationNo": "Registration number",
     "status": "Status",
     "footer": "This page is produced by the university's own records at the moment you opened it. It shows no financial information."
+  },
+  "portal": {
+    "footer": "This page shows your own record at the university. If a figure looks wrong, bring this page to the finance office.",
+    "nav": {
+      "overview": "Overview",
+      "account": "Account",
+      "statement": "Statement",
+      "instalments": "Instalments",
+      "registrations": "Registrations",
+      "documents": "Documents",
+      "settings": "Settings",
+      "viewing": "Viewing"
+    },
+    "role": {
+      "STUDENT": "Student",
+      "GUARDIAN": "Guardian"
+    },
+    "signIn": {
+      "heading": "Student and guardian sign-in",
+      "email": "Email address",
+      "password": "Password",
+      "submit": "Sign in",
+      "working": "Signing in…",
+      "haveCode": "Have an invitation code?",
+      "activateLink": "Set up your account",
+      "noCode": "No account yet?",
+      "contactLink": "Ask the registry",
+      "errors": {
+        "invalid": "That email address and password do not match.",
+        "locked": "Too many attempts. Try again in a quarter of an hour.",
+        "inactive": "That account is closed. Ask the registry office.",
+        "noAccess": "This account is not linked to any student. Ask the registry office.",
+        "noSite": "No university is configured at this address."
+      }
+    },
+    "activate": {
+      "heading": "Set up your portal account",
+      "blurb": "The registry office gives you a code when they grant you access. It is good for a fortnight and can be used once.",
+      "code": "Invitation code",
+      "codeHint": "32 characters, from the registry office.",
+      "checkCode": "Continue",
+      "working": "Working…",
+      "for": "Account for {name}",
+      "student": "Access to the record of {name}",
+      "existingPassword": "Your existing password",
+      "newPassword": "Choose a password",
+      "passwordHint": "At least 12 characters, with an upper-case letter, a lower-case letter and a digit.",
+      "confirm": "Type it again",
+      "finish": "Finish",
+      "errors": {
+        "badCode": "That code is not valid. It may have expired or already been used.",
+        "needPassword": "Enter a password.",
+        "mismatch": "The two passwords are not the same.",
+        "weak": "That password does not meet the policy.",
+        "rejected": "That could not be completed.",
+        "failed": "Something went wrong. Try again.",
+        "noSite": "No university is configured at this address."
+      }
+    },
+    "overview": {
+      "blocked": "You cannot register at the moment",
+      "clearedBy": "Cleared by: {role}",
+      "owed": "You owe",
+      "charged": "Billed",
+      "settled": "Paid",
+      "credit": "Credit held",
+      "nextDue": "Next payment due",
+      "overdue": "Past its date",
+      "noSchedule": "No instalment plan on your account.",
+      "registration": "Latest registration",
+      "noRegistration": "You have not registered for a term yet.",
+      "documentsDone": "Every required document is on file.",
+      "documentsOutstanding": "Still needed:",
+      "seeDocuments": "See the checklist",
+      "application": "Your application",
+      "noApplication": "No application is linked to your record."
+    },
+    "account": {
+      "summary": "Where your account stands",
+      "howToPay": "Payment online is not available yet. Pay at the cashier's office or by the bank transfer details the finance office gives you, and quote your student number.",
+      "charges": "What you have been billed",
+      "noCharges": "Nothing has been billed to your account.",
+      "receipts": "What you have paid",
+      "noReceipts": "No payments have been recorded.",
+      "date": "Date",
+      "fee": "Fee",
+      "gross": "Gross",
+      "discount": "Discount",
+      "sponsored": "Sponsor pays",
+      "yours": "You pay",
+      "outstanding": "Outstanding",
+      "reversed": "Reversed",
+      "receiptNo": "Receipt no.",
+      "channel": "Paid by",
+      "amount": "Amount",
+      "state": "State",
+      "cancelled": "Cancelled",
+      "dishonoured": "Cheque returned",
+      "received": "Received"
+    },
+    "statement": {
+      "title": "Statement of account",
+      "date": "Date",
+      "detail": "Detail",
+      "reference": "Reference",
+      "debit": "Debit",
+      "credit": "Credit",
+      "balance": "Balance",
+      "opening": "Opening balance",
+      "closing": "Closing balance",
+      "empty": "There is nothing on your account for this period.",
+      "range": "Period",
+      "printedOn": "Printed"
+    },
+    "statementKind": {
+      "CHARGE": "Billed",
+      "RECEIPT": "Paid",
+      "REVERSAL": "Bill reversed",
+      "CANCELLATION": "Receipt cancelled",
+      "DISHONOUR": "Cheque returned"
+    },
+    "instalments": {
+      "position": "Where you stand today",
+      "overdueNow": "Overdue now",
+      "daysOverdue": "Days overdue",
+      "behind": "Some of what was scheduled has not reached the university. Settle it or agree a revised plan with the finance office.",
+      "notBehind": "A date that has passed does not mean money is owed. Nothing on your account is overdue.",
+      "noPlan": "There is no instalment plan on your account. The whole balance is payable as billed.",
+      "plan": "Payment plan",
+      "seq": "No.",
+      "due": "Due",
+      "datePassedOwing": "Overdue",
+      "datePassedPaid": "Date passed, settled",
+      "upcoming": "Upcoming"
+    },
+    "registrations": {
+      "none": "You have not registered for a term yet.",
+      "no": "Registration no.",
+      "term": "Term",
+      "level": "Level",
+      "net": "Net fees",
+      "card": "Card",
+      "cardHint": "This is the same card the registry office issues. Whoever it is shown to can check it by the code on it."
+    },
+    "documents": {
+      "outstanding": "Some required documents are still missing or need renewing.",
+      "none": "Your programme does not list any required documents.",
+      "document": "Document",
+      "required": "Required",
+      "mandatory": "Required",
+      "optional": "Optional",
+      "expires": "Expires",
+      "howToSubmit": "Documents cannot be uploaded here yet. Bring the originals to the registry office, where they will be copied and verified."
+    },
+    "settings": {
+      "title": "Your account",
+      "account": "Sign-in details",
+      "name": "Name",
+      "email": "Email address",
+      "kind": "Account type",
+      "students": "Students you can see",
+      "accessNote": "Access is granted and withdrawn by the registry office. Ask them if this list is wrong.",
+      "password": "Password",
+      "current": "Current password",
+      "newPassword": "New password",
+      "confirm": "Type it again",
+      "change": "Change password",
+      "changed": "Your password has been changed. Any other device signed in to this account has been signed out.",
+      "working": "Working…",
+      "signOut": "Sign out",
+      "errors": {
+        "noSite": "No university is configured at this address.",
+        "signedOut": "Your session has ended. Sign in again.",
+        "mismatch": "The two passwords are not the same.",
+        "weak": "That password does not meet the policy.",
+        "rejected": "That could not be completed.",
+        "failed": "Something went wrong. Try again."
+      }
+    }
   }
 }

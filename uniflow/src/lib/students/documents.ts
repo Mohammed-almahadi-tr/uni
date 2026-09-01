@@ -1,6 +1,6 @@
 import 'server-only';
 import type { DocumentState } from '@/generated/prisma/enums';
-import { withTenant } from '@/lib/db/client';
+import { withTenant, type Tx } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { toDateOnly } from '@/lib/ledger/period';
@@ -446,86 +446,104 @@ export async function documentChecklist(
 ): Promise<Checklist> {
   requirePermission(principal, 'student.read');
 
+  return withTenant(principal.tenantId, (tx) =>
+    buildChecklist(tx, principal.tenantId, studentId, asOf),
+  );
+}
+
+/**
+ * The same checklist, inside a transaction the caller already holds.
+ *
+ * The student portal (C3) shows it to the person who has to go and find the
+ * documents, which is the audience it was always for — B3 built it for a
+ * registrar chasing them. Shared rather than reimplemented, so a student is
+ * never told they are missing a different set of papers than the registry
+ * office is chasing them for.
+ */
+export async function buildChecklist(
+  tx: Tx,
+  tenantId: string,
+  studentId: string,
+  asOf: Date = new Date(),
+): Promise<Checklist> {
   const today = toDateOnly(asOf);
 
-  return withTenant(principal.tenantId, async (tx) => {
-    const student = await tx.student.findUnique({
-      where: { id: studentId },
-      select: { tenantId: true, programmeId: true },
-    });
-    if (!student || student.tenantId !== principal.tenantId) {
-      throw new DocumentError('Student not found in this tenant.');
-    }
-
-    const requirements = student.programmeId
-      ? await tx.programmeDocumentRequirement.findMany({
-          where: { tenantId: principal.tenantId, programmeId: student.programmeId },
-          select: { documentTypeId: true, isMandatory: true },
-        })
-      : [];
-
-    const documents = await tx.studentDocument.findMany({
-      where: { tenantId: principal.tenantId, studentId, supersededAt: null },
-      select: {
-        id: true,
-        documentTypeId: true,
-        fileName: true,
-        state: true,
-        expiresOn: true,
-        rejectionReason: true,
-      },
-    });
-
-    // Every required type, plus any type the student has uploaded that the
-    // programme does not require — a document on file that nothing asks for is
-    // still a document on file, and hiding it is how it gets uploaded twice.
-    const typeIds = new Set<string>([
-      ...requirements.map((r) => r.documentTypeId),
-      ...documents.map((d) => d.documentTypeId),
-    ]);
-    if (typeIds.size === 0) return { rows: [], satisfied: true, outstanding: [] };
-
-    const types = await tx.documentType.findMany({
-      where: { tenantId: principal.tenantId, id: { in: [...typeIds] } },
-      select: { id: true, code: true, nameAr: true, nameEn: true, sortOrder: true },
-      orderBy: { sortOrder: 'asc' },
-    });
-
-    const mandatory = new Map(requirements.map((r) => [r.documentTypeId, r.isMandatory]));
-    const byType = new Map(documents.map((d) => [d.documentTypeId, d]));
-
-    const rows: ChecklistRow[] = types.map((t) => {
-      const doc = byType.get(t.id);
-      let state: ChecklistState = 'MISSING';
-      if (doc) {
-        if (doc.expiresOn && doc.expiresOn.getTime() < today.getTime()) {
-          state = 'EXPIRED';
-        } else {
-          state = doc.state;
-        }
-      }
-      return {
-        documentTypeId: t.id,
-        code: t.code,
-        nameAr: t.nameAr,
-        nameEn: t.nameEn,
-        // A type the student uploaded that the programme does not list is not
-        // mandatory; it is simply present.
-        isMandatory: mandatory.get(t.id) ?? false,
-        state,
-        documentId: doc?.id ?? null,
-        fileName: doc?.fileName ?? null,
-        expiresOn: doc?.expiresOn ?? null,
-        rejectionReason: doc?.rejectionReason ?? null,
-      };
-    });
-
-    const outstanding = rows
-      .filter((r) => r.isMandatory && r.state !== 'VERIFIED')
-      .map((r) => r.nameEn);
-
-    return { rows, satisfied: outstanding.length === 0, outstanding };
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { tenantId: true, programmeId: true },
   });
+  if (!student || student.tenantId !== tenantId) {
+    throw new DocumentError('Student not found in this tenant.');
+  }
+
+  const requirements = student.programmeId
+    ? await tx.programmeDocumentRequirement.findMany({
+        where: { tenantId: tenantId, programmeId: student.programmeId },
+        select: { documentTypeId: true, isMandatory: true },
+      })
+    : [];
+
+  const documents = await tx.studentDocument.findMany({
+    where: { tenantId: tenantId, studentId, supersededAt: null },
+    select: {
+      id: true,
+      documentTypeId: true,
+      fileName: true,
+      state: true,
+      expiresOn: true,
+      rejectionReason: true,
+    },
+  });
+
+  // Every required type, plus any type the student has uploaded that the
+  // programme does not require — a document on file that nothing asks for is
+  // still a document on file, and hiding it is how it gets uploaded twice.
+  const typeIds = new Set<string>([
+    ...requirements.map((r) => r.documentTypeId),
+    ...documents.map((d) => d.documentTypeId),
+  ]);
+  if (typeIds.size === 0) return { rows: [], satisfied: true, outstanding: [] };
+
+  const types = await tx.documentType.findMany({
+    where: { tenantId: tenantId, id: { in: [...typeIds] } },
+    select: { id: true, code: true, nameAr: true, nameEn: true, sortOrder: true },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  const mandatory = new Map(requirements.map((r) => [r.documentTypeId, r.isMandatory]));
+  const byType = new Map(documents.map((d) => [d.documentTypeId, d]));
+
+  const rows: ChecklistRow[] = types.map((t) => {
+    const doc = byType.get(t.id);
+    let state: ChecklistState = 'MISSING';
+    if (doc) {
+      if (doc.expiresOn && doc.expiresOn.getTime() < today.getTime()) {
+        state = 'EXPIRED';
+      } else {
+        state = doc.state;
+      }
+    }
+    return {
+      documentTypeId: t.id,
+      code: t.code,
+      nameAr: t.nameAr,
+      nameEn: t.nameEn,
+      // A type the student uploaded that the programme does not list is not
+      // mandatory; it is simply present.
+      isMandatory: mandatory.get(t.id) ?? false,
+      state,
+      documentId: doc?.id ?? null,
+      fileName: doc?.fileName ?? null,
+      expiresOn: doc?.expiresOn ?? null,
+      rejectionReason: doc?.rejectionReason ?? null,
+    };
+  });
+
+  const outstanding = rows
+    .filter((r) => r.isMandatory && r.state !== 'VERIFIED')
+    .map((r) => r.nameEn);
+
+  return { rows, satisfied: outstanding.length === 0, outstanding };
 }
 
 export interface ExpiringDocument {

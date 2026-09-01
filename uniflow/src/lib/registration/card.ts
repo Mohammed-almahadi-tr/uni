@@ -1,5 +1,5 @@
 import 'server-only';
-import { withTenant, withSystem } from '@/lib/db/client';
+import { withTenant, withSystem, type Tx } from '@/lib/db/client';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { RegistrationError } from './engine';
 import type { RegistrationStatus } from '@/generated/prisma/enums';
@@ -67,97 +67,131 @@ export async function registrationCard(
 ): Promise<RegistrationCard> {
   requirePermission(principal, 'registration.read');
 
-  return withTenant(principal.tenantId, async (tx) => {
-    const reg = await tx.semesterRegistration.findUnique({
-      where: { id: registrationId },
-      select: {
-        id: true,
-        tenantId: true,
-        registrationNo: true,
-        status: true,
-        levelYear: true,
-        registrationDate: true,
-        currency: true,
-        grossAmount: true,
-        discountAmount: true,
-        netAmount: true,
-        verifyToken: true,
-        student: {
-          select: { studentNo: true, fullNameAr: true, fullNameEn: true },
-        },
-        programme: {
-          select: {
-            nameAr: true,
-            nameEn: true,
-            faculty: { select: { nameAr: true, nameEn: true } },
-          },
-        },
-        batch: { select: { nameEn: true } },
-        academicYear: { select: { code: true } },
-        academicTerm: { select: { nameAr: true, nameEn: true } },
-      },
-    });
-    if (!reg || reg.tenantId !== principal.tenantId) {
-      throw new RegistrationError('That registration does not belong to this university.');
-    }
+  return withTenant(principal.tenantId, (tx) =>
+    buildRegistrationCard(tx, principal.tenantId, registrationId),
+  );
+}
 
-    // The logo comes from tenant_branding (C1), not from a second column on
-    // the tenant row. One logo, one place it is set, one place it is read.
-    const tenant = await tx.tenant.findUniqueOrThrow({
-      where: { id: principal.tenantId },
+/** The university's identity as it appears on the card. */
+export interface CardUniversity {
+  nameAr: string;
+  nameEn: string;
+  logoUrl: string | null;
+}
+
+/**
+ * The card itself, inside a transaction the caller already holds.
+ *
+ * `university` exists because the student portal (C3) calls this from a
+ * `withPortal` transaction, which is refused the `tenants` table — the row
+ * carries the institution's own policy figures, and a student's confinement
+ * has no business including them. The portal has already loaded the
+ * letterhead it is going to print on, under `withTenant`, so it passes the
+ * name and logo in rather than the transaction reading them again from a
+ * table it should not see. Staff callers omit it and the row is read as
+ * before.
+ */
+export async function buildRegistrationCard(
+  tx: Tx,
+  tenantId: string,
+  registrationId: string,
+  university?: CardUniversity,
+): Promise<RegistrationCard> {
+  const reg = await tx.semesterRegistration.findUnique({
+    where: { id: registrationId },
+    select: {
+      id: true,
+      tenantId: true,
+      registrationNo: true,
+      status: true,
+      levelYear: true,
+      registrationDate: true,
+      currency: true,
+      grossAmount: true,
+      discountAmount: true,
+      netAmount: true,
+      verifyToken: true,
+      student: {
+        select: { studentNo: true, fullNameAr: true, fullNameEn: true },
+      },
+      programme: {
+        select: {
+          nameAr: true,
+          nameEn: true,
+          faculty: { select: { nameAr: true, nameEn: true } },
+        },
+      },
+      batch: { select: { nameEn: true } },
+      academicYear: { select: { code: true } },
+      academicTerm: { select: { nameAr: true, nameEn: true } },
+    },
+  });
+  if (!reg || reg.tenantId !== tenantId) {
+    throw new RegistrationError('That registration does not belong to this university.');
+  }
+
+  // The logo comes from tenant_branding (C1), not from a second column on
+  // the tenant row. One logo, one place it is set, one place it is read.
+  let tenant: CardUniversity;
+  if (university) {
+    tenant = university;
+  } else {
+    const row = await tx.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
       select: { nameAr: true, nameEn: true, branding: { select: { logoUrl: true } } },
     });
-
-    const lines = await tx.registrationLine.findMany({
-      where: { registrationId: reg.id },
-      orderBy: { sortOrder: 'asc' },
-      select: {
-        netAmount: true,
-        feeItem: { select: { code: true, nameAr: true, nameEn: true } },
-      },
-    });
-
-    return {
-      registrationNo: reg.registrationNo,
-      status: reg.status,
-      issuedOn: reg.registrationDate.toISOString().slice(0, 10),
-      university: {
-        nameAr: tenant.nameAr,
-        nameEn: tenant.nameEn,
-        logoUrl: tenant.branding?.logoUrl ?? null,
-      },
-      student: {
-        studentNo: reg.student.studentNo,
-        nameAr: reg.student.fullNameAr,
-        nameEn: reg.student.fullNameEn,
-        programmeNameAr: reg.programme.nameAr,
-        programmeNameEn: reg.programme.nameEn,
-        facultyNameAr: reg.programme.faculty.nameAr,
-        facultyNameEn: reg.programme.faculty.nameEn,
-        batchNameEn: reg.batch.nameEn,
-      },
-      term: {
-        academicYearCode: reg.academicYear.code,
-        nameAr: reg.academicTerm.nameAr,
-        nameEn: reg.academicTerm.nameEn,
-        levelYear: reg.levelYear,
-      },
-      fees: {
-        currency: reg.currency.trim(),
-        gross: reg.grossAmount.toFixed(4),
-        discount: reg.discountAmount.toFixed(4),
-        net: reg.netAmount.toFixed(4),
-        lines: lines.map((l) => ({
-          code: l.feeItem.code,
-          nameAr: l.feeItem.nameAr,
-          nameEn: l.feeItem.nameEn,
-          net: l.netAmount.toFixed(4),
-        })),
-      },
-      verifyPath: `/verify/registration/${reg.verifyToken}`,
-      verifyToken: reg.verifyToken,
+    tenant = {
+      nameAr: row.nameAr,
+      nameEn: row.nameEn,
+      logoUrl: row.branding?.logoUrl ?? null,
     };
+  }
+
+  const lines = await tx.registrationLine.findMany({
+    where: { registrationId: reg.id },
+    orderBy: { sortOrder: 'asc' },
+    select: {
+      netAmount: true,
+      feeItem: { select: { code: true, nameAr: true, nameEn: true } },
+    },
   });
+
+  return {
+    registrationNo: reg.registrationNo,
+    status: reg.status,
+    issuedOn: reg.registrationDate.toISOString().slice(0, 10),
+    university: tenant,
+    student: {
+      studentNo: reg.student.studentNo,
+      nameAr: reg.student.fullNameAr,
+      nameEn: reg.student.fullNameEn,
+      programmeNameAr: reg.programme.nameAr,
+      programmeNameEn: reg.programme.nameEn,
+      facultyNameAr: reg.programme.faculty.nameAr,
+      facultyNameEn: reg.programme.faculty.nameEn,
+      batchNameEn: reg.batch.nameEn,
+    },
+    term: {
+      academicYearCode: reg.academicYear.code,
+      nameAr: reg.academicTerm.nameAr,
+      nameEn: reg.academicTerm.nameEn,
+      levelYear: reg.levelYear,
+    },
+    fees: {
+      currency: reg.currency.trim(),
+      gross: reg.grossAmount.toFixed(4),
+      discount: reg.discountAmount.toFixed(4),
+      net: reg.netAmount.toFixed(4),
+      lines: lines.map((l) => ({
+        code: l.feeItem.code,
+        nameAr: l.feeItem.nameAr,
+        nameEn: l.feeItem.nameEn,
+        net: l.netAmount.toFixed(4),
+      })),
+    },
+    verifyPath: `/verify/registration/${reg.verifyToken}`,
+    verifyToken: reg.verifyToken,
+  };
 }
 
 /** What a scan of the QR code returns. Deliberately small. */

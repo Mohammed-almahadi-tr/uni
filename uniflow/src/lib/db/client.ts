@@ -11,6 +11,12 @@
  *                               tenant even if the query itself forgets a
  *                               WHERE.
  *
+ *   withPortal(tenantId, studentId, fn)
+ *                             — a signed-in student or guardian. The app role
+ *                               again, plus app.portal_student_id, which a
+ *                               restrictive policy on every table reads: one
+ *                               student's rows, read-only, nothing else.
+ *
  *   withSystem(fn)            — migrations, seeding, tenant provisioning, the
  *                               audit-chain verifier, tests. Connects as the
  *                               owner role, which bypasses RLS by virtue of
@@ -94,6 +100,56 @@ export async function withTenant<T>(
   return client.$transaction(
     async (tx) => {
       await tx.$executeRawUnsafe(`SELECT set_config('app.tenant_id', $1, true)`, tenantId);
+      return fn(tx);
+    },
+    {
+      isolationLevel: options.isolationLevel ?? 'ReadCommitted',
+      timeout: options.timeout ?? 15_000,
+      maxWait: options.maxWait ?? 5_000,
+    },
+  );
+}
+
+/**
+ * Run work on behalf of a signed-in student or guardian (Track C3).
+ *
+ * The same app role and the same tenant confinement as `withTenant`, plus a
+ * second GUC: `app.portal_student_id`. Restrictive policies across every
+ * RLS-enabled table in the database read it, so a transaction opened here can
+ * see one student's rows, the reference data needed to name them, and nothing
+ * else — and can write nothing at all.
+ *
+ * That is the point of it. The portal is the first surface in this system
+ * where an authenticated party reads a record that is not the institution's
+ * own, and "the query remembers to filter by student" is not a boundary: it
+ * is a habit, and a page component added next year does not inherit it. A
+ * forgotten WHERE here returns no rows rather than somebody else's child.
+ *
+ * The caller must already have established that the account may read this
+ * student — see `assertStudentAccess`. That check runs under `withTenant`,
+ * because an account being identified is not yet confined to a student, and
+ * the three portal tables are among those a portal-scoped transaction is
+ * refused.
+ *
+ * SET LOCAL, for the reason at the top of this file: a session-level SET
+ * survives onto the pooled connection the next request gets.
+ */
+export async function withPortal<T>(
+  tenantId: string,
+  studentId: string,
+  fn: (tx: Tx) => Promise<T>,
+  options: TxOptions = {},
+  client: PrismaClient = prisma,
+): Promise<T> {
+  if (!UUID_RE.test(tenantId)) throw new Error(`withPortal: not a uuid: ${tenantId}`);
+  if (!UUID_RE.test(studentId)) throw new Error(`withPortal: not a uuid: ${studentId}`);
+  return client.$transaction(
+    async (tx) => {
+      await tx.$executeRawUnsafe(`SELECT set_config('app.tenant_id', $1, true)`, tenantId);
+      await tx.$executeRawUnsafe(
+        `SELECT set_config('app.portal_student_id', $1, true)`,
+        studentId,
+      );
       return fn(tx);
     },
     {

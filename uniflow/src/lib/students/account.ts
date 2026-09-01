@@ -38,10 +38,21 @@ export async function studentBalance(
 ): Promise<StudentBalance> {
   requirePermission(principal, 'student.read');
 
-  return withTenant(principal.tenantId, (tx) => balanceInTx(tx, principal.tenantId, studentId));
+  return withTenant(principal.tenantId, (tx) => buildBalance(tx, principal.tenantId, studentId));
 }
 
-async function balanceInTx(
+/**
+ * The same figures, inside a transaction the caller already holds.
+ *
+ * Exported because the student portal (C3) needs them under a *different*
+ * confinement: `withPortal` rather than `withTenant`, and against a
+ * relationship rather than a permission. Sharing the arithmetic rather than
+ * the entry point is the pattern this codebase uses wherever two audiences
+ * are owed the same number — a second implementation is a second answer, and
+ * a student reading a different balance than the cashier quotes them is the
+ * argument that follows.
+ */
+export async function buildBalance(
   tx: Tx,
   tenantId: string,
   studentId: string,
@@ -121,198 +132,227 @@ export async function statementOfAccount(
 ): Promise<Statement> {
   requirePermission(principal, 'student.read');
 
-  return withTenant(principal.tenantId, async (tx) => {
-    const { tenantId } = principal;
+  return withTenant(principal.tenantId, (tx) =>
+    buildStatement(tx, principal.tenantId, studentId, range),
+  );
+}
 
-    const student = await tx.student.findUnique({
-      where: { id: studentId },
-      select: { id: true, studentNo: true, fullNameAr: true, fullNameEn: true },
-    });
-    if (!student) throw new Error('Student not found in this tenant.');
+/**
+ * The statement itself, inside a transaction the caller already holds.
+ *
+ * Shared, unchanged, by the staff screen and the student portal — so the
+ * document a student prints at midnight and the one a bursar prints at the
+ * counter are the same document, down to the voucher reference on the
+ * reversal line. A second implementation for the student would be a second
+ * answer, and the argument that follows is about which of them is true.
+ *
+ * It reads `transaction_headers`, which a portal transaction is otherwise
+ * refused. The C3 policy on that table lets one through when a charge or
+ * receipt **the same transaction can already see** points at it, so the
+ * portal reads the vouchers behind its own documents and none of the rest of
+ * the ledger. Narrowing the statement instead — dropping the references for
+ * students — was the first cut, and it dropped the reversal and dishonour
+ * lines with them, because those are dated from the voucher that made them.
+ * A statement that quietly omits the cheque that bounced is worse than one
+ * that names a voucher number the reader ignores.
+ */
+export async function buildStatement(
+  tx: Tx,
+  tenantId: string,
+  studentId: string,
+  range: { from?: Date; to?: Date } = {},
+): Promise<Statement> {
+  const student = await tx.student.findUnique({
+    where: { id: studentId },
+    select: { id: true, studentNo: true, fullNameAr: true, fullNameEn: true },
+  });
+  if (!student) throw new Error('Student not found in this tenant.');
 
-    const from = range.from ? toDateOnly(range.from) : null;
-    const to = range.to ? toDateOnly(range.to) : null;
+  const from = range.from ? toDateOnly(range.from) : null;
+  const to = range.to ? toDateOnly(range.to) : null;
 
-    // Voucher references are looked up in one pass rather than as nested
-    // relations. Three sibling relations on one query makes Prisma's
-    // interpreter fan the loads out concurrently onto the transaction's single
-    // connection — which `pg` currently queues, with a deprecation warning,
-    // and will refuse outright at pg 9. Two extra round trips, fixed in number
-    // whatever the length of the history, are the better trade.
-    const charges = await tx.studentCharge.findMany({
-      where: { tenantId, studentId },
-      orderBy: [{ docDate: 'asc' }, { createdAt: 'asc' }],
-      select: {
-        id: true,
-        docDate: true,
-        netAmount: true,
-        sponsoredAmount: true,
-        reversedAt: true,
-        termLabel: true,
-        postedHeaderId: true,
-        reversalHeaderId: true,
-        feeItem: { select: { nameEn: true, nameAr: true, code: true } },
-      },
-    });
+  // Voucher references are looked up in one pass rather than as nested
+  // relations. Three sibling relations on one query makes Prisma's
+  // interpreter fan the loads out concurrently onto the transaction's single
+  // connection — which `pg` currently queues, with a deprecation warning,
+  // and will refuse outright at pg 9. Two extra round trips, fixed in number
+  // whatever the length of the history, are the better trade.
+  const charges = await tx.studentCharge.findMany({
+    where: { tenantId, studentId },
+    orderBy: [{ docDate: 'asc' }, { createdAt: 'asc' }],
+    select: {
+      id: true,
+      docDate: true,
+      netAmount: true,
+      sponsoredAmount: true,
+      reversedAt: true,
+      termLabel: true,
+      postedHeaderId: true,
+      reversalHeaderId: true,
+      feeItem: { select: { nameEn: true, nameAr: true, code: true } },
+    },
+  });
 
-    const receipts = await tx.studentReceipt.findMany({
-      where: { tenantId, studentId },
-      orderBy: [{ docDate: 'asc' }, { createdAt: 'asc' }],
-      select: {
-        id: true,
-        receiptNo: true,
-        docDate: true,
-        amount: true,
-        channel: true,
-        cancelledAt: true,
-        cancellationHeaderId: true,
-        dishonouredAt: true,
-        dishonourHeaderId: true,
-      },
-    });
+  const receipts = await tx.studentReceipt.findMany({
+    where: { tenantId, studentId },
+    orderBy: [{ docDate: 'asc' }, { createdAt: 'asc' }],
+    select: {
+      id: true,
+      receiptNo: true,
+      docDate: true,
+      amount: true,
+      channel: true,
+      cancelledAt: true,
+      cancellationHeaderId: true,
+      dishonouredAt: true,
+      dishonourHeaderId: true,
+    },
+  });
 
-    const headerIds = [
-      ...new Set(
-        [
-          ...charges.map((c) => c.postedHeaderId),
-          ...charges.map((c) => c.reversalHeaderId),
-          ...receipts.map((r) => r.cancellationHeaderId),
-          ...receipts.map((r) => r.dishonourHeaderId),
-        ].filter((id): id is string => id !== null),
-      ),
-    ];
-    const headers = await tx.transactionHeader.findMany({
-      where: { id: { in: headerIds } },
-      select: { id: true, voucherRef: true, docDate: true },
-    });
-    const headerById = new Map(headers.map((h) => [h.id, h]));
+  const headerIds = [
+    ...new Set(
+      [
+        ...charges.map((c) => c.postedHeaderId),
+        ...charges.map((c) => c.reversalHeaderId),
+        ...receipts.map((r) => r.cancellationHeaderId),
+        ...receipts.map((r) => r.dishonourHeaderId),
+      ].filter((id): id is string => id !== null),
+    ),
+  ];
+  const headers =
+    headerIds.length === 0
+      ? []
+      : await tx.transactionHeader.findMany({
+          where: { id: { in: headerIds } },
+          select: { id: true, voucherRef: true, docDate: true },
+        });
+  const headerById = new Map(headers.map((h) => [h.id, h]));
 
-    type Event = { date: Date; order: number; line: Omit<StatementLine, 'runningBalance'> };
-    const events: Event[] = [];
+  type Event = { date: Date; order: number; line: Omit<StatementLine, 'runningBalance'> };
+  const events: Event[] = [];
 
-    for (const c of charges) {
-      // A student's statement shows what the student personally owes
-      // (REQ-SPN-02). Where a sponsor carries part of a charge, the statement
-      // says so on the line rather than billing the student for it and
-      // leaving them to work out that somebody else is paying.
-      const studentPortion = c.netAmount.minus(c.sponsoredAmount);
-      const sponsorNote = c.sponsoredAmount.isZero()
-        ? ''
-        : ` (${c.sponsoredAmount.toFixed(2)} sponsored)`;
+  for (const c of charges) {
+    // A student's statement shows what the student personally owes
+    // (REQ-SPN-02). Where a sponsor carries part of a charge, the statement
+    // says so on the line rather than billing the student for it and
+    // leaving them to work out that somebody else is paying.
+    const studentPortion = c.netAmount.minus(c.sponsoredAmount);
+    const sponsorNote = c.sponsoredAmount.isZero()
+      ? ''
+      : ` (${c.sponsoredAmount.toFixed(2)} sponsored)`;
 
-      events.push({
+    events.push({
+      date: c.docDate,
+      order: 0,
+      line: {
         date: c.docDate,
-        order: 0,
+        kind: 'CHARGE',
+        reference: headerById.get(c.postedHeaderId)?.voucherRef ?? '',
+        description:
+          `${c.feeItem.nameEn}${c.termLabel ? ` — ${c.termLabel}` : ''}${sponsorNote}`,
+        debit: studentPortion.toFixed(4),
+        credit: '0.0000',
+      },
+    });
+
+    const reversal = c.reversalHeaderId ? headerById.get(c.reversalHeaderId) : undefined;
+    if (c.reversedAt && reversal) {
+      events.push({
+        date: reversal.docDate,
+        order: 2,
         line: {
-          date: c.docDate,
-          kind: 'CHARGE',
-          reference: headerById.get(c.postedHeaderId)?.voucherRef ?? '',
-          description:
-            `${c.feeItem.nameEn}${c.termLabel ? ` — ${c.termLabel}` : ''}${sponsorNote}`,
-          debit: studentPortion.toFixed(4),
+          date: reversal.docDate,
+          kind: 'REVERSAL',
+          reference: reversal.voucherRef,
+          description: `Reversal of ${c.feeItem.nameEn}`,
+          debit: '0.0000',
+          credit: studentPortion.toFixed(4),
+        },
+      });
+    }
+  }
+
+  for (const r of receipts) {
+    events.push({
+      date: r.docDate,
+      order: 1,
+      line: {
+        date: r.docDate,
+        kind: 'RECEIPT',
+        reference: r.receiptNo,
+        description: `Payment received (${r.channel.toLowerCase().replace('_', ' ')})`,
+        debit: '0.0000',
+        credit: r.amount.toFixed(4),
+      },
+    });
+    const dishonour = r.dishonourHeaderId ? headerById.get(r.dishonourHeaderId) : undefined;
+    if (r.dishonouredAt && dishonour) {
+      events.push({
+        date: dishonour.docDate,
+        order: 3,
+        line: {
+          date: dishonour.docDate,
+          kind: 'DISHONOUR',
+          reference: dishonour.voucherRef,
+          description: `Cheque behind receipt ${r.receiptNo} returned unpaid`,
+          debit: r.amount.toFixed(4),
           credit: '0.0000',
         },
       });
-
-      const reversal = c.reversalHeaderId ? headerById.get(c.reversalHeaderId) : undefined;
-      if (c.reversedAt && reversal) {
-        events.push({
-          date: reversal.docDate,
-          order: 2,
-          line: {
-            date: reversal.docDate,
-            kind: 'REVERSAL',
-            reference: reversal.voucherRef,
-            description: `Reversal of ${c.feeItem.nameEn}`,
-            debit: '0.0000',
-            credit: studentPortion.toFixed(4),
-          },
-        });
-      }
     }
 
-    for (const r of receipts) {
+    const cancellation = r.cancellationHeaderId
+      ? headerById.get(r.cancellationHeaderId)
+      : undefined;
+    if (r.cancelledAt && cancellation) {
       events.push({
-        date: r.docDate,
-        order: 1,
+        date: cancellation.docDate,
+        order: 3,
         line: {
-          date: r.docDate,
-          kind: 'RECEIPT',
-          reference: r.receiptNo,
-          description: `Payment received (${r.channel.toLowerCase().replace('_', ' ')})`,
-          debit: '0.0000',
-          credit: r.amount.toFixed(4),
+          date: cancellation.docDate,
+          kind: 'CANCELLATION',
+          reference: cancellation.voucherRef,
+          description: `Receipt ${r.receiptNo} cancelled`,
+          debit: r.amount.toFixed(4),
+          credit: '0.0000',
         },
       });
-      const dishonour = r.dishonourHeaderId ? headerById.get(r.dishonourHeaderId) : undefined;
-      if (r.dishonouredAt && dishonour) {
-        events.push({
-          date: dishonour.docDate,
-          order: 3,
-          line: {
-            date: dishonour.docDate,
-            kind: 'DISHONOUR',
-            reference: dishonour.voucherRef,
-            description: `Cheque behind receipt ${r.receiptNo} returned unpaid`,
-            debit: r.amount.toFixed(4),
-            credit: '0.0000',
-          },
-        });
-      }
-
-      const cancellation = r.cancellationHeaderId
-        ? headerById.get(r.cancellationHeaderId)
-        : undefined;
-      if (r.cancelledAt && cancellation) {
-        events.push({
-          date: cancellation.docDate,
-          order: 3,
-          line: {
-            date: cancellation.docDate,
-            kind: 'CANCELLATION',
-            reference: cancellation.voucherRef,
-            description: `Receipt ${r.receiptNo} cancelled`,
-            debit: r.amount.toFixed(4),
-            credit: '0.0000',
-          },
-        });
-      }
     }
+  }
 
-    events.sort(
-      (a, b) => a.date.getTime() - b.date.getTime() || a.order - b.order,
-    );
+  events.sort(
+    (a, b) => a.date.getTime() - b.date.getTime() || a.order - b.order,
+  );
 
-    let running = ZERO;
-    let opening = ZERO;
-    const lines: StatementLine[] = [];
+  let running = ZERO;
+  let opening = ZERO;
+  const lines: StatementLine[] = [];
 
-    for (const e of events) {
-      const delta = toStorage(e.line.debit).minus(toStorage(e.line.credit));
-      if (from && e.date < from) {
-        // Before the window: folded into the opening figure rather than shown.
-        opening = opening.plus(delta);
-        running = opening;
-        continue;
-      }
-      if (to && e.date > to) continue;
-
-      running = running.plus(delta);
-      lines.push({ ...e.line, runningBalance: running.toFixed(4) });
+  for (const e of events) {
+    const delta = toStorage(e.line.debit).minus(toStorage(e.line.credit));
+    if (from && e.date < from) {
+      // Before the window: folded into the opening figure rather than shown.
+      opening = opening.plus(delta);
+      running = opening;
+      continue;
     }
+    if (to && e.date > to) continue;
 
-    return {
-      studentId: student.id,
-      studentNo: student.studentNo,
-      fullNameAr: student.fullNameAr,
-      fullNameEn: student.fullNameEn,
-      from,
-      to,
-      openingBalance: opening.toFixed(4),
-      lines,
-      closingBalance: running.toFixed(4),
-    };
-  });
+    running = running.plus(delta);
+    lines.push({ ...e.line, runningBalance: running.toFixed(4) });
+  }
+
+  return {
+    studentId: student.id,
+    studentNo: student.studentNo,
+    fullNameAr: student.fullNameAr,
+    fullNameEn: student.fullNameEn,
+    from,
+    to,
+    openingBalance: opening.toFixed(4),
+    lines,
+    closingBalance: running.toFixed(4),
+  };
 }
 
 export interface AgingBucket {

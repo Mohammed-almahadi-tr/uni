@@ -3,7 +3,7 @@ import { withTenant, type Tx } from '@/lib/db/client';
 import { audit } from '@/lib/audit/log';
 import { requirePermission, type Principal } from '@/lib/auth/rbac';
 import { toDateOnly } from '@/lib/ledger/period';
-import { sum, toStorage, ZERO, type Money } from '@/lib/money';
+import { sum, toStorage, ZERO, type Money, type MoneyInput } from '@/lib/money';
 import type { HoldType } from '@/generated/prisma/enums';
 
 /**
@@ -388,11 +388,25 @@ export async function arrearsInTx(
  * Returns them all rather than the first, so a registrar can tell the student
  * everything they have to fix in one conversation instead of three.
  */
+export interface ArrearsPolicy {
+  arrearsGraceDays: number;
+  arrearsBlockThreshold: MoneyInput;
+}
+
 export async function blockingHoldsInTx(
   tx: Tx,
   tenantId: string,
   studentId: string,
   asOfDate: Date,
+  /**
+   * The tenant's arrears thresholds, when the caller has already read them.
+   *
+   * The student portal (C3) has: its confined transaction is refused the
+   * `tenants` row, which carries the institution's own policy figures, so it
+   * loads them under `withTenant` and passes them in. Every other caller
+   * omits this and the row is read here as before.
+   */
+  policy?: ArrearsPolicy,
 ): Promise<BlockingHold[]> {
   const asOf = toDateOnly(asOfDate);
 
@@ -422,14 +436,16 @@ export async function blockingHoldsInTx(
     clearanceRoleName: h.clearanceRole?.name ?? null,
   }));
 
-  const tenant = await tx.tenant.findUniqueOrThrow({
-    where: { id: tenantId },
-    select: { arrearsGraceDays: true, arrearsBlockThreshold: true },
-  });
+  const tenant =
+    policy ??
+    (await tx.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { arrearsGraceDays: true, arrearsBlockThreshold: true },
+    }));
 
   const arrears = await arrearsInTx(tx, tenantId, studentId, asOf);
   const overdue = toStorage(arrears.overdue);
-  const threshold = tenant.arrearsBlockThreshold;
+  const threshold = toStorage(tenant.arrearsBlockThreshold);
 
   if (
     overdue.greaterThan(0) &&

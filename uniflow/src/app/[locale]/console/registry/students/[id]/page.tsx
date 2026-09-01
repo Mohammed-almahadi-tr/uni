@@ -24,6 +24,9 @@ import {
   WarningBanner,
 } from '@/components/console/ui';
 import { StudentStrip } from '@/components/console/student-strip';
+import { listPortalAccess } from '@/lib/portal/account';
+import { can } from '@/lib/auth/rbac';
+import { PortalAccessPanel } from './portal-access';
 
 export async function generateMetadata({
   params,
@@ -71,12 +74,13 @@ export default async function StudentProfile({
   const t = await getTranslations('registry');
   const p = await getTranslations('print');
   const rp = await getTranslations('reports');
-  const [balance, holds, blocks, history, registrations] = await Promise.all([
+  const [balance, holds, blocks, history, registrations, portal] = await Promise.all([
     studentBalance(principal, id),
     listHolds(principal, id, { includeCleared: true }),
     registrationBlocks(principal, id),
     statusHistory(principal, id),
     listRegistrations(principal, { studentId: id }),
+    listPortalAccess(principal, id),
   ]);
 
   const currency = registrations[0]?.currency ?? 'SDG';
@@ -307,6 +311,34 @@ export default async function StudentProfile({
               </tbody>
             </Table>
           </TableWrap>
+        )}
+      </Panel>
+
+      {/* Who can see this student's account in the portal (C3). Read by
+          anybody who may read the student; changed only by `student.manage`,
+          which is what the panel's own actions demand — so a reader sees the
+          list and cannot alter it. */}
+      <Panel title={t('portalAccess.title')}>
+        {can(principal, 'student.manage') ? (
+          <PortalAccessPanel
+            studentId={id}
+            access={portal.access}
+            pending={portal.pending}
+          />
+        ) : portal.access.length === 0 && portal.pending.length === 0 ? (
+          <Empty>{t('portalAccess.none')}</Empty>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {portal.access.map((a) => (
+              <li key={a.accessId} className={a.revokedAt ? 'text-muted-foreground' : ''}>
+                <span className={a.revokedAt ? 'line-through' : undefined}>{a.fullName}</span>
+                <span className="text-xs text-muted-foreground" dir="ltr">
+                  {' '}
+                  {a.email}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </Panel>
 
