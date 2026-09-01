@@ -18,7 +18,10 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "db:roles": "node scripts/bootstrap-role.mjs",
-    "db:check-roles": "node scripts/check-roles.mjs"
+    "db:check-roles": "node scripts/check-roles.mjs",
+    "seed:demo": "tsx --conditions=react-server scripts/seed-demo.ts",
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:buttons": "node scripts/press-buttons.mjs"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.1.0",

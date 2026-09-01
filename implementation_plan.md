@@ -33,7 +33,7 @@ application lives in [`uniflow/`](uniflow/); see
 [`uniflow/README.md`](uniflow/README.md) for setup and the Supabase deployment
 path.
 
-**1,038 tests pass across 27 suites; typecheck, lint and production build are
+**1,040 tests pass across 28 suites; typecheck, lint and production build are
 all clean.** Every item §4.1-§4.10 is built and verified.
 
 **Track D is complete, D1-D5.** Every screen the console declares exists, and
@@ -2381,7 +2381,7 @@ passed a row the commit then refused — a registrar told their spreadsheet was
 clean, finding out halfway through a roster of four hundred. The preview now
 enforces the same bound, which is the whole value of having a dry run.
 
-#### One defect found while building
+#### Two defects found while building
 
 **An absent id was read as no filter at all.** `assertBelongs` checked the
 admission category with `findFirst({ where: { id: input.admissionCategoryId } })`,
@@ -2416,6 +2416,13 @@ not exist, which is the accident worth having.
 - **Withdrawing an application from the public side.** `withdrawApplication`
   exists and is staff-only. An applicant who wants to withdraw telephones,
   which is what the status page tells them.
+
+**And one found later, from C3.** Both of this phase's action files exported
+their initial `useActionState` value, which a `'use server'` module may not
+do — so every submission of the application wizard and the status lookup
+returned 500 from the day they were written. Nothing in this repository could
+see it until somebody started the application and pressed the button. Recorded
+in full under C3, with the structural test that now prevents it.
 
 ### C3 — Student & Guardian Self-Service Portal · complete · **Track C closed**
 
@@ -2519,7 +2526,46 @@ disagreed the student would be right to believe neither.
 | The portal-access panel on `registry/students/[id]` | Who may see this student, who has been invited, and who used to be able to. It is a fact *about the student*, and the registrar deciding it is looking at their record |
 | The account page lists who else can read it | A student should be able to see that somebody else has access. There is no control here to grant or withdraw it — that is the registry's — but it is not a secret |
 
-#### Two things the first cut got wrong
+#### Three things the first cut got wrong
+
+**Every form in the product returned 500, and nothing in the suite could see
+it.** A `'use server'` file may export **async functions and nothing else**:
+every other export becomes a server reference, and Next refuses the entire
+module — *"A "use server" file can only export async functions, found
+object."* Six action files exported the initial `useActionState` value beside
+their actions, so the moment anybody pressed a button the page 500'd.
+
+The six were C2's application wizard and status lookup, and all four of C3's:
+sign-in, activation, the password change and the console's portal-access
+panel. **Every public form this product has**, broken from the day each was
+written.
+
+It survived `tsc --noEmit`, `eslint`, `next build` and 1,038 tests, because
+the refusal is raised by Next's server-actions loader at the moment an action
+is *invoked*, and nothing in a unit suite loads a route that way. It was found
+by starting the application and pressing the buttons.
+
+Three things came out of it:
+
+- The initial state now lives in a plain `state.ts` beside each action —
+  one definition, imported by both the action and the component it feeds.
+- `tests/server-actions.test.ts` walks every `'use server'` file on disk and
+  fails on any export that is not an async function, which turns a runtime-only
+  failure into a red test. Types are exempt; they are erased before the loader
+  sees the module.
+- `npm run seed:demo`, `npm run smoke` and `npm run smoke:buttons`. The first
+  builds a demonstration tenant on `localhost` out of the *same*
+  `makeUniversity` the suite uses, so the demonstration cannot drift from what
+  the tests assert. The second walks 55 routes signed out, as a student, as a
+  guardian and as staff. The third reads each form's own
+  progressive-enhancement fields out of the HTML and posts them back, which is
+  precisely what a browser without JavaScript does — so the server runs the
+  same action a click would, and 21 button behaviours are asserted end to end.
+
+The lesson is narrower than "add browser tests": a whole category of failure
+in this framework is invisible to every check that does not go through the
+HTTP surface, and the suite had no member that did.
+
 
 **Denying the portal `transaction_headers` deleted two statement lines.** The
 obvious confinement — the student's own sub-ledger and none of the general

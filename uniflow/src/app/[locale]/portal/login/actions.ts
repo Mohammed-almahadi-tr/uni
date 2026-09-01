@@ -1,5 +1,6 @@
 'use server';
 
+import type { PortalSignInState } from './state';
 import { cookies } from 'next/headers';
 import { currentTenant } from '@/lib/cms/request';
 import { portalLogin } from '@/lib/portal/account';
@@ -21,14 +22,6 @@ import { PORTAL_COOKIE, PORTAL_TTL_SECONDS } from '@/lib/portal/session';
  * the problem. It discloses nothing an attacker does not already have —
  * they would have had to know the password to see it.
  */
-
-export interface PortalSignInState {
-  ok: boolean;
-  /** A key under `portal.signIn.errors`, so the failure is bilingual. */
-  error: 'invalid' | 'locked' | 'inactive' | 'noAccess' | 'noSite' | null;
-}
-
-export const blankSignIn: PortalSignInState = { ok: false, error: null };
 
 const field = (form: FormData, key: string): string => {
   const v = form.get(key);

@@ -1,12 +1,12 @@
 'use server';
 
+import { blankActivate, type ActivateState } from './state';
 import { currentTenant } from '@/lib/cms/request';
 import { WeakPasswordError } from '@/lib/auth/password';
 import {
   acceptInvitation,
   PortalAccountError,
   previewInvitation,
-  type InvitationPreview,
 } from '@/lib/portal/account';
 import { setPortalCookie } from '../login/actions';
 
@@ -31,28 +31,6 @@ import { setPortalCookie } from '../login/actions';
  * Unknown, expired, withdrawn and already accepted all return the same thing.
  * The differences are exactly what somebody guessing codes wants to learn.
  */
-
-export interface ActivateState {
-  step: 'code' | 'password';
-  preview: InvitationPreview | null;
-  /** The code is held across the two steps in the form's own state rather
-   *  than in a cookie: it is a one-time secret, and putting it anywhere
-   *  durable is the thing this flow is avoiding. */
-  code: string;
-  error: string | null;
-  /** Password policy failures, in the words the policy uses. */
-  problems: string[];
-  ok: boolean;
-}
-
-export const blankActivate: ActivateState = {
-  step: 'code',
-  preview: null,
-  code: '',
-  error: null,
-  problems: [],
-  ok: false,
-};
 
 const field = (form: FormData, key: string): string => {
   const v = form.get(key);

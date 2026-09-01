@@ -35,11 +35,41 @@ npm install
 npm run db:start      # real PostgreSQL 17, no Docker, no admin install
 npm run db:roles      # create the non-superuser application role
 npm run db:deploy     # apply migrations
-npm test              # 663 tests
+npm test              # 1,040 tests
 ```
 
 `db:start` stays in the foreground and holds the server. Run it in its own
 terminal.
+
+### Seeing it run
+
+```bash
+npm run seed:demo     # a demonstration university served at localhost
+npm run dev           # http://localhost:3000
+```
+
+`seed:demo` builds the tenant out of the **same** `makeUniversity` the test
+suite uses, so what you click through cannot drift from what the tests assert.
+It claims the host `localhost`, publishes two programmes, opens an application
+window, registers a student and takes a payment, and prints the sign-in
+credentials for the staff console and for the student and guardian portals.
+
+With the server up, two harnesses check it over HTTP:
+
+```bash
+npm run smoke              # 55 routes, signed out and as each kind of user
+npm run smoke:buttons <invitation-code>   # 21 form submissions
+```
+
+`smoke:buttons` reads each form's own progressive-enhancement fields out of
+the HTML and posts them back — which is exactly what a browser with
+JavaScript disabled does — so the server runs the same action a click would.
+It exists because a whole category of failure in this framework is invisible
+to `tsc`, `eslint`, `next build` and the unit suite: a `'use server'` module
+that exports anything but an async function is refused at the moment an
+action is *invoked*, and that once left every form in this product returning
+500 with every other check green. `tests/server-actions.test.ts` now guards
+that specific rule; these two guard the rest of the HTTP surface.
 
 ### Scripts
 
@@ -54,6 +84,9 @@ terminal.
 | `npm run db:deploy` | Apply pending migrations (non-interactive) |
 | `npm test` | Full suite against a throwaway test database |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm run seed:demo` | Build a demonstration tenant on `localhost` and print its credentials |
+| `npm run smoke` | Walk 55 routes against a running dev server |
+| `npm run smoke:buttons` | Submit 21 forms against a running dev server |
 
 ---
 

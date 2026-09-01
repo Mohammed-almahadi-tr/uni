@@ -3,7 +3,8 @@
 import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { blankPassword, changePassword, signOut } from './actions';
+import { changePassword, signOut } from './actions';
+import { blankPassword } from './state';
 
 const field = 'h-11 w-full rounded-md border border-input bg-background px-3 text-sm';
 

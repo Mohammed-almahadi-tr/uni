@@ -4,7 +4,8 @@ import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { AccessRow, PendingInvitation } from '@/lib/portal/account';
 import { Empty, Field, Pill, Select, Table, TableWrap, Td, Th } from '@/components/console/ui';
-import { blankAccess, invite, withdraw } from './actions';
+import { invite, withdraw } from './actions';
+import { blankAccess } from './state';
 
 /**
  * Who can see this student's account, and how somebody comes to (Track C3).

@@ -1,5 +1,6 @@
 'use server';
 
+import { blankApplyState, type ApplyState } from './state';
 import { cookies } from 'next/headers';
 import { currentTenant } from '@/lib/cms/request';
 import { ApplicationError } from '@/lib/admissions/applications';
@@ -36,16 +37,6 @@ import {
  * the message catalogue, and the generic failure stays bilingual like
  * everything else on the page.
  */
-
-export interface ApplyState {
-  error: string | null;
-  /** A catalogue key the client renders, for failures with nothing safe to say. */
-  errorKey: string | null;
-  /** Set on the final step. What the applicant must keep. */
-  receipt: { applicationNo: string; trackingToken: string } | null;
-}
-
-export const blankApplyState: ApplyState = { error: null, errorKey: null, receipt: null };
 
 const str = (f: FormData, k: string): string => {
   const v = f.get(k);

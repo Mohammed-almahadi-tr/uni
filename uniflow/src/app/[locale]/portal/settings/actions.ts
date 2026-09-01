@@ -1,5 +1,6 @@
 'use server';
 
+import { blankPassword, type PasswordState } from './state';
 import { currentTenant } from '@/lib/cms/request';
 import { WeakPasswordError } from '@/lib/auth/password';
 import { currentPortalAccount } from '@/lib/portal/guard';
@@ -17,14 +18,6 @@ import { setPortalCookie, portalSignOut } from '../login/actions';
  * changing your password would log you out of the device you were changing it
  * on, which teaches people not to.
  */
-
-export interface PasswordState {
-  ok: boolean;
-  error: 'noSite' | 'signedOut' | 'mismatch' | 'weak' | 'rejected' | 'failed' | null;
-  problems: string[];
-}
-
-export const blankPassword: PasswordState = { ok: false, error: null, problems: [] };
 
 const field = (form: FormData, key: string): string => {
   const v = form.get(key);

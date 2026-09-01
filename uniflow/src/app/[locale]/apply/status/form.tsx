@@ -4,7 +4,8 @@ import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { TrackedApplication } from '@/lib/admissions/portal';
 import type { Letterhead } from '@/lib/print/sheet';
-import { blankStatusState, lookupApplication } from './actions';
+import { lookupApplication } from './actions';
+import { blankStatusState } from './state';
 import { ApplicationSlip } from './slip';
 
 /**

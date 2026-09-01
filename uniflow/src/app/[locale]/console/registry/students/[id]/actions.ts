@@ -1,5 +1,6 @@
 'use server';
 
+import { blankAccess, type PortalAccessState } from './state';
 import { revalidatePath } from 'next/cache';
 import type { PortalRole } from '@/generated/prisma/enums';
 import { currentContext } from '@/lib/console/session';
@@ -23,24 +24,6 @@ import {
  * distinct permission nobody thinks to grant is a portal nobody can be let
  * into.
  */
-
-export interface PortalAccessState {
-  ok: boolean;
-  error: string | null;
-  /** The invitation code, shown to the registrar **once**, to hand over. It
-   *  is never stored in clear and cannot be shown again — a second look
-   *  means issuing a second invitation, which is the correct amount of
-   *  friction for handing somebody a credential. */
-  code: string | null;
-  expiresAt: string | null;
-}
-
-export const blankAccess: PortalAccessState = {
-  ok: false,
-  error: null,
-  code: null,
-  expiresAt: null,
-};
 
 const field = (form: FormData, key: string): string => {
   const v = form.get(key);

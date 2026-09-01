@@ -1,7 +1,8 @@
 'use server';
 
+import { blankStatusState, type StatusState } from './state';
 import { currentTenant } from '@/lib/cms/request';
-import { trackApplication, type TrackedApplication } from '@/lib/admissions/portal';
+import { trackApplication } from '@/lib/admissions/portal';
 
 /**
  * Checking an application (SRS REQ-LP-04, Track C2).
@@ -22,20 +23,6 @@ import { trackApplication, type TrackedApplication } from '@/lib/admissions/port
  * which half was wrong, an attacker walks the sequential application numbers
  * until one says "wrong token" and knows that application exists.
  */
-
-export interface StatusState {
-  application: TrackedApplication | null;
-  /** A catalogue key the client renders, so the failure is bilingual. */
-  errorKey: string | null;
-  /** Whether a lookup has been attempted at all — an empty form is not a miss. */
-  searched: boolean;
-}
-
-export const blankStatusState: StatusState = {
-  application: null,
-  errorKey: null,
-  searched: false,
-};
 
 export async function lookupApplication(
   _prev: StatusState,

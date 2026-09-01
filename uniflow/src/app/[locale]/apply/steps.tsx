@@ -1,15 +1,15 @@
 'use client';
 
+import { blankApplyState, type ApplyState } from './state';
 import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { OpenBatch } from '@/lib/admissions/portal';
 import type { ApplyStep, DraftFields } from '@/lib/admissions/draft';
+
 import {
-  blankApplyState,
   discardDraft,
   saveStep,
   submitApplication,
-  type ApplyState,
 } from './actions';
 
 /**

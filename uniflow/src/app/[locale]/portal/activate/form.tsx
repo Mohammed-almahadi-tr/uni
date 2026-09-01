@@ -4,7 +4,8 @@ import { useActionState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import type { Locale } from '@/components/site/chrome';
-import { blankActivate, submitActivation } from './actions';
+import { submitActivation } from './actions';
+import { blankActivate } from './state';
 
 const field = 'h-11 w-full rounded-md border border-input bg-background px-3 text-sm';
 

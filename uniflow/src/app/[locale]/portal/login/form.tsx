@@ -3,7 +3,8 @@
 import { useActionState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { blankSignIn, portalSignIn } from './actions';
+import { portalSignIn } from './actions';
+import { blankSignIn } from './state';
 
 const field = 'h-11 w-full rounded-md border border-input bg-background px-3 text-sm';
 
