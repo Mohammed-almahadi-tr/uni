@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import pg from 'pg';
 import { SignJWT } from 'jose';
+import { heading, signIn } from './lib/forms.mjs';
 
 const BASE = 'http://localhost:3000';
 const secret = new TextEncoder().encode(process.env.SESSION_SECRET);
@@ -24,13 +25,6 @@ const tenant = (
     `SELECT t.id FROM tenants t JOIN tenant_domains d ON d.tenant_id = t.id WHERE d.host='localhost'`,
   )
 ).rows[0].id;
-
-const staff = (
-  await c.query(
-    `SELECT id, session_version FROM users WHERE tenant_id=$1 AND email='admin@demo.test'`,
-    [tenant],
-  )
-).rows[0];
 
 const student = (
   await c.query(
@@ -69,19 +63,13 @@ const kids = (
 
 await c.end();
 
-const staffCookie = `uniflow_session=${await mint(
-  { tenantId: tenant, userId: staff.id, mfaVerified: true, version: staff.session_version },
-  'uniflow-app',
-)}`;
-const studentCookie = `uniflow_portal=${await mint(
-  { tenantId: tenant, accountId: student.id, version: student.session_version },
-  'uniflow-portal',
-)}`;
-const parentCookie = `uniflow_portal=${await mint(
-  { tenantId: tenant, accountId: parent.id, version: parent.session_version },
-  'uniflow-portal',
-)}`;
-// A portal token presented at the console, and the reverse.
+// Sessions obtained by signing in, not by minting a token — see lib/forms.mjs.
+const staffCookie = await signIn(BASE, '/en/login', 'admin@demo.test', 'Khartoum2026Demo', 'uniflow_session');
+const studentCookie = await signIn(BASE, '/en/portal/login', 'student@demo.test', 'Khartoum2026Portal', 'uniflow_portal');
+const parentCookie = await signIn(BASE, '/en/portal/login', 'parent@demo.test', 'Khartoum2026Portal', 'uniflow_portal');
+// The one token that still has to be minted: a portal-audience token placed
+// in the console's cookie, which no sign-in would ever produce and which is
+// exactly the thing being tested.
 const crossPortal = `uniflow_session=${await mint(
   { tenantId: tenant, accountId: student.id, version: student.session_version },
   'uniflow-portal',
@@ -110,6 +98,12 @@ async function get(label, path, { cookie, expect: want = 200, contains, absent }
   // A Next error page still returns 200 in dev; catch the digest marker.
   if (body.includes('__next_error__') || /Application error: a server-side/.test(body)) {
     problems.push('rendered an error page');
+  }
+  // The console's refusal screen. Checked on the heading, never on page text:
+  // next-intl ships the whole message catalogue to the client, so its wording
+  // is in the payload of every console page whether or not it is on screen.
+  if (heading(body) === 'Not available to you') {
+    problems.push('refused as not permitted');
   }
   results.push({
     label,

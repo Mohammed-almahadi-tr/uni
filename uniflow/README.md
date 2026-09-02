@@ -54,6 +54,19 @@ It claims the host `localhost`, publishes two programmes, opens an application
 window, registers a student and takes a payment, and prints the sign-in
 credentials for the staff console and for the student and guardian portals.
 
+**Re-running it reuses what is already there** and just prints the
+credentials. `npm run seed:demo -- --fresh` builds a new university instead —
+which *signs out anybody holding a session*, because a session is bound to the
+tenant it was issued for and `localhost` will have moved. If you are suddenly
+bounced back to the sign-in page, that is what happened; signing in again is
+the whole of the fix.
+
+`--fresh` **retires** the old tenant rather than deleting it: the domain is
+detached and `is_active` goes false. It cannot be deleted — the cascade is
+refused by `assert_audit_append_only()`, because the audit log accepts no
+DELETE from anybody, which is a guarantee worth more than a tidy development
+database.
+
 With the server up, two harnesses check it over HTTP:
 
 ```bash
@@ -84,7 +97,7 @@ that specific rule; these two guard the rest of the HTTP surface.
 | `npm run db:deploy` | Apply pending migrations (non-interactive) |
 | `npm test` | Full suite against a throwaway test database |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run seed:demo` | Build a demonstration tenant on `localhost` and print its credentials |
+| `npm run seed:demo` | Print the demonstration tenant's credentials, building it if there is none (`-- --fresh` forces a new one) |
 | `npm run smoke` | Walk 55 routes against a running dev server |
 | `npm run smoke:buttons` | Submit 21 forms against a running dev server |
 

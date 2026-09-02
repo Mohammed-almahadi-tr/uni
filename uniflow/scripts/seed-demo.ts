@@ -12,11 +12,24 @@
  * tests assert against, and the first thing anybody notices on a demonstration
  * is the screen the fixtures never exercised.
  *
- * Run: npx tsx --conditions=react-server scripts/seed-demo.ts
+ * Run: npm run seed:demo
  *
- * It is additive and idempotent only in the sense that it makes a *new*
- * tenant each time; it claims `localhost` for that tenant, so the previous
- * demonstration tenant stops being served.
+ * **Re-running reuses what is already there.** It prints the credentials and
+ * stops. Pass `--fresh` to provision a new university instead.
+ *
+ * The first cut minted a new tenant on every run, and that was wrong in two
+ * ways at once: the database gained a dead university per run, and — worse —
+ * anybody signed in was silently locked out, because a session is bound to
+ * the tenant it was issued for and `localhost` had moved to a different one.
+ * Being signed out by somebody else running a seed script is not a thing a
+ * demonstration should be able to do to you.
+ *
+ * `--fresh` **retires** the previous tenant rather than deleting it: its
+ * domain is detached and `is_active` goes false, so it stops being served and
+ * its rows stay. It cannot be deleted, and the attempt is instructive — the
+ * cascade is refused by `assert_audit_append_only()`, because the audit log
+ * does not accept a DELETE from anybody. A demonstration's convenience is not
+ * a reason to put a hole in that.
  */
 import 'dotenv/config';
 import { withSystem } from '../src/lib/db/client';
@@ -43,7 +56,70 @@ const PORTAL_PASSWORD = 'Khartoum2026Portal';
 
 const D = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
 
+const NAME_EN = 'Blue Nile University';
+const NAME_AR = 'جامعة النيل الأزرق';
+
+/**
+ * Remove the previous demonstration tenant, if this script made it.
+ *
+ * Both conditions have to hold: it serves the development host, and it is the
+ * university this file creates. A cascade delete is not something to run on a
+ * guess.
+ */
+async function retirePrevious(): Promise<void> {
+  const retired = await withSystem(async (tx) => {
+    const previous = await tx.tenant.findMany({
+      where: { nameEn: NAME_EN, isActive: true, domains: { some: { host: HOST } } },
+      select: { id: true, slug: true },
+    });
+    for (const t of previous) {
+      await tx.tenantDomain.deleteMany({ where: { tenantId: t.id } });
+      await tx.tenant.update({ where: { id: t.id }, data: { isActive: false } });
+    }
+    return previous;
+  });
+  for (const t of retired) console.log(`  retired previous demonstration tenant ${t.slug}`);
+}
+
+/** The demonstration tenant currently serving the development host, if any. */
+async function existing() {
+  return withSystem((tx) =>
+    tx.tenant.findFirst({
+      where: { nameEn: NAME_EN, isActive: true, domains: { some: { host: HOST } } },
+      select: { id: true, slug: true },
+    }),
+  );
+}
+
 async function main() {
+  const fresh = process.argv.includes('--fresh');
+  const already = await existing();
+
+  if (already && !fresh) {
+    const student = await withSystem((tx) =>
+      tx.student.findFirst({
+        where: { tenantId: already.id },
+        orderBy: { studentNo: 'asc' },
+        select: { id: true, studentNo: true },
+      }),
+    );
+    console.log('\n─────────────────────────────────────────────');
+    console.log(`  A demonstration tenant is already serving ${HOST}.`);
+    console.log(`  tenant        ${already.id}`);
+    console.log(`  host          http://${HOST}:3000`);
+    console.log(`  console       ${STAFF_EMAIL} / ${STAFF_PASSWORD}`);
+    console.log(`  portal        ${PORTAL_STUDENT_EMAIL} / ${PORTAL_PASSWORD}`);
+    console.log(`  portal        ${PORTAL_GUARDIAN_EMAIL} / ${PORTAL_PASSWORD}`);
+    if (student) console.log(`  student       ${student.studentNo} ${student.id}`);
+    console.log('');
+    console.log('  Run with --fresh to retire it and build a new one.');
+    console.log('  (That signs out anybody holding a session for this one.)');
+    console.log('─────────────────────────────────────────────\n');
+    return;
+  }
+
+  await retirePrevious();
+
   const u = await makeUniversity({ year: 2026, openPeriods: [1, 2, 3, 4, 5, 6] });
 
   // ---- The host, so the tenant resolver finds it -------------------------
@@ -54,7 +130,7 @@ async function main() {
     });
     await tx.tenant.update({
       where: { id: u.tenantId },
-      data: { nameAr: 'جامعة النيل الأزرق', nameEn: 'Blue Nile University' },
+      data: { nameAr: NAME_AR, nameEn: NAME_EN },
     });
     await tx.campus.create({
       data: {

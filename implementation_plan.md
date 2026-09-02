@@ -2562,6 +2562,31 @@ Three things came out of it:
   precisely what a browser without JavaScript does — so the server runs the
   same action a click would, and 21 button behaviours are asserted end to end.
 
+Two things the harnesses themselves got wrong are worth recording, because
+both produced confident and false results:
+
+- **Asserting on page text.** next-intl ships the whole message catalogue to
+  the client, so every string in it is in the payload of every render. A
+  working console read as *forbidden*, and a correct two-step form read as
+  having *advanced a step*, purely because the wording for the other branch
+  was in the catalogue. Assertions now read the rendered `<h1>` or look inside
+  the `<form>`.
+- **Minting a session instead of signing in.** The staff cookie was minted
+  with `mfaVerified: true`, which no sign-in ever produces — a password alone
+  never satisfies the second factor. The console was being walked under a
+  session nobody holds, so the harness could not have told you whether a
+  member of staff could reach it at all. Both harnesses now sign in through
+  the form; the only minted token left is the deliberately mis-audienced one
+  the cross-door test exists to reject.
+
+**And the seed itself locked people out.** Its first cut minted a new tenant
+on every run and left the old one behind, so each run silently signed out
+anybody holding a session — a session is bound to its tenant, and `localhost`
+had moved. It now reuses what is there and prints the credentials; `--fresh`
+builds a new one and **retires** the old rather than deleting it. Deleting is
+not available: the cascade is refused by `assert_audit_append_only()`, which
+is the audit chain doing exactly what A1 built it to do.
+
 The lesson is narrower than "add browser tests": a whole category of failure
 in this framework is invisible to every check that does not go through the
 HTTP surface, and the suite had no member that did.

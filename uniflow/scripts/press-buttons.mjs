@@ -11,6 +11,7 @@
 import 'dotenv/config';
 import pg from 'pg';
 import { SignJWT } from 'jose';
+import { forms, submitForm } from './lib/forms.mjs';
 
 const BASE = 'http://localhost:3000';
 const secret = new TextEncoder().encode(process.env.SESSION_SECRET);
@@ -66,48 +67,8 @@ const results = [];
 const check = (label, problems) =>
   results.push({ label, ok: problems.length === 0, problems });
 
-const decode = (s) =>
-  s
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#x27;/g, "'");
-
-/** Every form on the page, with its hidden fields, in document order. */
-function forms(html) {
-  const out = [];
-  const re = /<form\b[^>]*>([\s\S]*?)<\/form>/g;
-  let m;
-  while ((m = re.exec(html)) !== null) {
-    const fields = {};
-    const inputs = m[1].matchAll(/<input\b[^>]*>/g);
-    for (const [tag] of inputs) {
-      const name = /name="([^"]*)"/.exec(tag)?.[1];
-      if (!name) continue;
-      const value = /value="([^"]*)"/.exec(tag)?.[1] ?? '';
-      fields[decode(name)] = decode(value);
-    }
-    out.push({ inner: m[1], fields });
-  }
-  return out;
-}
-
-/** Submit one form: its own hidden fields, plus what a person would type. */
-async function submit(path, form, typed, cookie) {
-  const body = new FormData();
-  for (const [k, v] of Object.entries(form.fields)) body.append(k, v);
-  for (const [k, v] of Object.entries(typed)) body.set(k, v);
-
-  const res = await fetch(BASE + path, {
-    method: 'POST',
-    headers: cookie ? { cookie } : {},
-    body,
-    redirect: 'manual',
-  });
-  const text = res.status >= 200 && res.status < 300 ? await res.text() : '';
-  return { res, text, setCookie: res.headers.get('set-cookie') ?? '' };
-}
+/** Submit one form against this base URL. */
+const submit = (path, form, typed, cookie) => submitForm(BASE, path, form, typed, cookie);
 
 async function page(path, cookie) {
   const res = await fetch(BASE + path, { headers: cookie ? { cookie } : {} });
