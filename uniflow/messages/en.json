@@ -90,6 +90,8 @@
       "news": "News",
       "calendar": "Calendar",
       "contact": "Contact",
+      "portal": "Portal",
+      "login": "Sign In",
       "apply": "Apply"
     },
     "sections": {
@@ -159,7 +161,8 @@
       "procurement": "Procurement",
       "registry": "Registry",
       "reports": "Reports",
-      "settings": "Settings"
+      "settings": "Settings",
+      "dashboard": "Dashboard"
     },
     "items": {
       "admissions": "Admissions",
@@ -182,6 +185,7 @@
       "invoices": "Vendor invoices",
       "lifecycle": "Status, transfer and withdrawal",
       "medical": "Medical records",
+      "ministryImport": "Ministry roster import",
       "orders": "Purchase orders",
       "payments": "Payment vouchers",
       "periods": "Fiscal periods",
@@ -241,6 +245,15 @@
     "pending": {
       "badge": "Not built yet",
       "note": "This screen arrives in phase {phase}. The function behind it is complete and tested; what is missing is the screen."
+    },
+    "nav": {
+      "menu": "Menu"
+    },
+    "theme": {
+      "label": "Appearance",
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
     }
   },
   "registry": {
@@ -457,6 +470,17 @@
       "VERIFIED": "Verified",
       "REJECTED": "Rejected",
       "EXPIRED": "Expired"
+    },
+    "ministryImport": {
+      "title": "Ministry roster import",
+      "subtitle": "Import accepted candidates from the Ministry of Higher Education. This never creates a student or student-portal account.",
+      "panel": "Excel workbook",
+      "file": "Ministry Excel roster (.xlsx)",
+      "hint": "Required columns: الاسم الرباعي, المدرسة, الرقم الوطني, سنة القبول, الدفعة. One file must contain one batch only.",
+      "submit": "Validate and import roster",
+      "working": "Validating and importing…",
+      "imported": "Imported {count} candidate(s). They are candidates, not students.",
+      "rowIssue": "Row {row}, {field}: {message}"
     },
     "medical": {
       "title": "Medical records",

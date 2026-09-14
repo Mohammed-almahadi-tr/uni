@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
-import { Cairo, Inter, JetBrains_Mono } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { setRequestLocale } from 'next-intl/server';
 import { directionOf, routing } from '@/i18n/routing';
 import { themeStyle } from '@/lib/cms/branding';
 import { currentSite } from '@/lib/cms/request';
+import { currentTheme } from '@/lib/console/theme';
+import { ThemeScript } from '@/components/theme-script';
 import '../globals.css';
 
 /**
@@ -13,25 +14,19 @@ import '../globals.css';
  * renders Arabic with wrong proportions and no proper joining — on a printed
  * voucher that reads as a defect to whoever signs it.
  */
-const arabic = Cairo({
-  variable: '--font-arabic',
-  subsets: ['arabic', 'latin'],
-  display: 'swap',
-});
-
-const latin = Inter({
-  variable: '--font-latin',
-  subsets: ['latin'],
-  display: 'swap',
-});
-
+/**
+ * Latin body face. A humanist sans with a large x-height and unambiguous
+ * digits, which matters on a screen that is mostly account codes, cheque
+ * numbers and student identifiers read aloud across a counter.
+ */
+/**
+ * Latin display face, for headings and the documents this system issues.
+ * A transitional serif because an offer letter, a certificate and a sponsor
+ * invoice are instruments a university signs, and a geometric sans sets them
+ * like a software dashboard. Latin only: it has no Arabic range, so Arabic
+ * headings stay on Cairo (see globals.css).
+ */
 /** Account codes and amounts, where column alignment matters. */
-const mono = JetBrains_Mono({
-  variable: '--font-mono-latin',
-  subsets: ['latin'],
-  display: 'swap',
-});
-
 /**
  * Title, description and favicon come from the tenant the host resolves to
  * (C1, REQ-LP-01).
@@ -76,7 +71,7 @@ export default async function LocaleLayout({
 
   setRequestLocale(locale);
   const dir = directionOf(locale);
-  const site = await currentSite();
+  const [site, theme] = await Promise.all([currentSite(), currentTheme()]);
 
   return (
     // dir on <html> is what mirrors the entire layout. Tailwind's logical
@@ -85,9 +80,14 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={dir}
-      className={`${arabic.variable} ${latin.variable} ${mono.variable} h-full antialiased`}
+      // The resolved scheme is on the server-rendered markup, so an explicit
+      // light or dark choice is correct in the very first byte. `system` is
+      // finished by the inline script below, still before the first paint.
+      data-theme={theme}
+      className={`h-full antialiased${theme === 'dark' ? ' dark' : ''}`}
     >
       <head>
+        <ThemeScript theme={theme} />
         {/* Inlined rather than fetched: the palette differs per host, so it
             cannot be a cached static file, and a separate request for it means
             the page paints once in the default teal and again in the tenant's

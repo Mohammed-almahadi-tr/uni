@@ -2,60 +2,122 @@
 
 /* ---------------------------------------------------------------------------
    Design tokens (SRS REQ-LP-01, REQ-NFR-12).
- 
+
    Colours are HSL *channels*, not finished colours, so a tenant can set its
    own palette by overriding three custom properties at runtime — the
    white-label requirement — without a rebuild. The theme engine writes these
-   onto <html> from the tenant's `theme_config`.
- 
-   The defaults are a deep teal, chosen to be legible in print as well as on
-   screen: every voucher and receipt this system produces gets printed.
+   onto :root from the tenant's `theme_config`.
+
+   The shipped default is a deep emerald with a gold accent on warm paper.
+   Emerald reads as institutional rather than corporate, gold marks the small
+   number of ceremonial surfaces a university actually issues — an offer
+   letter, a certificate, a sponsor invoice — and the paper ground keeps a
+   ten-hour cashier shift off a glaring white field. All three survive a laser
+   printer: every voucher and receipt this system produces gets printed.
 --------------------------------------------------------------------------- */
 
 :root {
-  --primary-h: 176;
-  --primary-s: 82%;
-  --primary-l: 27%;
+  /* Brand. The three channels the tenant may override. */
+  --primary-h: 163;
+  --primary-s: 78%;
+  --primary-l: 22%;
 
-  --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: var(--primary-h) var(--primary-s) var(--primary-l);
-  --primary: var(--primary-h) var(--primary-s) var(--primary-l);
-  --primary-foreground: 0 0% 100%;
+  /* Surfaces. Warm paper rather than pure white, and the card is the lighter
+     surface so a panel reads as a sheet laid on a desk. */
+  --background: 45 33% 97%;
+  --foreground: 168 24% 11%;
+  --muted: 44 24% 93%;
+  --muted-foreground: 165 10% 38%;
+  --border: 44 20% 87%;
+  --input: 44 20% 84%;
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card-foreground: 168 24% 11%;
+
+  --primary: var(--primary-h) var(--primary-s) var(--primary-l);
+  --primary-foreground: 45 33% 97%;
+  --ring: var(--primary-h) var(--primary-s) var(--primary-l);
+
+  /* Secondary and accent are written by the theme engine too, and were
+     previously declared nowhere — a tenant could set an accent that no rule
+     ever read. They are declared and registered here so the one theme path
+     actually reaches the interface. */
+  --secondary: 162 84% 16%;
+  --secondary-foreground: 45 33% 97%;
+  --accent: 44 58% 62%;
+  --accent-foreground: 168 30% 12%;
 
   /* Ledger semantics. Debit and credit are not "good" and "bad", so they are
      deliberately not red/green — an accountant reads them as sides, and
      colouring a debit red implies an error where there is none. */
-  --debit: 221 83% 45%;
-  --credit: 271 70% 45%;
-  --destructive: 0 72% 45%;
-  --warning: 38 92% 42%;
-  --success: 142 65% 32%;
+  --debit: 221 72% 42%;
+  --credit: 271 58% 44%;
+  --destructive: 3 68% 42%;
+  --warning: 32 82% 38%;
+  --success: 152 58% 28%;
 
-  --radius: 0.5rem;
+  --radius: 0.625rem;
+
+  /* Elevation. Two steps only: a sheet on the desk, and something floating
+     above it. Tinted with the brand hue so shadows do not go grey against a
+     warm ground. */
+  --shadow-sheet: 0 1px 2px hsl(var(--secondary) / 0.05), 0 1px 12px hsl(var(--secondary) / 0.04);
+  --shadow-raised: 0 4px 12px hsl(var(--secondary) / 0.08), 0 12px 32px hsl(var(--secondary) / 0.08);
+
+  /* Console shell geometry. Named because the sidebar, its spacer and the
+     mobile drawer all have to agree. */
+  --sidebar-width: 17rem;
+  --sidebar: 168 30% 12%;
+  --sidebar-foreground: 45 25% 92%;
+  --sidebar-muted: 168 18% 62%;
+  --sidebar-border: 168 22% 22%;
+  --sidebar-active: 163 60% 20%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: 222 47% 8%;
-    --foreground: 210 40% 96%;
-    --muted: 217 33% 15%;
-    --muted-foreground: 215 20% 65%;
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --card: 222 47% 10%;
-    --card-foreground: 210 40% 96%;
-    --primary-l: 42%;
-    --debit: 221 83% 65%;
-    --credit: 271 70% 68%;
-  }
+/* ---------------------------------------------------------------------------
+   Dark mode.
+
+   Class-driven rather than `@media (prefers-color-scheme: dark)`, because the
+   choice is a stored preference on the user's row and must beat the operating
+   system's setting — a cashier on a shared terminal set to dark still gets the
+   light sheet they picked. `data-theme="system"` means "follow the machine",
+   and the inline script in the locale layout resolves that to this class in
+   <head>, before the first paint, so no screen flashes white and then dark.
+
+   The emerald keeps its hue and gains lightness: at 22% it is a background
+   here, not a foreground, so the primary is lifted until text on it clears
+   contrast against the near-black ground.
+--------------------------------------------------------------------------- */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root.dark {
+  color-scheme: dark;
+  --background: 170 22% 7%;
+  --foreground: 45 20% 92%;
+  --muted: 168 16% 14%;
+  --muted-foreground: 165 10% 62%;
+  --border: 168 16% 19%;
+  --input: 168 16% 24%;
+  --card: 170 20% 10%;
+  --card-foreground: 45 20% 92%;
+  --primary-l: 40%;
+  --primary-foreground: 170 30% 7%;
+  --secondary: 163 45% 26%;
+  --secondary-foreground: 45 20% 92%;
+  --accent: 44 62% 62%;
+  --debit: 221 78% 68%;
+  --credit: 271 62% 70%;
+  --success: 152 48% 48%;
+  --warning: 38 88% 58%;
+  --destructive: 3 72% 60%;
+  --shadow-sheet: 0 1px 2px hsl(0 0% 0% / 0.4);
+  --shadow-raised: 0 8px 28px hsl(0 0% 0% / 0.5);
+  --sidebar: 170 24% 9%;
+  --sidebar-foreground: 45 20% 92%;
+  --sidebar-muted: 165 12% 60%;
+  --sidebar-border: 168 16% 18%;
+  --sidebar-active: 163 40% 18%;
 }
+
 
 @theme inline {
   --color-background: hsl(var(--background));
@@ -67,6 +129,10 @@
   --color-ring: hsl(var(--ring));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
   --color-debit: hsl(var(--debit));
@@ -74,10 +140,22 @@
   --color-destructive: hsl(var(--destructive));
   --color-warning: hsl(var(--warning));
   --color-success: hsl(var(--success));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-muted: hsl(var(--sidebar-muted));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-active: hsl(var(--sidebar-active));
 
+  --font-latin: "Segoe UI", Arial, sans-serif;
+  --font-display-latin: Georgia, "Times New Roman", serif;
+  --font-arabic: Tahoma, "Segoe UI", Arial, sans-serif;
+  --font-mono-latin: Consolas, "Courier New", monospace;
   --font-sans: var(--font-latin);
-  --font-arabic: var(--font-arabic);
+  --font-display: var(--font-display-latin);
   --font-mono: var(--font-mono-latin);
+
+  --shadow-sheet: var(--shadow-sheet);
+  --shadow-raised: var(--shadow-raised);
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -102,6 +180,39 @@ body {
   font-family: var(--font-latin), system-ui, sans-serif;
 }
 
+/* Headings take the display serif in Latin. In Arabic they stay on the Arabic
+   face — a Latin serif has no Arabic range at all, and the allow-list of
+   tenant faces is Arabic-only for the same reason. */
+:lang(en) h1,
+:lang(en) h2,
+:lang(en) h3,
+[dir="ltr"] h1,
+[dir="ltr"] h2,
+[dir="ltr"] h3,
+.font-display {
+  font-family: var(--font-display-latin), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+:lang(ar) h1,
+:lang(ar) h2,
+:lang(ar) h3,
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] .font-display {
+  font-family: var(--font-arabic), system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+/* One focus treatment for the whole application. A cashier tabbing through a
+   receipt form must always be able to see where they are, and each screen
+   re-deciding that is how a form ends up with an invisible focus state. */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
 /* Money and account codes align on the decimal point when the digits are
    tabular. Without this a column of figures does not line up, and a cashier
    reconciling a till reads the wrong row. */
@@ -117,6 +228,34 @@ body {
   direction: ltr;
   unicode-bidi: isolate;
   font-variant-numeric: tabular-nums;
+}
+
+/* A short all-caps label: column groups, section eyebrows, the sidebar's
+   group headings. Declared once so twenty screens do not each pick their own
+   tracking. */
+.eyebrow {
+  font-family: var(--font-latin), system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[dir="rtl"] .eyebrow {
+  font-family: var(--font-arabic), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* The gold rule under a ceremonial heading — an offer letter, a certificate,
+   a sponsor invoice. Used sparingly and on purpose. */
+.rule-accent::after {
+  content: "";
+  display: block;
+  width: 2.5rem;
+  height: 2px;
+  margin-top: 0.5rem;
+  background: hsl(var(--accent));
 }
 
 /* ----------------------------------------------------------------------------
@@ -160,6 +299,12 @@ body {
     margin: 0;
     max-width: none;
     box-shadow: none;
+  }
+
+  /* The sidebar layout reserves a column with a margin; on paper there is no
+     sidebar to reserve it for. */
+  .console-inset {
+    margin-inline-start: 0 !important;
   }
 
   /* Backgrounds carry meaning on these documents: the banded total row on a

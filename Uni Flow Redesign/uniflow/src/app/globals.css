@@ -1,0 +1,334 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens (SRS REQ-LP-01, REQ-NFR-12).
+
+   Colours are HSL *channels*, not finished colours, so a tenant can set its
+   own palette by overriding three custom properties at runtime — the
+   white-label requirement — without a rebuild. The theme engine writes these
+   onto :root from the tenant's `theme_config`.
+
+   The shipped default is a deep emerald with a gold accent on warm paper.
+   Emerald reads as institutional rather than corporate, gold marks the small
+   number of ceremonial surfaces a university actually issues — an offer
+   letter, a certificate, a sponsor invoice — and the paper ground keeps a
+   ten-hour cashier shift off a glaring white field. All three survive a laser
+   printer: every voucher and receipt this system produces gets printed.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* Brand. The three channels the tenant may override. */
+  --primary-h: 163;
+  --primary-s: 78%;
+  --primary-l: 22%;
+
+  /* Surfaces. Warm paper rather than pure white, and the card is the lighter
+     surface so a panel reads as a sheet laid on a desk. */
+  --background: 45 33% 97%;
+  --foreground: 168 24% 11%;
+  --muted: 44 24% 93%;
+  --muted-foreground: 165 10% 38%;
+  --border: 44 20% 87%;
+  --input: 44 20% 84%;
+  --card: 0 0% 100%;
+  --card-foreground: 168 24% 11%;
+
+  --primary: var(--primary-h) var(--primary-s) var(--primary-l);
+  --primary-foreground: 45 33% 97%;
+  --ring: var(--primary-h) var(--primary-s) var(--primary-l);
+
+  /* Secondary and accent are written by the theme engine too, and were
+     previously declared nowhere — a tenant could set an accent that no rule
+     ever read. They are declared and registered here so the one theme path
+     actually reaches the interface. */
+  --secondary: 162 84% 16%;
+  --secondary-foreground: 45 33% 97%;
+  --accent: 44 58% 62%;
+  --accent-foreground: 168 30% 12%;
+
+  /* Ledger semantics. Debit and credit are not "good" and "bad", so they are
+     deliberately not red/green — an accountant reads them as sides, and
+     colouring a debit red implies an error where there is none. */
+  --debit: 221 72% 42%;
+  --credit: 271 58% 44%;
+  --destructive: 3 68% 42%;
+  --warning: 32 82% 38%;
+  --success: 152 58% 28%;
+
+  --radius: 0.625rem;
+
+  /* Elevation. Two steps only: a sheet on the desk, and something floating
+     above it. Tinted with the brand hue so shadows do not go grey against a
+     warm ground. */
+  --shadow-sheet: 0 1px 2px hsl(var(--secondary) / 0.05), 0 1px 12px hsl(var(--secondary) / 0.04);
+  --shadow-raised: 0 4px 12px hsl(var(--secondary) / 0.08), 0 12px 32px hsl(var(--secondary) / 0.08);
+
+  /* Console shell geometry. Named because the sidebar, its spacer and the
+     mobile drawer all have to agree. */
+  --sidebar-width: 17rem;
+  --sidebar: 168 30% 12%;
+  --sidebar-foreground: 45 25% 92%;
+  --sidebar-muted: 168 18% 62%;
+  --sidebar-border: 168 22% 22%;
+  --sidebar-active: 163 60% 20%;
+}
+
+/* ---------------------------------------------------------------------------
+   Dark mode.
+
+   Class-driven rather than `@media (prefers-color-scheme: dark)`, because the
+   choice is a stored preference on the user's row and must beat the operating
+   system's setting — a cashier on a shared terminal set to dark still gets the
+   light sheet they picked. `data-theme="system"` means "follow the machine",
+   and the inline script in the locale layout resolves that to this class in
+   <head>, before the first paint, so no screen flashes white and then dark.
+
+   The emerald keeps its hue and gains lightness: at 22% it is a background
+   here, not a foreground, so the primary is lifted until text on it clears
+   contrast against the near-black ground.
+--------------------------------------------------------------------------- */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root.dark {
+  color-scheme: dark;
+  --background: 170 22% 7%;
+  --foreground: 45 20% 92%;
+  --muted: 168 16% 14%;
+  --muted-foreground: 165 10% 62%;
+  --border: 168 16% 19%;
+  --input: 168 16% 24%;
+  --card: 170 20% 10%;
+  --card-foreground: 45 20% 92%;
+  --primary-l: 40%;
+  --primary-foreground: 170 30% 7%;
+  --secondary: 163 45% 26%;
+  --secondary-foreground: 45 20% 92%;
+  --accent: 44 62% 62%;
+  --debit: 221 78% 68%;
+  --credit: 271 62% 70%;
+  --success: 152 48% 48%;
+  --warning: 38 88% 58%;
+  --destructive: 3 72% 60%;
+  --shadow-sheet: 0 1px 2px hsl(0 0% 0% / 0.4);
+  --shadow-raised: 0 8px 28px hsl(0 0% 0% / 0.5);
+  --sidebar: 170 24% 9%;
+  --sidebar-foreground: 45 20% 92%;
+  --sidebar-muted: 165 12% 60%;
+  --sidebar-border: 168 16% 18%;
+  --sidebar-active: 163 40% 18%;
+}
+
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-debit: hsl(var(--debit));
+  --color-credit: hsl(var(--credit));
+  --color-destructive: hsl(var(--destructive));
+  --color-warning: hsl(var(--warning));
+  --color-success: hsl(var(--success));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-muted: hsl(var(--sidebar-muted));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-active: hsl(var(--sidebar-active));
+
+  --font-sans: var(--font-latin);
+  --font-display: var(--font-display-latin);
+  --font-arabic: var(--font-arabic);
+  --font-mono: var(--font-mono-latin);
+
+  --shadow-sheet: var(--shadow-sheet);
+  --shadow-raised: var(--shadow-raised);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* Arabic gets its own face. Latin fonts render Arabic with the wrong
+   proportions and no proper joining, which on a printed voucher looks like a
+   defect to the person signing it. */
+:lang(ar),
+[dir="rtl"] {
+  font-family: var(--font-arabic), system-ui, sans-serif;
+}
+
+:lang(en),
+[dir="ltr"] {
+  font-family: var(--font-latin), system-ui, sans-serif;
+}
+
+/* Headings take the display serif in Latin. In Arabic they stay on the Arabic
+   face — a Latin serif has no Arabic range at all, and the allow-list of
+   tenant faces is Arabic-only for the same reason. */
+:lang(en) h1,
+:lang(en) h2,
+:lang(en) h3,
+[dir="ltr"] h1,
+[dir="ltr"] h2,
+[dir="ltr"] h3,
+.font-display {
+  font-family: var(--font-display-latin), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+:lang(ar) h1,
+:lang(ar) h2,
+:lang(ar) h3,
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] .font-display {
+  font-family: var(--font-arabic), system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+/* One focus treatment for the whole application. A cashier tabbing through a
+   receipt form must always be able to see where they are, and each screen
+   re-deciding that is how a form ends up with an invisible focus state. */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Money and account codes align on the decimal point when the digits are
+   tabular. Without this a column of figures does not line up, and a cashier
+   reconciling a till reads the wrong row. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Amounts and account codes stay left-to-right even inside Arabic text —
+   otherwise "1,234.56" renders with the minus sign or decimal in the wrong
+   place next to Arabic characters. */
+.numeric {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A short all-caps label: column groups, section eyebrows, the sidebar's
+   group headings. Declared once so twenty screens do not each pick their own
+   tracking. */
+.eyebrow {
+  font-family: var(--font-latin), system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[dir="rtl"] .eyebrow {
+  font-family: var(--font-arabic), system-ui, sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* The gold rule under a ceremonial heading — an offer letter, a certificate,
+   a sponsor invoice. Used sparingly and on purpose. */
+.rule-accent::after {
+  content: "";
+  display: block;
+  width: 2.5rem;
+  height: 2px;
+  margin-top: 0.5rem;
+  background: hsl(var(--accent));
+}
+
+/* ----------------------------------------------------------------------------
+   The print surface (Track D5)
+
+   D2, D3 and D4 each shipped a screen that prints and each deferred the page
+   setup to here. The receipt, the voucher, the registration card, the profile
+   card, the offer letter and the sponsor invoice are all A4 portrait, and they
+   are all laid out by these rules rather than by six stylesheets that agree
+   until one of them is edited.
+
+   Reports do NOT use this. They are rendered as standalone HTML by
+   `reports/render.ts`, which carries its own landscape page box — a trial
+   balance is six columns of figures and a receipt is a column of facts, and
+   forcing either into the other's orientation is what produces a report
+   nobody can read at arm's length. The two are declared side by side in
+   `lib/print/sheet.ts` so the difference stays deliberate.
+---------------------------------------------------------------------------- */
+
+@page {
+  size: A4 portrait;
+  /* The bottom margin is deeper than the top because the footer sits in it. */
+  margin: 16mm 16mm 20mm;
+}
+
+@media print {
+  /* Vouchers are printed constantly. Print styling is a feature here, not an
+     afterthought. */
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
+
+  /* The console shell — sidebar, header, page chrome — is application, not
+     document. A sheet prints as the whole page or it prints as a screenshot of
+     a screen, and the second is what the legacy Crystal Reports produced. */
+  .print-sheet {
+    margin: 0;
+    max-width: none;
+    box-shadow: none;
+  }
+
+  /* The sidebar layout reserves a column with a margin; on paper there is no
+     sidebar to reserve it for. */
+  .console-inset {
+    margin-inline-start: 0 !important;
+  }
+
+  /* Backgrounds carry meaning on these documents: the banded total row on a
+     receipt is how the amount reads at a glance. Ask the browser to keep
+     them rather than dropping them to save toner. */
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* A table header that does not repeat leaves page two of a statement as an
+     unlabelled grid of numbers. */
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Links printed with their href are useful on a web page and noise on a
+     receipt, so nothing here expands them — but a link still has to be
+     legible in black. */
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

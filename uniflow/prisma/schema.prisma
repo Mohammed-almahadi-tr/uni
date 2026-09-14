@@ -520,6 +520,8 @@ model Tenant {
   applications       Application[]
   applicationChoices ApplicationChoice[]
   admissionOffers    AdmissionOffer[]
+  ministryImports    MinistryImport[]
+  ministryCandidates MinistryCandidate[]
 
   studentProfiles      StudentProfile[]
   documentTypes        DocumentType[]
@@ -2723,12 +2725,14 @@ model Batch {
   applicationsOpenFrom DateTime? @map("applications_open_from") @db.Date
   applicationsOpenTo   DateTime? @map("applications_open_to") @db.Date
 
-  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  feeSchedules  FeeSchedule[]
-  students      Student[]
-  seatQuotas    SeatQuota[]
-  applications  Application[]
-  registrations SemesterRegistration[]
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  feeSchedules       FeeSchedule[]
+  students           Student[]
+  seatQuotas         SeatQuota[]
+  applications       Application[]
+  registrations      SemesterRegistration[]
+  ministryImports    MinistryImport[]
+  ministryCandidates MinistryCandidate[]
 
   @@unique([tenantId, code])
   @@index([tenantId, admissionYear])
@@ -2881,6 +2885,20 @@ enum ApplicationState {
   ENROLLED
 }
 
+/// A person supplied by the ministry roster. This record is intentionally
+/// separate from Student until registrar enrolment is complete.
+enum MinistryCandidateState {
+  IMPORTED
+  PROFILE_COMPLETED
+  MEDICAL_PENDING
+  MEDICALLY_CLEARED
+  INTERVIEW_PENDING
+  ACCEPTED
+  REJECTED
+  REGISTRATION_PENDING
+  REGISTERED
+}
+
 /// A committee's verdict (REQ-ADM-CAP-03). Distinct from `ApplicationState`:
 /// the decision is what the committee said, the state is where the application
 /// has got to. A CONDITIONAL_ACCEPT that lapses ends REJECTED without anyone
@@ -3015,6 +3033,60 @@ model EligibilityRule {
 /// must not consume a student number or appear in student reporting, and the
 /// same person may apply in successive years. The Student record is created at
 /// the moment an offer is accepted, and not before.
+///
+/// A ministry roster has a smaller, fixed data contract than an application;
+/// its rows live in `MinistryCandidate` below until the admissions process has
+/// collected the remaining facts. Keeping it distinct makes it impossible for
+/// a roster import to grant a person student or portal access accidentally.
+model MinistryImport {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  batchId      String   @map("batch_id") @db.Uuid
+  fileName     String   @map("file_name")
+  fileSha256   String   @map("file_sha256") @db.Char(64)
+  totalRows    Int      @map("total_rows")
+  importedRows Int      @map("imported_rows")
+  rejectedRows Int      @map("rejected_rows")
+  importedAt   DateTime @default(now()) @map("imported_at") @db.Timestamptz(6)
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  batch      Batch               @relation(fields: [batchId], references: [id])
+  candidates MinistryCandidate[]
+
+  @@unique([tenantId, fileSha256])
+  @@index([tenantId, batchId, importedAt])
+  @@map("ministry_imports")
+}
+
+model MinistryCandidate {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  tenantId           String                 @map("tenant_id") @db.Uuid
+  importId           String                 @map("import_id") @db.Uuid
+  batchId            String                 @map("batch_id") @db.Uuid
+  importRow          Int                    @map("import_row")
+  fullNameAr         String                 @map("full_name_ar")
+  school             String
+  nationalId         String                 @map("national_id")
+  admissionYear      Int                    @map("admission_year")
+  state              MinistryCandidateState @default(IMPORTED)
+  fullNameEn         String?                @map("full_name_en")
+  guardianName       String?                @map("guardian_name")
+  email              String?
+  phone              String?
+  profileCompletedAt DateTime?              @map("profile_completed_at") @db.Timestamptz(6)
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  import MinistryImport @relation(fields: [importId], references: [id], onDelete: Restrict)
+  batch  Batch          @relation(fields: [batchId], references: [id])
+
+  @@unique([importId, importRow])
+  @@unique([tenantId, nationalId])
+  @@index([tenantId, batchId, state])
+  @@index([tenantId, admissionYear])
+  @@map("ministry_candidates")
+}
+
 model Application {
   id            String @id @default(uuid()) @db.Uuid
   tenantId      String @map("tenant_id") @db.Uuid

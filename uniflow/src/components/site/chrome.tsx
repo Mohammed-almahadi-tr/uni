@@ -71,15 +71,17 @@ export async function SiteHeader({
           <NavLink href="/news">{t('news')}</NavLink>
           <NavLink href="/calendar">{t('calendar')}</NavLink>
           <NavLink href="/contact">{t('contact')}</NavLink>
-          {/* Applying is the one thing on this site somebody came to *do*
-              rather than read, so it is a button and not another link in the
-              row. It is always present: the apply page itself says whether an
-              intake is open, which is the answer a prospective student wants
-              either way — a link that vanishes when applications close looks
-              like a site that is broken. */}
+          <NavLink href="/portal/login">{t('portal')}</NavLink>
+          {/* Sign In & Apply buttons */}
+          <Link
+            href="/login"
+            className="ms-1 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
+          >
+            {t('login')}
+          </Link>
           <Link
             href="/apply"
-            className="ms-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            className="ms-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             {t('apply')}
           </Link>

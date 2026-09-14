@@ -1,0 +1,378 @@
+import type { ReportDocument, ReportRow } from './document';
+
+/**
+ * A minimal .xlsx writer (SRS REQ-RPT-07).
+ *
+ * ## Why this is hand-written rather than a library
+ *
+ * The alternatives are large. `exceljs` and its peers pull in a spreadsheet
+ * object model, a formula parser and a streaming layer to write what these
+ * reports need: one sheet, text and numbers, a bold row and a number format.
+ * The whole of that is about two hundred lines, and every one of them is here
+ * to read.
+ *
+ * Two decisions keep it small enough to be worth owning:
+ *
+ *   1. **Entries are stored, not deflated.** A ZIP entry may use method 0, and
+ *      Excel accepts it. That removes the compression step entirely — the file
+ *      is larger and nobody notices, because a trial balance is a few hundred
+ *      kilobytes.
+ *   2. **Strings are inline.** The shared-string table is an optimisation for
+ *      repeated text; account names barely repeat, so skipping it removes a
+ *      whole part of the format and a whole class of index bugs.
+ *
+ * ## Money never becomes a JavaScript number
+ *
+ * Amounts arrive as decimal strings and are written into `<v>` verbatim.
+ * Excel parses the text itself, so a value that would lose precision as an
+ * IEEE-754 double survives intact. There is no `Number(...)` anywhere in this
+ * file, and that is deliberate rather than incidental.
+ */
+
+export interface XlsxOptions {
+  locale?: 'ar' | 'en';
+  /** Sheet name. Excel forbids : \ / ? * [ ] and caps it at 31 characters. */
+  sheetName?: string;
+}
+
+export function toXlsx(doc: ReportDocument, opts: XlsxOptions = {}): Buffer {
+  const locale = opts.locale ?? 'ar';
+  const rtl = locale === 'ar';
+  const sheetName = sanitiseSheetName(
+    opts.sheetName ?? (rtl ? doc.titleAr : doc.titleEn),
+  );
+
+  const files: Array<{ name: string; data: Buffer }> = [
+    { name: '[Content_Types].xml', data: buf(CONTENT_TYPES) },
+    { name: '_rels/.rels', data: buf(ROOT_RELS) },
+    { name: 'xl/workbook.xml', data: buf(workbookXml(sheetName)) },
+    { name: 'xl/_rels/workbook.xml.rels', data: buf(WORKBOOK_RELS) },
+    { name: 'xl/styles.xml', data: buf(STYLES) },
+    { name: 'xl/worksheets/sheet1.xml', data: buf(sheetXml(doc, locale, rtl)) },
+  ];
+
+  return zip(files);
+}
+
+// ---------------------------------------------------------------------------
+// Sheet content
+// ---------------------------------------------------------------------------
+
+/** Style indices into cellXfs in STYLES below. */
+const S_DEFAULT = 0;
+const S_TITLE = 1;
+const S_HEADER = 2;
+const S_MONEY = 3;
+const S_MONEY_BOLD = 4;
+const S_BOLD = 5;
+const S_NOTE = 6;
+
+function sheetXml(doc: ReportDocument, locale: 'ar' | 'en', rtl: boolean): string {
+  const label = (en: string, ar: string) => (locale === 'ar' ? ar : en);
+  const out: string[] = [];
+  let r = 0;
+
+  const row = (cells: string[]) => {
+    r += 1;
+    out.push(`<row r="${r}">${cells.join('')}</row>`);
+  };
+
+  row([textCell(1, r + 1, label(doc.titleEn, doc.titleAr), S_TITLE)]);
+  const subtitle = locale === 'ar' ? doc.subtitleAr : doc.subtitleEn;
+  if (subtitle) row([textCell(1, r + 1, subtitle, S_BOLD)]);
+
+  for (const m of doc.meta) {
+    row([
+      textCell(1, r + 1, label(m.labelEn, m.labelAr), S_BOLD),
+      textCell(2, r + 1, m.value, S_DEFAULT),
+    ]);
+  }
+
+  // A blank row between the header block and the table. Without it a
+  // spreadsheet's autofilter and "format as table" both grab the meta rows.
+  r += 1;
+
+  row(doc.columns.map((c, i) => textCell(i + 1, r + 1, label(c.labelEn, c.labelAr), S_HEADER)));
+
+  for (const dataRow of doc.rows) {
+    row(bodyCells(dataRow, r + 1));
+  }
+
+  const notes = locale === 'ar' ? doc.notesAr : doc.notesEn;
+  if (notes.length > 0) {
+    r += 1;
+    for (const n of notes) row([textCell(1, r + 1, n, S_NOTE)]);
+  }
+
+  const cols = doc.columns
+    .map((c, i) => `<col min="${i + 1}" max="${i + 1}" width="${c.width ?? 16}" customWidth="1"/>`)
+    .join('');
+
+  return (
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+    `<sheetViews><sheetView workbookViewId="0"${rtl ? ' rightToLeft="1"' : ''}>` +
+    // Freeze the header row so a two-hundred-line trial balance keeps its
+    // column titles while it is scrolled.
+    `<pane ySplit="${headerRowIndex(doc)}" topLeftCell="A${headerRowIndex(doc) + 1}" activePane="bottomLeft" state="frozen"/>` +
+    `</sheetView></sheetViews>` +
+    `<cols>${cols}</cols>` +
+    `<sheetData>${out.join('')}</sheetData>` +
+    `</worksheet>`
+  );
+}
+
+/** 1-based index of the column-header row, for the frozen pane. */
+function headerRowIndex(doc: ReportDocument): number {
+  let n = 1; // title
+  if (doc.subtitleAr || doc.subtitleEn) n += 1;
+  n += doc.meta.length;
+  n += 1; // blank spacer
+  return n + 1;
+}
+
+function bodyCells(row: ReportRow, rowNo: number): string[] {
+  const strong = row.emphasis === 'total';
+  return row.cells.map((cell, i) => {
+    const col = i + 1;
+    switch (cell.kind) {
+      case 'blank':
+        return '';
+      case 'money':
+        return numberCell(col, rowNo, cell.value, strong ? S_MONEY_BOLD : S_MONEY);
+      case 'int':
+        return numberCell(col, rowNo, String(cell.value), strong ? S_BOLD : S_DEFAULT);
+      case 'text': {
+        // Indent the account column by its depth in the chart, so the
+        // hierarchy survives the export rather than collapsing flat.
+        const indent = i === 1 && row.level ? '  '.repeat(Math.max(0, row.level - 1)) : '';
+        return textCell(col, rowNo, indent + cell.value, strong ? S_BOLD : S_DEFAULT);
+      }
+    }
+  });
+}
+
+function textCell(col: number, row: number, value: string, style: number): string {
+  return (
+    `<c r="${ref(col, row)}" s="${style}" t="inlineStr">` +
+    `<is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`
+  );
+}
+
+function numberCell(col: number, row: number, value: string, style: number): string {
+  // The decimal string goes straight through. Excel does the parsing, so no
+  // amount passes through a JavaScript double on the way to the file.
+  const v = value.trim();
+  if (!/^-?\d+(\.\d+)?$/.test(v)) return textCell(col, row, value, style);
+  return `<c r="${ref(col, row)}" s="${style}"><v>${v}</v></c>`;
+}
+
+function ref(col: number, row: number): string {
+  let n = col;
+  let name = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    name = String.fromCharCode(65 + rem) + name;
+    n = Math.floor((n - 1) / 26);
+  }
+  return `${name}${row}`;
+}
+
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .split("")
+    .filter((ch) => {
+      const c = ch.charCodeAt(0);
+      // Tab, newline and carriage return are the only control
+      // characters XML 1.0 allows. Any other one makes Excel report the
+      // whole workbook as corrupt rather than skipping the cell.
+      return c === 9 || c === 10 || c === 13 || c >= 32;
+    })
+    .join("");
+}
+
+function sanitiseSheetName(name: string): string {
+  const cleaned = name.replace(/[:\\/?*[\]]/g, ' ').trim();
+  return (cleaned || 'Report').slice(0, 31);
+}
+
+// ---------------------------------------------------------------------------
+// Static parts
+// ---------------------------------------------------------------------------
+
+const CONTENT_TYPES =
+  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+  `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+  `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+  `<Default Extension="xml" ContentType="application/xml"/>` +
+  `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+  `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>` +
+  `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+  `</Types>`;
+
+const ROOT_RELS =
+  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+  `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+  `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+  `</Relationships>`;
+
+const WORKBOOK_RELS =
+  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+  `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+  `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>` +
+  `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+  `</Relationships>`;
+
+function workbookXml(sheetName: string): string {
+  return (
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+    `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ` +
+    `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+    `<sheets><sheet name="${escapeXml(sheetName)}" sheetId="1" r:id="rId1"/></sheets>` +
+    `</workbook>`
+  );
+}
+
+/**
+ * Four decimal places, thousands separated, negatives in parentheses.
+ *
+ * Parentheses rather than a minus sign because that is how a negative reads on
+ * a financial statement in this region as everywhere else, and because a
+ * leading minus is easy to lose against a right-aligned column edge.
+ */
+const STYLES =
+  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+  `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+  `<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.0000;(#,##0.0000)"/></numFmts>` +
+  `<fonts count="4">` +
+  `<font><sz val="11"/><name val="Calibri"/></font>` +
+  `<font><b/><sz val="16"/><name val="Calibri"/></font>` +
+  `<font><b/><sz val="11"/><name val="Calibri"/></font>` +
+  `<font><i/><sz val="10"/><color rgb="FF8A5A00"/><name val="Calibri"/></font>` +
+  `</fonts>` +
+  `<fills count="3">` +
+  `<fill><patternFill patternType="none"/></fill>` +
+  `<fill><patternFill patternType="gray125"/></fill>` +
+  `<fill><patternFill patternType="solid"><fgColor rgb="FFF1F5F9"/><bgColor indexed="64"/></patternFill></fill>` +
+  `</fills>` +
+  `<borders count="2">` +
+  `<border><left/><right/><top/><bottom/><diagonal/></border>` +
+  `<border><left/><right/><top/><bottom style="thin"><color rgb="FFCBD5E1"/></bottom><diagonal/></border>` +
+  `</borders>` +
+  `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
+  `<cellXfs count="7">` +
+  `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+  `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+  `<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+  `<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>` +
+  `<xf numFmtId="164" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>` +
+  `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+  `<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+  `</cellXfs>` +
+  `</styleSheet>`;
+
+// ---------------------------------------------------------------------------
+// ZIP container
+// ---------------------------------------------------------------------------
+
+function buf(s: string): Buffer {
+  return Buffer.from(s, 'utf8');
+}
+
+const CRC_TABLE = (() => {
+  const table = new Int32Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    let c = i;
+    for (let k = 0; k < 8; k += 1) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[i] = c;
+  }
+  return table;
+})();
+
+function crc32(data: Buffer): number {
+  let c = -1;
+  for (let i = 0; i < data.length; i += 1) {
+    c = CRC_TABLE[(c ^ data[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ -1) >>> 0;
+}
+
+/**
+ * Write a ZIP with stored (uncompressed) entries.
+ *
+ * A fixed 1980-01-01 timestamp on every entry, deliberately: it makes the
+ * output byte-for-byte reproducible, so two exports of the same report are the
+ * same file and a test can assert on it. The modification time of a generated
+ * spreadsheet carries no information anybody wants.
+ */
+function zip(files: Array<{ name: string; data: Buffer }>): Buffer {
+  const DOS_TIME = 0;
+  const DOS_DATE = 33; // 1980-01-01
+
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+
+  for (const f of files) {
+    const nameBytes = Buffer.from(f.name, 'utf8');
+    const crc = crc32(f.data);
+
+    const local = Buffer.alloc(30 + nameBytes.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4); // version needed
+    local.writeUInt16LE(0x0800, 6); // UTF-8 filenames
+    local.writeUInt16LE(0, 8); // method: stored
+    local.writeUInt16LE(DOS_TIME, 10);
+    local.writeUInt16LE(DOS_DATE, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(f.data.length, 18);
+    local.writeUInt32LE(f.data.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    local.writeUInt16LE(0, 28);
+    nameBytes.copy(local, 30);
+
+    locals.push(local, f.data);
+
+    const central = Buffer.alloc(46 + nameBytes.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4); // version made by
+    central.writeUInt16LE(20, 6); // version needed
+    central.writeUInt16LE(0x0800, 8);
+    central.writeUInt16LE(0, 10);
+    central.writeUInt16LE(DOS_TIME, 12);
+    central.writeUInt16LE(DOS_DATE, 14);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(f.data.length, 20);
+    central.writeUInt32LE(f.data.length, 24);
+    central.writeUInt16LE(nameBytes.length, 28);
+    central.writeUInt16LE(0, 30); // extra
+    central.writeUInt16LE(0, 32); // comment
+    central.writeUInt16LE(0, 34); // disk
+    central.writeUInt16LE(0, 36); // internal attrs
+    central.writeUInt32LE(0, 38); // external attrs
+    central.writeUInt32LE(offset, 42);
+    nameBytes.copy(central, 46);
+    centrals.push(central);
+
+    offset += local.length + f.data.length;
+  }
+
+  const centralBuf = Buffer.concat(centrals);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(files.length, 8);
+  eocd.writeUInt16LE(files.length, 10);
+  eocd.writeUInt32LE(centralBuf.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+  eocd.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...locals, centralBuf, eocd]);
+}
