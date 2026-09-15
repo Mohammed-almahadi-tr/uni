@@ -129,6 +129,9 @@ export async function provisionTenant(
       data: {
         tenantId: tenant.id,
         shortCode: input.slug.slice(0, 12).toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'UNI',
+        logoUrl: DEFAULT_BRANDING.logoUrl,
+        logoDarkUrl: DEFAULT_BRANDING.logoDarkUrl,
+        faviconUrl: DEFAULT_BRANDING.faviconUrl,
         primaryH: DEFAULT_BRANDING.primary.h,
         primaryS: DEFAULT_BRANDING.primary.s,
         primaryL: DEFAULT_BRANDING.primary.l,
