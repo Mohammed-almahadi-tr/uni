@@ -56,8 +56,8 @@ const PORTAL_PASSWORD = 'Khartoum2026Portal';
 
 const D = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
 
-const NAME_EN = 'Blue Nile University';
-const NAME_AR = 'جامعة النيل الأزرق';
+const NAME_EN = 'Omdurman Alahlia University';
+const NAME_AR = 'جامعة امدرمان الاهلية';
 
 /**
  * Remove the previous demonstration tenant, if this script made it.
@@ -154,7 +154,7 @@ async function main() {
     name: 'demo-cms',
   });
   await setBranding(brander, {
-    shortCode: 'BNU',
+    shortCode: 'OAU',
     mottoAr: 'العلم نور',
     mottoEn: 'Knowledge is light',
     primary: { h: 205, s: 74, l: 30 },
@@ -233,8 +233,8 @@ async function main() {
       nationalityId: u.nationalities.SD,
     });
 
-  const amira = await admit('BNU-2026-0001', 'أميرة عثمان الطيب', 'Amira Osman Eltayeb');
-  const yousif = await admit('BNU-2026-0002', 'يوسف عثمان الطيب', 'Yousif Osman Eltayeb');
+  const amira = await admit('OAU-2026-0001', 'أميرة عثمان الطيب', 'Amira Osman Eltayeb');
+  const yousif = await admit('OAU-2026-0002', 'يوسف عثمان الطيب', 'Yousif Osman Eltayeb');
 
   const registration = await registerStudent(registrar, {
     studentId: amira.id,

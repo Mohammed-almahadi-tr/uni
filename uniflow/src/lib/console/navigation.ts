@@ -158,6 +158,8 @@ export const CONSOLE_SECTIONS: readonly ConsoleSection[] = [
       { key: 'lifecycle', path: 'registry/lifecycle', anyOf: ['student.status', 'registration.transfer'], phase: 'D3' },
       { key: 'admissions', path: 'registry/admissions', anyOf: ['application.read', 'application.decide', 'application.offer'], phase: 'D4', detail: 'registry/admissions/[id]/offer' },
       { key: 'ministryImport', path: 'registry/ministry-import', anyOf: ['admission.import'], phase: 'D4' },
+      { key: 'candidateMedical', path: 'registry/candidate-medical', anyOf: ['admission.manage', 'medical.read', 'medical.manage'], phase: 'D4' },
+      { key: 'candidateInterviews', path: 'registry/candidate-interviews', anyOf: ['admission.manage'], phase: 'D4' },
       { key: 'documents', path: 'registry/documents', anyOf: ['document.verify'], phase: 'D3' },
       { key: 'medical', path: 'registry/medical', anyOf: ['medical.read', 'medical.manage'], phase: 'D3' },
     ],

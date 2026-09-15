@@ -28,8 +28,8 @@ export async function uploadMinistryRoster(
   if (!/\.xlsx$/i.test(file.name)) {
     return { ...blank(), error: 'Upload an .xlsx workbook.' };
   }
-  if (file.size > 5 * 1024 * 1024) {
-    return { ...blank(), error: 'The workbook must be 5 MB or smaller.' };
+  if (file.size > 4 * 1024 * 1024) {
+    return { ...blank(), error: 'The workbook must be 4 MB or smaller.' };
   }
 
   try {

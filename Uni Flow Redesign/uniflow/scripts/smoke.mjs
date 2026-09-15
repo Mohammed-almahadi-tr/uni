@@ -117,8 +117,8 @@ async function get(label, path, { cookie, expect: want = 200, contains, absent }
 }
 
 // ---- Public, no session ---------------------------------------------------
-await get('landing (ar)', '/ar', { contains: ['جامعة النيل الأزرق'] });
-await get('landing (en)', '/en', { contains: ['Blue Nile University'] });
+await get('landing (ar)', '/ar', { contains: ['جامعة امدرمان الاهلية'] });
+await get('landing (en)', '/en', { contains: ['Omdurman Alahlia University'] });
 await get('landing (unprefixed)', '/', { expect: [307, 308] });
 await get('programmes', '/en/programmes', { contains: ['Bachelor of Medicine'] });
 await get('news', '/en/news');
@@ -126,9 +126,9 @@ await get('calendar', '/en/calendar');
 await get('contact', '/en/contact', { contains: ['Main Campus'] });
 await get('apply', '/en/apply', { contains: ['Batch 2026'] });
 await get('apply status', '/en/apply/status');
-await get('staff login', '/en/login', { contains: ['Blue Nile University'] });
+await get('staff login', '/en/login', { contains: ['Omdurman Alahlia University'] });
 await get('verify card', `/en/verify/registration/${reg.verify_token}`, {
-  contains: ['Amira Osman Eltayeb', 'BNU-2026-0001'],
+  contains: ['Amira Osman Eltayeb', 'OAU-2026-0001'],
   // The verification page must never disclose money.
   absent: ['1,200,000', '1200000'],
 });
@@ -136,7 +136,7 @@ await get('verify card (bad token)', '/en/verify/registration/' + 'f'.repeat(32)
 
 // ---- C3 public doors ------------------------------------------------------
 await get('portal login', '/en/portal/login', {
-  contains: ['Blue Nile University', 'Set up your account'],
+  contains: ['Omdurman Alahlia University', 'Set up your account'],
 });
 await get('portal activate', '/en/portal/activate', { contains: ['Invitation code'] });
 
@@ -156,7 +156,7 @@ for (const p of [
 // ---- C3 as the student ----------------------------------------------------
 await get('portal overview', '/en/portal', {
   cookie: studentCookie,
-  contains: ['Amira Osman Eltayeb', 'BNU-2026-0001', 'You cannot register', 'secondary certificate'],
+  contains: ['Amira Osman Eltayeb', 'OAU-2026-0001', 'You cannot register', 'secondary certificate'],
 });
 await get('portal account', '/en/portal/account', {
   cookie: studentCookie,
@@ -176,7 +176,7 @@ await get('portal registrations', '/en/portal/registrations', {
 });
 await get('portal card', `/en/portal/registrations/${reg.id}/card`, {
   cookie: studentCookie,
-  contains: ['Registration card', '<svg', 'BNU-2026-0001'],
+  contains: ['Registration card', '<svg', 'OAU-2026-0001'],
 });
 await get('portal documents', '/en/portal/documents', {
   cookie: studentCookie,
@@ -210,7 +210,7 @@ await get('guardian overview', '/en/portal', {
 // point of it. What must have changed is the heading and the student number.
 const switched = await get('guardian switches child', `/en/portal/account?student=${kids[1]}`, {
   cookie: parentCookie,
-  contains: ['Yousif Osman Eltayeb', 'BNU-2026-0002'],
+  contains: ['Yousif Osman Eltayeb', 'OAU-2026-0002'],
 });
 {
   const h1 = /<h1[^>]*>([^<]*)<\/h1>/.exec(switched)?.[1] ?? '';

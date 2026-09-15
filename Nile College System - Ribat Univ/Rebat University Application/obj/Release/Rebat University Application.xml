@@ -1,0 +1,332 @@
+﻿<?xml version="1.0"?>
+<doc>
+<assembly>
+<name>
+RebatUniversityApplication
+</name>
+</assembly>
+<members>
+<member name="T:Rebat_University.DSstudVac.ViewStudVacantsDataTable">
+	<summary>
+Represents the strongly named DataTable class.
+</summary>
+</member><member name="T:Rebat_University.DSstudVac.ViewStudVacantsRow">
+	<summary>
+Represents strongly named DataRow class.
+</summary>
+</member><member name="T:Rebat_University.DSstudVac.ViewStudVacantsRowChangeEvent">
+	<summary>
+Row event argument class
+</summary>
+</member><member name="T:Rebat_University.DSstudVac">
+	<summary>
+Represents a strongly typed in-memory cache of data.
+</summary>
+</member><member name="T:Rebat_University.DSvacants.ViewStudVacantsDataTable">
+	<summary>
+Represents the strongly named DataTable class.
+</summary>
+</member><member name="T:Rebat_University.DSvacants.ViewStudVacantsRow">
+	<summary>
+Represents strongly named DataRow class.
+</summary>
+</member><member name="T:Rebat_University.DSvacants.ViewStudVacantsRowChangeEvent">
+	<summary>
+Row event argument class
+</summary>
+</member><member name="T:Rebat_University.DSvacants">
+	<summary>
+Represents a strongly typed in-memory cache of data.
+</summary>
+</member><member name="T:Rebat_University.DsColleges.CollegesDataTable">
+	<summary>
+Represents the strongly named DataTable class.
+</summary>
+</member><member name="T:Rebat_University.DsColleges.CollegesRow">
+	<summary>
+Represents strongly named DataRow class.
+</summary>
+</member><member name="T:Rebat_University.DsColleges.CollegesRowChangeEvent">
+	<summary>
+Row event argument class
+</summary>
+</member><member name="T:Rebat_University.DsColleges">
+	<summary>
+Represents a strongly typed in-memory cache of data.
+</summary>
+</member><member name="T:Rebat_University.DsCollegesTableAdapters.CollegesTableAdapter">
+	<summary>
+Represents the connection and commands used to retrieve and save data.
+</summary>
+</member><member name="M:Rebat_University.DsCollegesTableAdapters.TableAdapterManager.UpdateUpdatedRows(Rebat_University.DsColleges,System.Collections.Generic.List{System.Data.DataRow},System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Update rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.DsCollegesTableAdapters.TableAdapterManager.UpdateInsertedRows(Rebat_University.DsColleges,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Insert rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.DsCollegesTableAdapters.TableAdapterManager.UpdateDeletedRows(Rebat_University.DsColleges,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Delete rows in bottom-up order.
+</summary>
+</member><member name="M:Rebat_University.DsCollegesTableAdapters.TableAdapterManager.GetRealUpdatedRows(System.Data.DataRow[],System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Remove inserted rows that become updated rows after calling TableAdapter.Update(inserted rows) first
+</summary>
+</member><member name="M:Rebat_University.DsCollegesTableAdapters.TableAdapterManager.UpdateAll(Rebat_University.DsColleges)">
+	<summary>
+Update all changes to the dataset.
+</summary>
+</member><member name="T:Rebat_University.DsCollegesTableAdapters.TableAdapterManager.UpdateOrderOption">
+	<summary>
+Update Order Option
+</summary>
+</member><member name="T:Rebat_University.DsCollegesTableAdapters.TableAdapterManager.SelfReferenceComparer">
+	<summary>
+Used to sort self-referenced table's rows
+</summary>
+</member><member name="T:Rebat_University.DsCollegesTableAdapters.TableAdapterManager">
+	<summary>
+TableAdapterManager is used to coordinate TableAdapters in the dataset to enable Hierarchical Update scenarios
+</summary>
+</member><member name="T:Rebat_University.DsBillSNo.BillSNoDataTable">
+	<summary>
+Represents the strongly named DataTable class.
+</summary>
+</member><member name="T:Rebat_University.DsBillSNo.BillSNoRow">
+	<summary>
+Represents strongly named DataRow class.
+</summary>
+</member><member name="T:Rebat_University.DsBillSNo.BillSNoRowChangeEvent">
+	<summary>
+Row event argument class
+</summary>
+</member><member name="T:Rebat_University.DsBillSNo">
+	<summary>
+Represents a strongly typed in-memory cache of data.
+</summary>
+</member><member name="T:Rebat_University.DsBillSNoTableAdapters.BillSNoTableAdapter">
+	<summary>
+Represents the connection and commands used to retrieve and save data.
+</summary>
+</member><member name="M:Rebat_University.DsBillSNoTableAdapters.TableAdapterManager.UpdateUpdatedRows(Rebat_University.DsBillSNo,System.Collections.Generic.List{System.Data.DataRow},System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Update rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.DsBillSNoTableAdapters.TableAdapterManager.UpdateInsertedRows(Rebat_University.DsBillSNo,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Insert rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.DsBillSNoTableAdapters.TableAdapterManager.UpdateDeletedRows(Rebat_University.DsBillSNo,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Delete rows in bottom-up order.
+</summary>
+</member><member name="M:Rebat_University.DsBillSNoTableAdapters.TableAdapterManager.GetRealUpdatedRows(System.Data.DataRow[],System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Remove inserted rows that become updated rows after calling TableAdapter.Update(inserted rows) first
+</summary>
+</member><member name="M:Rebat_University.DsBillSNoTableAdapters.TableAdapterManager.UpdateAll(Rebat_University.DsBillSNo)">
+	<summary>
+Update all changes to the dataset.
+</summary>
+</member><member name="T:Rebat_University.DsBillSNoTableAdapters.TableAdapterManager.UpdateOrderOption">
+	<summary>
+Update Order Option
+</summary>
+</member><member name="T:Rebat_University.DsBillSNoTableAdapters.TableAdapterManager.SelfReferenceComparer">
+	<summary>
+Used to sort self-referenced table's rows
+</summary>
+</member><member name="T:Rebat_University.DsBillSNoTableAdapters.TableAdapterManager">
+	<summary>
+TableAdapterManager is used to coordinate TableAdapters in the dataset to enable Hierarchical Update scenarios
+</summary>
+</member><member name="T:Rebat_University.ReqBill.RequestBillDataTable">
+	<summary>
+Represents the strongly named DataTable class.
+</summary>
+</member><member name="T:Rebat_University.ReqBill.RequestBillRow">
+	<summary>
+Represents strongly named DataRow class.
+</summary>
+</member><member name="T:Rebat_University.ReqBill.RequestBillRowChangeEvent">
+	<summary>
+Row event argument class
+</summary>
+</member><member name="T:Rebat_University.ReqBill">
+	<summary>
+Represents a strongly typed in-memory cache of data.
+</summary>
+</member><member name="T:Rebat_University.ReqBillTableAdapters.RequestBillTableAdapter">
+	<summary>
+Represents the connection and commands used to retrieve and save data.
+</summary>
+</member><member name="M:Rebat_University.ReqBillTableAdapters.TableAdapterManager.UpdateUpdatedRows(Rebat_University.ReqBill,System.Collections.Generic.List{System.Data.DataRow},System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Update rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.ReqBillTableAdapters.TableAdapterManager.UpdateInsertedRows(Rebat_University.ReqBill,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Insert rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.ReqBillTableAdapters.TableAdapterManager.UpdateDeletedRows(Rebat_University.ReqBill,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Delete rows in bottom-up order.
+</summary>
+</member><member name="M:Rebat_University.ReqBillTableAdapters.TableAdapterManager.GetRealUpdatedRows(System.Data.DataRow[],System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Remove inserted rows that become updated rows after calling TableAdapter.Update(inserted rows) first
+</summary>
+</member><member name="M:Rebat_University.ReqBillTableAdapters.TableAdapterManager.UpdateAll(Rebat_University.ReqBill)">
+	<summary>
+Update all changes to the dataset.
+</summary>
+</member><member name="T:Rebat_University.ReqBillTableAdapters.TableAdapterManager.UpdateOrderOption">
+	<summary>
+Update Order Option
+</summary>
+</member><member name="T:Rebat_University.ReqBillTableAdapters.TableAdapterManager.SelfReferenceComparer">
+	<summary>
+Used to sort self-referenced table's rows
+</summary>
+</member><member name="T:Rebat_University.ReqBillTableAdapters.TableAdapterManager">
+	<summary>
+TableAdapterManager is used to coordinate TableAdapters in the dataset to enable Hierarchical Update scenarios
+</summary>
+</member><member name="T:Rebat_University.DsTransactions.TransactionsDataTable">
+	<summary>
+Represents the strongly named DataTable class.
+</summary>
+</member><member name="T:Rebat_University.DsTransactions.TransactionsRow">
+	<summary>
+Represents strongly named DataRow class.
+</summary>
+</member><member name="T:Rebat_University.DsTransactions.TransactionsRowChangeEvent">
+	<summary>
+Row event argument class
+</summary>
+</member><member name="T:Rebat_University.DsTransactions">
+	<summary>
+Represents a strongly typed in-memory cache of data.
+</summary>
+</member><member name="T:Rebat_University.DsTransactionsTableAdapters.TransactionsTableAdapter">
+	<summary>
+Represents the connection and commands used to retrieve and save data.
+</summary>
+</member><member name="M:Rebat_University.DsTransactionsTableAdapters.TableAdapterManager.UpdateUpdatedRows(Rebat_University.DsTransactions,System.Collections.Generic.List{System.Data.DataRow},System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Update rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.DsTransactionsTableAdapters.TableAdapterManager.UpdateInsertedRows(Rebat_University.DsTransactions,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Insert rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.DsTransactionsTableAdapters.TableAdapterManager.UpdateDeletedRows(Rebat_University.DsTransactions,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Delete rows in bottom-up order.
+</summary>
+</member><member name="M:Rebat_University.DsTransactionsTableAdapters.TableAdapterManager.GetRealUpdatedRows(System.Data.DataRow[],System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Remove inserted rows that become updated rows after calling TableAdapter.Update(inserted rows) first
+</summary>
+</member><member name="M:Rebat_University.DsTransactionsTableAdapters.TableAdapterManager.UpdateAll(Rebat_University.DsTransactions)">
+	<summary>
+Update all changes to the dataset.
+</summary>
+</member><member name="T:Rebat_University.DsTransactionsTableAdapters.TableAdapterManager.UpdateOrderOption">
+	<summary>
+Update Order Option
+</summary>
+</member><member name="T:Rebat_University.DsTransactionsTableAdapters.TableAdapterManager.SelfReferenceComparer">
+	<summary>
+Used to sort self-referenced table's rows
+</summary>
+</member><member name="T:Rebat_University.DsTransactionsTableAdapters.TableAdapterManager">
+	<summary>
+TableAdapterManager is used to coordinate TableAdapters in the dataset to enable Hierarchical Update scenarios
+</summary>
+</member><member name="T:Rebat_University.Regs.RegisterationDataTable">
+	<summary>
+Represents the strongly named DataTable class.
+</summary>
+</member><member name="T:Rebat_University.Regs.RegisterationRow">
+	<summary>
+Represents strongly named DataRow class.
+</summary>
+</member><member name="T:Rebat_University.Regs.RegisterationRowChangeEvent">
+	<summary>
+Row event argument class
+</summary>
+</member><member name="T:Rebat_University.Regs">
+	<summary>
+Represents a strongly typed in-memory cache of data.
+</summary>
+</member><member name="T:Rebat_University.RegsTableAdapters.RegisterationTableAdapter">
+	<summary>
+Represents the connection and commands used to retrieve and save data.
+</summary>
+</member><member name="M:Rebat_University.RegsTableAdapters.TableAdapterManager.UpdateUpdatedRows(Rebat_University.Regs,System.Collections.Generic.List{System.Data.DataRow},System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Update rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.RegsTableAdapters.TableAdapterManager.UpdateInsertedRows(Rebat_University.Regs,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Insert rows in top-down order.
+</summary>
+</member><member name="M:Rebat_University.RegsTableAdapters.TableAdapterManager.UpdateDeletedRows(Rebat_University.Regs,System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Delete rows in bottom-up order.
+</summary>
+</member><member name="M:Rebat_University.RegsTableAdapters.TableAdapterManager.GetRealUpdatedRows(System.Data.DataRow[],System.Collections.Generic.List{System.Data.DataRow})">
+	<summary>
+Remove inserted rows that become updated rows after calling TableAdapter.Update(inserted rows) first
+</summary>
+</member><member name="M:Rebat_University.RegsTableAdapters.TableAdapterManager.UpdateAll(Rebat_University.Regs)">
+	<summary>
+Update all changes to the dataset.
+</summary>
+</member><member name="T:Rebat_University.RegsTableAdapters.TableAdapterManager.UpdateOrderOption">
+	<summary>
+Update Order Option
+</summary>
+</member><member name="T:Rebat_University.RegsTableAdapters.TableAdapterManager.SelfReferenceComparer">
+	<summary>
+Used to sort self-referenced table's rows
+</summary>
+</member><member name="T:Rebat_University.RegsTableAdapters.TableAdapterManager">
+	<summary>
+TableAdapterManager is used to coordinate TableAdapters in the dataset to enable Hierarchical Update scenarios
+</summary>
+</member><member name="P:Rebat_University.My.Resources.Resources.ResourceManager">
+	<summary>
+  Returns the cached ResourceManager instance used by this class.
+</summary>
+</member><member name="P:Rebat_University.My.Resources.Resources.Culture">
+	<summary>
+  Overrides the current thread's CurrentUICulture property for all
+  resource lookups using this strongly typed resource class.
+</summary>
+</member><member name="T:Rebat_University.My.Resources.Resources">
+	<summary>
+  A strongly-typed resource class, for looking up localized strings, etc.
+</summary>
+</member><member name="T:Rebat_University.DSstudVacants.ViewStudVacantsDataTable">
+	<summary>
+Represents the strongly named DataTable class.
+</summary>
+</member><member name="T:Rebat_University.DSstudVacants.ViewStudVacantsRow">
+	<summary>
+Represents strongly named DataRow class.
+</summary>
+</member><member name="T:Rebat_University.DSstudVacants.ViewStudVacantsRowChangeEvent">
+	<summary>
+Row event argument class
+</summary>
+</member><member name="T:Rebat_University.DSstudVacants">
+	<summary>
+Represents a strongly typed in-memory cache of data.
+</summary>
+</member>
+</members>
+</doc>

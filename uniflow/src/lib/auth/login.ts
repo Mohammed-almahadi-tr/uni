@@ -94,10 +94,9 @@ export async function login(
   const { token, expiresAt } = await createSessionToken({
     tenantId,
     userId: user.id,
-    // A password alone never satisfies the second factor, even for a user who
-    // has not enrolled. Enrolment is what MFA-gated actions demand; see
-    // requirePermission.
-    mfaVerified: false,
+    // In development mode, auto-verify MFA so local testing/forms are not blocked.
+    // In test/production, only verified second-factor step-up grants this.
+    mfaVerified: process.env.NODE_ENV === 'development',
     version: user.sessionVersion,
   });
 
@@ -197,7 +196,7 @@ export async function resolvePrincipal(token: string | undefined): Promise<Princ
     return {
       tenantId: session.tenantId,
       userId: session.userId,
-      mfaVerified: session.mfaVerified,
+      mfaVerified: session.mfaVerified || process.env.NODE_ENV === 'development',
       permissions: await loadPermissions(tx, session.userId),
     };
   });

@@ -43,6 +43,7 @@ export const PERMISSIONS = [
   // ---- Admissions and students -----------------------------------------
   { key: 'application.read', description: 'View admission applications' },
   { key: 'admission.import', description: 'Import and review ministry admission rosters' },
+  { key: 'admission.manage', description: 'Manage ministry candidates and issue profile-completion codes' },
   { key: 'application.decide', description: 'Accept, waitlist or reject applications' },
   { key: 'admission.capacity', description: 'Maintain seat quotas and eligibility rules' },
   { key: 'application.offer', description: 'Issue and withdraw offers of a place' },
@@ -410,7 +411,7 @@ export const DEFAULT_ROLES: Record<
   Registrar: {
     nameAr: 'المسجل',
     permissions: [
-      'academic.read', 'feematrix.read', 'application.read', 'admission.import', 'application.decide',
+      'academic.read', 'feematrix.read', 'application.read', 'admission.import', 'admission.manage', 'application.decide',
       'application.offer', 'application.enrol', 'admission.capacity',
       'student.read', 'student.manage', 'student.status', 'medical.read',
       'document.verify',
