@@ -715,7 +715,7 @@ describe('a screen may be built before its phase is', () => {
 describe('the back office is declared and reachable', () => {
   it('has built every screen D4 declares', () => {
     const d4 = CONSOLE_SECTIONS.flatMap((s) => s.items).filter((i) => i.phase === 'D4');
-    expect(d4.length).toBe(21);
+    expect(d4.length).toBe(23);
     expect(d4.every(isBuilt)).toBe(true);
   });
 

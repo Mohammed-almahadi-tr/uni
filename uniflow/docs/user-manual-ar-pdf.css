@@ -1,0 +1,161 @@
+@page {
+  size: A4;
+  margin: 19mm 16mm 18mm;
+}
+
+html {
+  direction: rtl;
+}
+
+body {
+  direction: rtl;
+  color: #17202a;
+  background: #ffffff;
+  font-family: Tahoma, Arial, "Segoe UI", sans-serif;
+  font-size: 12px;
+  line-height: 1.8;
+  text-align: right;
+}
+
+h1,
+h2,
+h3 {
+  color: #123b4a;
+  font-weight: 700;
+  break-after: avoid-page;
+}
+
+h1 {
+  margin: 22mm 0 8mm;
+  padding: 11mm 8mm;
+  border-top: 5px solid #0f766e;
+  border-bottom: 1px solid #99b9b5;
+  background: #eef8f6;
+  font-size: 27px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+h1 + p {
+  margin: 0 0 15mm;
+  color: #49636d;
+  font-size: 13px;
+  line-height: 2;
+  text-align: center;
+}
+
+h2 {
+  margin: 9mm 0 3mm;
+  padding: 2.5mm 4mm;
+  border-right: 4px solid #0f766e;
+  background: #f4f8f8;
+  font-size: 19px;
+}
+
+h3 {
+  margin: 6mm 0 2mm;
+  color: #1d5d65;
+  font-size: 15px;
+}
+
+p {
+  margin: 0 0 3mm;
+}
+
+ul,
+ol {
+  margin: 1.5mm 0 4mm;
+  padding-right: 8mm;
+  padding-left: 0;
+}
+
+li {
+  margin: 0 0 1.2mm;
+  padding-right: 1.5mm;
+}
+
+strong {
+  color: #0d4e52;
+}
+
+code {
+  direction: ltr;
+  display: inline-block;
+  padding: 0.1em 0.4em;
+  border: 1px solid #d9e2e3;
+  border-radius: 4px;
+  color: #7a2c2c;
+  background: #f7f9f9;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.88em;
+  unicode-bidi: embed;
+}
+
+table {
+  width: 100%;
+  margin: 3mm 0 6mm;
+  border-collapse: collapse;
+  break-inside: avoid-page;
+  font-size: 10.5px;
+}
+
+thead {
+  display: table-header-group;
+}
+
+tr {
+  break-inside: avoid-page;
+}
+
+th,
+td {
+  padding: 2.2mm 2.6mm;
+  border: 1px solid #b9cbcc;
+  text-align: right;
+  vertical-align: top;
+}
+
+th {
+  color: #ffffff;
+  background: #176b68;
+  font-weight: 700;
+}
+
+tbody tr:nth-child(even) {
+  background: #f5f9f8;
+}
+
+a {
+  color: #0b5e75;
+  text-decoration: none;
+}
+
+blockquote {
+  margin: 4mm 0;
+  padding: 2mm 5mm;
+  border-right: 4px solid #d5a72d;
+  color: #4f4a38;
+  background: #fff9e8;
+}
+
+hr {
+  margin: 7mm 0;
+  border: 0;
+  border-top: 1px solid #cad7d8;
+}
+
+@media print {
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  h1,
+  h2,
+  h3,
+  table,
+  li {
+    orphans: 3;
+    widows: 3;
+  }
+}

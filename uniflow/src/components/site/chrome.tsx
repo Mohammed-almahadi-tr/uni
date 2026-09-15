@@ -72,7 +72,7 @@ export async function SiteHeader({
           <NavLink href="/calendar">{t('calendar')}</NavLink>
           <NavLink href="/contact">{t('contact')}</NavLink>
           <NavLink href="/portal/login">{t('portal')}</NavLink>
-          {/* Sign In & Apply buttons */}
+          {/* Staff sign-in and ministry-candidate profile portal. */}
           <Link
             href="/login"
             className="ms-1 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
@@ -80,7 +80,7 @@ export async function SiteHeader({
             {t('login')}
           </Link>
           <Link
-            href="/apply"
+            href="/candidate/profile"
             className="ms-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             {t('apply')}

@@ -15,6 +15,7 @@ export async function recordCandidateInterviewDecision(
   principal: Principal,
   input: {
     candidateId: string;
+    programmeId: string;
     decision: AdmissionDecision;
     score?: number | null;
     notes?: string | null;
@@ -53,10 +54,15 @@ export async function recordCandidateInterviewDecision(
       where: { id: input.candidateId, tenantId: principal.tenantId },
       select: { id: true, state: true, programmeId: true, interviewDecision: { select: { id: true } } },
     });
-    if (!candidate || candidate.state !== 'INTERVIEW_PENDING' || !candidate.programmeId) {
-      throw new CandidateInterviewError('Only a medically cleared candidate in the interview queue may be decided.');
+    if (!candidate || !['PROFILE_COMPLETED', 'INTERVIEW_PENDING'].includes(candidate.state)) {
+      throw new CandidateInterviewError('Only a ministry candidate who completed their profile may be decided by the registrar.');
     }
-    if (candidate.interviewDecision) throw new CandidateInterviewError('The committee has already recorded a decision for this candidate.');
+    if (candidate.interviewDecision) throw new CandidateInterviewError('The registrar has already recorded a decision for this candidate.');
+    const programme = await tx.programme.findFirst({
+      where: { id: input.programmeId, tenantId: principal.tenantId, isActive: true },
+      select: { id: true },
+    });
+    if (!programme) throw new CandidateInterviewError('Choose an active university programme.');
 
     const decision = await tx.candidateInterviewDecision.create({
       data: {
@@ -69,11 +75,12 @@ export async function recordCandidateInterviewDecision(
         discountPct: input.discountPct.toFixed(4),
         instalmentCount: input.instalmentCount,
         decidedById: principal.userId,
+        finalizedAt: input.decision === 'REJECT' ? null : new Date(),
       },
       select: { id: true },
     });
-    const nextState = input.decision === 'REJECT' ? 'REJECTED' : 'ACCEPTED';
-    await tx.ministryCandidate.update({ where: { id: candidate.id }, data: { state: nextState } });
+    const nextState = input.decision === 'REJECT' ? 'REJECTED' : 'REGISTRATION_PENDING';
+    await tx.ministryCandidate.update({ where: { id: candidate.id }, data: { programmeId: programme.id, state: nextState } });
     await audit(tx, principal.tenantId, {
       actorId: principal.userId,
       action: 'INSERT',
@@ -81,6 +88,7 @@ export async function recordCandidateInterviewDecision(
       resourceId: decision.id,
       after: {
         candidateId: candidate.id,
+        programmeId: programme.id,
         decision: input.decision,
         score: input.score ?? null,
         discountPct: input.discountPct,

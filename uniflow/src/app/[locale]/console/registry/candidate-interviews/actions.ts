@@ -18,6 +18,7 @@ export async function decideInterview(_previous: InterviewActionState, data: For
   try {
     await recordCandidateInterviewDecision(ctx.principal, {
       candidateId: str(data, 'candidateId'),
+      programmeId: str(data, 'programmeId'),
       decision: str(data, 'decision') as AdmissionDecision,
       score: scoreText ? Number(scoreText) : null,
       notes: str(data, 'notes') || null,

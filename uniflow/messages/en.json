@@ -92,7 +92,7 @@
       "contact": "Contact",
       "portal": "Portal",
       "login": "Sign In",
-      "apply": "Apply"
+      "apply": "Candidate Portal"
     },
     "sections": {
       "about": "About {university}",
@@ -187,7 +187,7 @@
       "medical": "Medical records",
       "ministryImport": "Ministry roster import",
       "candidateMedical": "Candidate medical gate",
-      "candidateInterviews": "Candidate interviews",
+    "candidateInterviews": "Registrar decisions",
       "orders": "Purchase orders",
       "payments": "Payment vouchers",
       "periods": "Fiscal periods",
@@ -540,14 +540,15 @@
       }
     },
     "candidateInterviews": {
-      "title": "Candidate interviews",
-      "subtitle": "Record the committee decision and approved financial terms. Candidates remain outside Student Self Service until registrar registration is complete.",
-      "queue": "Interview and decision queue",
+      "title": "Registrar admission decisions",
+      "subtitle": "Candidates arrive only through the ministry Excel roster. After a candidate completes their portal information, the registrar assigns the programme and records acceptance or rejection.",
+      "queue": "Candidates awaiting registrar decision",
       "search": "Search by name or national ID",
-      "empty": "No candidates are in the interview workflow.",
+      "empty": "No candidates are waiting for a registrar decision.",
       "nationalId": "National ID",
       "programme": "Programme",
-      "panel": "Committee decision",
+      "chooseProgramme": "Choose the programme assigned by the registrar",
+      "panel": "Registrar decision",
       "decision": "Decision",
       "score": "Interview score",
       "discount": "Approved discount percentage",
@@ -557,8 +558,8 @@
       "ACCEPT": "Accept",
       "CONDITIONAL_ACCEPT": "Conditional accept",
       "REJECT": "Reject",
-      "record": "Record final committee decision",
-      "recordedDecision": "Recorded committee decision",
+      "record": "Record registrar decision",
+      "recordedDecision": "Recorded registrar decision",
       "decidedBy": "Decided by",
       "decidedAt": "Decision date",
       "finalAdmission": "Finalize admission",
@@ -566,6 +567,7 @@
       "finalize": "Finalize and send to registration",
       "working": "Working…",
       "states": {
+        "PROFILE_COMPLETED": "Profile completed — awaiting registrar",
         "INTERVIEW_PENDING": "Interview pending",
         "ACCEPTED": "Accepted",
         "REJECTED": "Rejected",
@@ -1692,6 +1694,21 @@
       "MALE": "Male",
       "FEMALE": "Female"
     }
+  },
+  "candidatePortal": {
+    "title": "Ministry Candidate Portal",
+    "subtitle": "Only candidates imported from the Ministry of Higher Education can continue. Enter the one-time code issued by the university, then complete your information. You cannot apply to or choose a college here; the registrar makes the placement and admission decision.",
+    "code": "Candidate code",
+    "checking": "Checking…",
+    "continue": "Continue",
+    "nameEn": "Full name in English",
+    "guardian": "Guardian name",
+    "email": "Email",
+    "phone": "Phone",
+    "saving": "Saving…",
+    "submit": "Submit information",
+    "complete": "Your information has been received and sent to the registrar for an admission decision.",
+    "invalid": "This candidate code is invalid or has expired. Contact the admissions office."
   },
   "apply": {
     "title": "Apply for admission",

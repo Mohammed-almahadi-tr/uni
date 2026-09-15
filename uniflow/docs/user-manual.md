@@ -1,5 +1,10 @@
 # UniFlow User Manual
 
+> الدليل العربي المحدث: [دليل استخدام نظام جامعة امدرمان الاهلية](user-manual-ar.md)
+>
+> ملاحظة: القبول العام الذاتي الموضح في النسخة الإنجليزية القديمة موقوف؛
+> المسار المعتمد حالياً يبدأ حصراً من كشف الوزارة. راجع الدليل العربي أعلاه.
+
 Version: 1.0  
 Applies to: the current UniFlow web application  
 Languages: English and Arabic (`/en/...` and `/ar/...`)
