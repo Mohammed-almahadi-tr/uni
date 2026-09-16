@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
-    "vercel-build": "prisma generate && prisma migrate deploy && npm run db:roles && npm run db:sync-permissions && npm run db:check-roles && next build",
+    "prebuild": "node scripts/patch-next-global-error.mjs",
+    "build": "prisma generate && prisma migrate deploy && npm run db:roles && npm run db:sync-permissions && npm run db:check-roles && next build",
+    "vercel-build": "npm run build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
