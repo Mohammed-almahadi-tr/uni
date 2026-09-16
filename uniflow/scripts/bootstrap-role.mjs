@@ -32,7 +32,15 @@ import 'dotenv/config';
 import pg from 'pg';
 
 const APP_ROLE = process.env.APP_DB_ROLE ?? 'uniflow_app';
-const APP_PASSWORD = process.env.APP_DB_PASSWORD ?? 'uniflow_local_dev';
+const APP_PASSWORD = process.env.APP_DB_PASSWORD;
+
+if (!/^[a-z_][a-z0-9_]*$/.test(APP_ROLE)) {
+  throw new Error('APP_DB_ROLE must be a lowercase PostgreSQL identifier');
+}
+if (!APP_PASSWORD || APP_PASSWORD.length < 16) {
+  throw new Error('APP_DB_PASSWORD must be set to at least 16 characters');
+}
+const passwordSql = APP_PASSWORD.replaceAll("'", "''");
 
 const ownerUrl = process.env.DIRECT_URL;
 if (!ownerUrl) throw new Error('DIRECT_URL is not set');
@@ -50,10 +58,11 @@ for (const url of targets) {
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${APP_ROLE}') THEN
-          CREATE ROLE ${APP_ROLE} LOGIN PASSWORD '${APP_PASSWORD}'
+          CREATE ROLE ${APP_ROLE} LOGIN PASSWORD '${passwordSql}'
             NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
         ELSE
-          ALTER ROLE ${APP_ROLE} NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+          ALTER ROLE ${APP_ROLE} LOGIN PASSWORD '${passwordSql}'
+            NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
         END IF;
       END
       $$;

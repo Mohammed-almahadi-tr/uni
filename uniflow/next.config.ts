@@ -4,6 +4,12 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
+  // This repository contains historical applications with their own lockfiles.
+  // Keep Turbopack scoped to the deployable UniFlow application so Vercel does
+  // not infer the repository root from a parent package-lock.json.
+  turbopack: {
+    root: process.cwd(),
+  },
   // Argon2 is a native addon; it must not be bundled into the server build.
   serverExternalPackages: ['@node-rs/argon2'],
   // Ministry workbooks are posted through a Server Action. Keep this below
